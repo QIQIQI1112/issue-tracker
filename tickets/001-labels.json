@@ -1,0 +1,13 @@
+{
+  "id": "exercise-001",
+  "title": "Add issue labels and label filtering",
+  "goal": "Assign short labels to issues through the UI and filter the issue list by one label.",
+  "acceptance": [
+    "Labels assigned through the UI survive a full server restart.",
+    "A selected label filter shows only matching issues.",
+    "Empty and overlong labels are rejected.",
+    "Existing issue behaviors remain working."
+  ],
+  "verificationCommand": "npm run verify",
+  "notes": "Example exercise brief only. No autonomous dispatcher consumes this file yet."
+}
