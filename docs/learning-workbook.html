@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Engineering Loop Lab — assignment workbook</title>
+  <style>
+    :root { color-scheme: light; --paper:#f5f5f1; --surface:#fff; --ink:#192c2a; --muted:#5d6d69; --line:#d9e1db; --accent:#246c57; --soft:#eaf3ed; --field:#fff; --focus:#387d65; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.6 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    button,input,textarea { font:inherit; }
+    button,a,input,textarea,summary { -webkit-tap-highlight-color:transparent; }
+    button { cursor:pointer; }
+    a { color:var(--accent); text-underline-offset:3px; }
+    button:focus-visible,a:focus-visible,summary:focus-visible,input:focus-visible,textarea:focus-visible { outline:3px solid var(--focus); outline-offset:3px; }
+    h1,h2,h3,p { margin-top:0; }
+    h1 { font-size:clamp(26px,3.4vw,38px); line-height:1.2; letter-spacing:-1px; margin-bottom:12px; }
+    h2 { font-size:clamp(24px,3vw,32px); line-height:1.25; letter-spacing:-.6px; margin-bottom:12px; }
+    h3 { font-size:17px; margin-bottom:10px; }
+    p { margin-bottom:16px; }
+    .shell { display:grid; grid-template-columns:258px minmax(0,1fr); min-height:100vh; }
+    aside { min-width:0; border-right:1px solid var(--line); padding:30px 20px; background:var(--surface); }
+    .sidebar-inner { position:sticky; top:30px; }
+    .brand { display:flex; align-items:center; gap:10px; font-weight:650; font-size:18px; margin-bottom:26px; }
+    .brand-mark { width:32px; height:32px; border-radius:9px; background:var(--ink); color:var(--surface); display:grid; place-items:center; font-size:22px; line-height:1; }
+    .eyebrow { color:var(--muted); text-transform:uppercase; letter-spacing:1.5px; font-size:11px; font-weight:650; margin-bottom:10px; }
+    .path-note,.progress-text,.small { font-size:13px; color:var(--muted); }
+    .path-note { margin-bottom:22px; }
+    .progress-track { height:5px; background:var(--line); border-radius:8px; overflow:hidden; margin:12px 0 8px; }
+    .progress-fill { height:100%; background:var(--accent); width:0; }
+    nav { display:grid; gap:4px; margin:24px -7px; }
+    .chapter-button { display:flex; gap:10px; align-items:center; text-align:left; border:0; border-radius:7px; background:transparent; color:var(--muted); padding:11px 9px; font-size:14px; line-height:1.35; }
+    .chapter-button[aria-current="step"] { background:var(--soft); color:var(--ink); font-weight:600; }
+    .chapter-number { color:var(--muted); font:12px ui-monospace,SFMono-Regular,Consolas,monospace; }
+    .ready-dot { margin-left:auto; color:var(--accent); }
+    .sidebar-footer { border-top:1px solid var(--line); padding-top:16px; font-size:12px; color:var(--muted); }
+    main { min-width:0; padding:38px clamp(20px,4.5vw,64px) 60px; }
+    .main-inner { max-width:920px; margin:auto; }
+    .intro { max-width:660px; color:var(--muted); margin-bottom:22px; }
+    .toolbar { display:flex; flex-wrap:wrap; gap:9px; margin-bottom:10px; }
+    .button { border:1px solid var(--line); background:var(--surface); color:var(--ink); padding:9px 14px; border-radius:7px; font-size:13px; font-weight:550; }
+    .button.primary { background:var(--ink); border-color:var(--ink); color:var(--surface); }
+    .button:disabled { opacity:.5; cursor:default; }
+    .save-status { min-height:24px; font-size:12px; color:var(--muted); margin-bottom:12px; overflow-wrap:anywhere; }
+    .storage-note { font-size:12px; color:var(--muted); max-width:720px; margin-bottom:14px; }
+    details { margin:12px 0; }
+    summary { cursor:pointer; color:var(--accent); font-size:14px; width:fit-content; }
+    details p { margin:12px 0; }
+    .backup-tools { display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:12px 0; }
+    .import-label { font-size:13px; display:grid; gap:6px; }
+    input[type="file"] { max-width:100%; font-size:12px; }
+    .orientation { margin:20px 0 32px; padding:17px 0; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+    .orientation summary { color:var(--ink); font-weight:600; }
+    .orientation ol { padding-left:22px; margin-bottom:10px; font-size:14px; }
+    .orientation li { padding:3px 0; }
+    .loop { display:flex; flex-wrap:wrap; gap:8px; align-items:center; color:var(--muted); font:12px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace; margin:14px 0; }
+    .loop span { padding:4px 7px; background:var(--soft); border-radius:4px; color:var(--ink); }
+    .assignment[hidden] { display:none; }
+    .assignment-header { margin-bottom:24px; }
+    .assignment-meta { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:12px; color:var(--muted); font-size:12px; }
+    .phase { padding:3px 8px; background:var(--soft); color:var(--accent); border-radius:4px; font-weight:600; }
+    .objective { max-width:740px; color:var(--muted); font-size:16px; }
+    .resources { display:flex; flex-wrap:wrap; gap:6px 14px; margin:16px 0; font-size:12px; }
+    code { font: .86em ui-monospace,SFMono-Regular,Consolas,monospace; background:var(--soft); border-radius:3px; padding:2px 5px; overflow-wrap:anywhere; }
+    pre { background:var(--soft); padding:13px 16px; border-radius:5px; white-space:pre-wrap; overflow-wrap:anywhere; font-size:13px; }
+    pre code { background:none; padding:0; }
+    .task-section { margin:24px 0 30px; }
+    .task-section ol,.task-section ul { padding-left:22px; margin:0; }
+    .task-section li { margin-bottom:10px; }
+    .evidence { background:var(--soft); padding:16px 20px; border-radius:7px; margin:22px 0 30px; font-size:14px; }
+    .evidence p { margin:0; }
+    .question { margin:28px 0; }
+    .question label { display:block; font-size:16px; font-weight:650; margin-bottom:7px; }
+    .question-number { color:var(--accent); font:12px ui-monospace,SFMono-Regular,Consolas,monospace; margin-right:7px; }
+    .question-prompt { color:var(--muted); font-size:14px; margin-bottom:12px; }
+    textarea { display:block; width:100%; min-height:144px; resize:vertical; border:1px solid var(--line); border-radius:7px; padding:13px 15px; color:var(--ink); background:var(--field); font-size:14px; line-height:1.6; }
+    textarea::placeholder { color:var(--muted); opacity:.85; }
+    .hint { font-size:13px; }
+    .hint summary { font-size:12px; }
+    .review-box { padding:20px 0; border-top:1px solid var(--line); margin-top:32px; }
+    .review-box ul { font-size:14px; padding-left:20px; margin-bottom:18px; }
+    .ready-label { display:flex; align-items:flex-start; gap:10px; font-size:14px; font-weight:600; }
+    .ready-label input { width:18px; height:18px; accent-color:var(--accent); margin:2px 0 0; flex:none; }
+    .ready-explanation { font-size:12px; color:var(--muted); margin:7px 0 0 28px; }
+    .pagination { display:flex; align-items:center; justify-content:space-between; gap:12px; border-top:1px solid var(--line); margin-top:30px; padding-top:20px; }
+    .page-position { font-size:12px; color:var(--muted); }
+    footer { color:var(--muted); font-size:12px; margin-top:32px; }
+    @media (prefers-color-scheme:dark) { :root { color-scheme:dark; --paper:#15201e; --surface:#1a2925; --ink:#e0eae3; --muted:#a8bbb1; --line:#385048; --accent:#9bd2b1; --soft:#243c32; --field:#192823; --focus:#9bd2b1; } }
+    @media(max-width:820px) { .shell { grid-template-columns:1fr; } aside { padding:18px 20px; border-right:0; border-bottom:1px solid var(--line); } .sidebar-inner { position:static; } .brand { margin-bottom:8px; } .path-note,.sidebar-footer,aside .eyebrow { display:none; } nav { display:flex; overflow-x:auto; margin:14px -4px 0; padding-bottom:6px; } .chapter-button { flex:0 0 auto; max-width:205px; } .progress-track { margin-top:10px; } main { padding:26px 20px 42px; } }
+    @media(max-width:430px) { .toolbar .button { flex:1 1 auto; } .page-position { display:none; } .backup-tools { align-items:flex-start; } .evidence { padding:14px 16px; } }
+    @media print { :root { --paper:#fff; --surface:#fff; --ink:#111; --muted:#444; --line:#bbb; --soft:#f3f3f3; --field:#fff; } body { font-size:11pt; } .shell { display:block; } aside,.toolbar,.save-status,.storage-note,.backup,.pagination,footer,.hint { display:none!important; } main { padding:0; } .orientation { display:none; } .assignment[hidden] { display:block!important; } .assignment { break-before:page; } textarea { min-height:100px; border:1px solid #aaa; font-size:10pt; } .question { break-inside:avoid; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside aria-label="Workbook overview">
+      <div class="sidebar-inner">
+        <div class="brand"><span class="brand-mark" aria-hidden="true">↻</span>Loop Lab</div>
+        <p class="path-note">From a working app to an engineering loop you can inspect and trust.</p>
+        <div class="eyebrow">Your assignments</div>
+        <div class="progress-track" role="progressbar" aria-label="Assignments marked ready for review" aria-valuemin="0" aria-valuemax="8" aria-valuenow="0"><div class="progress-fill" id="progress-fill"></div></div>
+        <div class="progress-text" id="progress-text">0 of 8 ready for review</div>
+        <nav id="chapter-nav" aria-label="Assignments"></nav>
+        <div class="sidebar-footer">Readiness is your own assessment.<br>Answers are reviewed with evidence, not automatically graded.</div>
+      </div>
+    </aside>
+    <main id="main-content">
+      <div class="main-inner">
+        <div class="eyebrow">A workbook for /Users/louis/issue-tracker</div>
+        <h1>Engineering Loop Lab</h1>
+        <p class="intro">Understand one change. Prove it. Give an agent the same tools. Then build a controller that decides what happens next.</p>
+        <div class="toolbar" aria-label="Save and export your work">
+          <button class="button primary" id="save-html" type="button">Save answered HTML</button>
+          <button class="button" id="export-review" type="button">Export answers for review</button>
+        </div>
+        <div class="save-status" id="save-status" role="status" aria-live="polite">Your answers will autosave in this browser when storage is available.</div>
+        <p class="storage-note">Typing does not rewrite this HTML file. <strong>Save answered HTML</strong> downloads a portable copy containing your answers. <strong>Export answers for review</strong> downloads a Markdown file you can bring back to this chat. Keep an exported copy when you finish a session.</p>
+        <details class="backup">
+          <summary>Backup and restore</summary>
+          <div class="backup-tools">
+            <button class="button" id="export-json" type="button">Download JSON backup</button>
+            <label class="import-label" for="import-file">Restore a JSON backup<input type="file" id="import-file" accept=".json,application/json"></label>
+          </div>
+          <p class="small">Restoring replaces this workbook's current answers. Invalid backups are rejected before any answer changes.</p>
+        </details>
+        <details class="orientation" open>
+          <summary>How to work through this lab</summary>
+          <ol>
+            <li>Start with assignment 01. Work at your own pace; the time estimates are guides.</li>
+            <li>Write your prediction before asking AI to explain it. Then compare the explanation with the code and observed behavior.</li>
+            <li>Use AI as a tutor for 01–04. In 05, you can write the implementation yourself or direct an agent, but you own the contract and evidence.</li>
+            <li>Include file/function names, commands, actual results, and evidence paths. “It works” is not an answer.</li>
+            <li>Mark an assignment ready when you can explain your answers. Export that assignment's answers and ask for review before moving on if you want feedback.</li>
+          </ol>
+          <div class="loop" aria-label="The learning sequence"><span>Understand</span>→<span>Specify</span>→<span>Change</span>→<span>Verify</span>→<span>Decide</span></div>
+          <p class="small">This workbook gives assignments; it does not run commands, edit your application, or start agents. Practical work follows AGENTS.md. Use disposable data and isolated instances; keep evidence after cleanup.</p>
+        </details>
+        <div id="assignments"></div>
+        <div class="pagination">
+          <button class="button" id="previous" type="button">← Previous assignment</button>
+          <span class="page-position" id="page-position">Assignment 1 of 8</span>
+          <button class="button" id="next" type="button">Next assignment →</button>
+        </div>
+        <footer>Built for the stage-one issue tracker baseline. As the repository changes, record the revision you actually studied and tested. Your written answers are not sent anywhere by this workbook.</footer>
+      </div>
+    </main>
+  </div>
+  <script id="embedded-state" type="application/json">{"version":1,"workbookId":"issue-tracker-engineering-loop-lab","updatedAt":null,"answers":{},"ready":{},"active":"a1"}</script>
+  <script>
+  (() => {
+    'use strict';
+    const assignments = [
+      {
+        id:'a1', title:'Map the system', phase:'Understand', time:'25–40 minutes',
+        objective:'Separate the product, the verification harness, and the future controller. Establish a baseline you can point to.',
+        resources:[['README','../README.md'],['Repository rules','../AGENTS.md'],['Architecture','architecture.md'],['Controller boundary','../factory/README.md']],
+        tasks:[
+          'Read the four references. Draw a small map with three areas: application, verifier, controller. Name which areas contain executable code today.',
+          'Run npm run verify from the repository root. Open .runs/latest.json, follow summaryPath, and inspect that run’s summary.json and browser-results.json.',
+          'Identify three different kinds of data: issues stored by the product, development requests such as the labels ticket, and a future controller’s attempt state. Decide where each belongs.'
+        ],
+        commands:['npm run verify'],
+        evidence:'A system map plus the exact baseline summary path and tested Git revision. A screenshot alone is not sufficient.',
+        questions:[
+          {id:'system',title:'What system do you have today?',prompt:'Describe the three areas in your own words. Give at least two concrete files for the app and two for the verifier. What controller behavior is still missing?',placeholder:'Application: …\nVerifier: …\nController: …',hint:'Look for who performs an action versus who decides whether to repeat it. A script that runs tests is not automatically a task controller.'},
+          {id:'baseline',title:'What is your baseline evidence?',prompt:'Record the command, summary path, commit, dirty flag, each gate’s result, and browser failure/skip counts. What exactly can you conclude from this evidence?',placeholder:'Command:\nSummary path:\nRevision / dirty:\nGate results:\nBrowser results:\nConclusion:'},
+          {id:'data',title:'Where does each kind of state belong?',prompt:'Explain why a demo issue, a development ticket, and an attempt record should not all live in the application’s resettable SQLite database.',placeholder:'Product records belong …\nDevelopment requests belong …\nAttempt records belong …\nReason:'},
+          {id:'questions',title:'What remains unclear?',prompt:'List up to three unfamiliar concepts. Write your current guess for each before requesting an explanation.',placeholder:'Concept → my current understanding → question'}
+        ],
+        rubric:['Your map distinguishes running the product from checking it and deciding what to do next.','Your evidence identifies the files and revision actually tested.','You can explain the difference between product data and controller state.']
+      },
+      {
+        id:'a2', title:'Trace one user action', phase:'Understand', time:'40–60 minutes',
+        objective:'Follow one issue from the browser to SQLite and back. Understand the failure path as well as the success path.',
+        resources:[['IssueForm','../src/ui/IssueForm.tsx'],['App','../src/ui/App.tsx'],['Browser client','../src/ui/client.ts'],['HTTP API','../src/api.ts'],['Domain','../src/domain.ts'],['SQLite store','../src/storage.ts'],['Browser proof','../acceptance/ui.spec.ts']],
+        tasks:[
+          'Read the create path in the listed files. Predict what happens when the title contains spaces around valid text.',
+          'Run the focused create/reload/edit/delete browser check. Follow its assertions: which verify visible behavior, which verify HTTP behavior, and which verify persistence?',
+          'Read the invalid-body API check. Explain how invalid input is rejected even when a caller bypasses the form. Trace the error back to the browser message.',
+          'Read the PATCH path. Predict what happens to description and priority when only title is supplied.'
+        ],
+        commands:["npm run test:e2e -- acceptance/ui.spec.ts --grep 'create, reload'","node --import tsx --test --test-name-pattern='API validates IDs' tests/api.test.ts"],
+        evidence:'A numbered trace naming the real functions and request/response shapes, plus the focused check results. These commands use owned test instances.',
+        questions:[
+          {id:'success',title:'Trace a successful create.',prompt:'Start at submit in IssueForm. End at the new issue displayed in App. Name each function, the HTTP method/path, validation, storage write, response status, and UI update.',placeholder:'1. User …\n2. Function …\n3. Request …\n4. Validation …\n5. Storage …\n6. Response …\n7. UI …'},
+          {id:'rejection',title:'Trace a rejected create.',prompt:'Explain both paths: a blank title entered into the form, and an invalid title sent directly to the API. In each path, does an HTTP request occur and does SQLite change?',placeholder:'Form path:\nDirect API path:\nEvidence:',hint:'Client validation helps the user. Server validation must still protect the data when the client is bypassed.'},
+          {id:'patch',title:'What does an omitted PATCH field mean?',prompt:'Use a concrete issue with title, description, and priority. Predict the result of PATCH with only a new title. Point to the code that preserves the other values.',placeholder:'Before:\nRequest:\nAfter:\nResponsible code:'},
+          {id:'proof',title:'What does the browser check actually prove?',prompt:'Choose three assertions from the create/reload/edit/delete test. Explain the observable claim behind each and one behavior that test does not prove.',placeholder:'Assertion → claim\nAssertion → claim\nAssertion → claim\nNot established by this test:'}
+        ],
+        rubric:['The trace matches the actual functions, not just the architecture diagram.','You distinguish client-side rejection from server-side rejection.','You understand partial updates and what reload evidence does and does not establish.']
+      },
+      {
+        id:'a3', title:'Define boundaries and contracts', phase:'Specify', time:'45–60 minutes',
+        objective:'Turn “add labels” into observable rules. Decide who owns each responsibility before any implementation.',
+        resources:[['Architecture','architecture.md'],['Existing exercise','exercises.md'],['Example ticket','../tickets/001-labels.json'],['Domain','../src/domain.ts'],['Lint boundaries','../eslint.config.js']],
+        tasks:[
+          'Write a one-sentence definition of a boundary and a contract, using an example from this repository.',
+          'Draft the labels contract. Set a maximum length; decide trimming, case sensitivity, duplicates, maximum labels if needed, create defaults, and PATCH behavior. Distinguish an empty list from an empty label.',
+          'Include existing databases: how will an issue created before labels exist behave after the change? Do not use reset as a migration strategy.',
+          'Create a behavior/check matrix. Include assign, replace, clear, invalid input, filtering, and restart persistence. Keep existing required assertions intact. This is a proposed feature contract to review before coding.'
+        ],
+        evidence:'A proposed labels contract, a responsibility map, and a matrix connecting each rule to an observable check.',
+        questions:[
+          {id:'terms',title:'How do boundary, contract, and proof differ?',prompt:'Define each term, then give a specific example from the current issue title behavior.',placeholder:'Boundary:\nContract:\nProof:'},
+          {id:'rules',title:'What is your labels contract?',prompt:'Write precise rules for valid labels, normalization, duplicates, create defaults, PATCH omission versus [], filtering, and existing issues. Use example input and expected output for ambiguous cases.',placeholder:'Valid values and limits:\nNormalization / duplicates:\nCreate default:\nPATCH omitted:\nPATCH []:\nFilter semantics:\nExisting issue behavior:',hint:'“Short labels” and “matching issues” do not specify length or case rules. Different reasonable implementations can disagree unless you settle them.'},
+          {id:'ownership',title:'Which layer owns each responsibility?',prompt:'Map validation, database representation/migration, HTTP error translation, form behavior, filtering, and acceptance proof to files. Which import directions are forbidden, and what enforces them?',placeholder:'Responsibility → file → reason\nForbidden dependency → enforcement'},
+          {id:'matrix',title:'How will each rule be proved?',prompt:'For at least six behaviors, state the setup, action, exact expected outcome, and check level. Include rejection without writes and persistence across a real restart.',placeholder:'Behavior | Setup | Action | Expected outcome | Check\n…'}
+        ],
+        rubric:['Two implementers could use your rules and agree on the expected results.','Validation is owned by the domain; HTTP, storage, and UI keep their own responsibilities.','The matrix includes bad input, clearing, existing data, and full restart persistence.']
+      },
+      {
+        id:'a4', title:'Audit the evidence', phase:'Verify', time:'35–50 minutes',
+        objective:'Learn when green output is sufficient, when it is incomplete, and what a controller must verify independently.',
+        resources:[['Verification contract','verification.md'],['Verifier','../scripts/verify.mjs'],['Playwright config','../playwright.config.ts'],['Owned workspace','../acceptance/workspace.ts'],['Restart check','../acceptance/persistence.spec.ts']],
+        tasks:[
+          'Follow one actual run from .runs/latest.json to its summary, browser report, logs, and a trace. Inspect at least one trace with Playwright show-trace.',
+          'Read verify.mjs. List exactly what it checks automatically and what the documentation currently leaves you to inspect.',
+          'Compare page reload, closing/reopening IssueStore, and stopping/restarting the server. State the different failure each can expose.',
+          'Evaluate these hypothetical reports without changing the acceptance suite: all commands exit zero but a required test was skipped; green results belong to an older revision; the worker says done but has no artifacts; a red test fails because Chromium is missing.'
+        ],
+        evidence:'An evidence index and a decision for each hypothetical report, justified by the verification contract.',
+        questions:[
+          {id:'index',title:'Where is the evidence and what does it establish?',prompt:'Record one real summary path, browser report path, log path, and trace path. Explain the purpose of each and what you observed in the trace.',placeholder:'Summary →\nBrowser report →\nLog →\nTrace →'},
+          {id:'gate',title:'What does the verifier enforce today?',prompt:'Separate automatically enforced conditions from documented inspection requirements. What additional checks would a controller need before trusting a passing run?',placeholder:'Enforced now:\nRequires inspection now:\nProposed controller conditions:',hint:'Exit code zero and “all required behaviors were checked” are separate claims. A test count alone cannot establish that the required checks ran.'},
+          {id:'decisions',title:'Would you accept these reports?',prompt:'For each of the four scenarios, choose accept, repair, or stop/report. Explain the next action and how you would avoid mistaking an environment failure for a feature failure.',placeholder:'Skipped required test:\nOlder revision:\nNo artifacts:\nMissing Chromium:'},
+          {id:'restart',title:'Why test a full server restart?',prompt:'Compare page reload, reopening the store, and restarting the server. Which paths are covered in this repository, and which proof would the labels feature require?',placeholder:'Page reload proves …\nStore reopen proves …\nServer restart proves …\nLabels need …'}
+        ],
+        rubric:['Your decision depends on artifacts, tested revision, and required behavior coverage.','You do not treat an unrelated environment error as the expected failing feature check.','You can explain why reload and restart checks are different.']
+      },
+      {
+        id:'a5', title:'Implement one proved change', phase:'Practice', time:'2–3 focused sessions',
+        objective:'Complete the labels exercise as a sequence of small, observable changes. Experience one whole engineering loop before automating it.',
+        resources:[['Repository workflow','../AGENTS.md'],['Labels exercise','exercises.md'],['API tests','../tests/api.test.ts'],['Storage tests','../tests/storage.test.ts'],['Browser checks','../acceptance/ui.spec.ts'],['Restart check','../acceptance/persistence.spec.ts']],
+        tasks:[
+          'Review the feature contract from assignment 03. Work on a learning branch or isolated checkout. If another worker runs in parallel, give it its own worktree, ports, and database.',
+          'Add one new failing behavior check for assigning one label through the API. Run it and record the actual failure. Confirm the failure is the missing behavior, not a broken import, missing browser, or occupied port.',
+          'Implement the smallest domain/storage/API path that satisfies that behavior. Prove that an existing issue/database is preserved when the schema gains labels. Re-run the focused check and existing tests.',
+          'Add failing browser checks for label editing and filtering, then implement the UI. Cover clearing labels and rejected values according to your contract. Add the full server-restart proof.',
+          'Run npm run verify. Inspect the artifacts and diff. Obtain independent review before committing; record findings and fixes. Keep proposed changes to required criteria separate from the implementation.'
+        ],
+        commands:['npm test','npm run verify'],
+        evidence:'The original failing check and output, the passing focused result, migration/old-data proof, final verification artifacts, and independent review findings.',
+        questions:[
+          {id:'red',title:'What was the first expected failure?',prompt:'Record the new check, command, expected result, actual failure, and why it demonstrated the missing feature. Preserve its log or evidence path.',placeholder:'Check / command:\nExpected result:\nActual failure:\nWhy this failure is relevant:\nEvidence path:'},
+          {id:'green',title:'What was the smallest passing change?',prompt:'Describe the data shape, files changed, and why each belongs to its layer. Explain how old records survived and how the focused check turned green.',placeholder:'Data shape:\nFiles and responsibility:\nExisting data / migration proof:\nFocused result:'},
+          {id:'final',title:'What proves the complete feature?',prompt:'Record editing/filtering/invalid-input/clearing/restart evidence and the final full summary path, tested revision, and dirty flag. Explain how that evidence relates to the final patch.',placeholder:'UI / invalid input / filtering:\nClear behavior:\nRestart / existing data:\nFull verification:\nRevision / dirty / patch relation:'},
+          {id:'interventions',title:'Where did you have to intervene?',prompt:'Record each time you supplied a command, explained a boundary, relayed a log, or rescued state. Include review findings. For each repeatable problem, propose a script, check, or focused document.',placeholder:'Intervention / review finding → cause → improvement',hint:'If you directed an agent, make it return concrete evidence. Your task is to explain why the evidence is sufficient, even if you did not type the implementation.'}
+        ],
+        rubric:['You observed an expected failing behavior check before implementation.','Labels work through the real UI/API and survive a full server restart; existing records survive the schema change.','Existing acceptance checks remain intact; the final evidence and independent review describe the actual patch.']
+      },
+      {
+        id:'a6', title:'Remove the human relay', phase:'Delegate', time:'45–75 minutes',
+        objective:'Give an agent enough context and tools to verify a feature without relying on you to drive the app or relay debugging output.',
+        resources:[['Operating commands','../README.md'],['Verification guide','verification.md'],['UI acceptance','../acceptance/ui.spec.ts'],['Workspace ownership','../acceptance/workspace.ts'],['Intervention record','exercises.md']],
+        tasks:[
+          'Write one short feature map for labels: user entry points, prerequisites, actual accessible selectors, success/cancel/error/empty paths, expected visible state, persistence checks, and evidence locations.',
+          'Write a verification recipe using existing scripts: launch/readiness, expected instance identity, drive, observe, cleanup. Specify the owned worktree, ports, database, and browser context. Do not ask an agent to drive your live browser profile.',
+          'Give one agent a verification-only task for the feature already implemented. Require it to read the map, run the real checks, and return artifact paths. Tell it not to edit code or acceptance criteria during this exercise.',
+          'Record every clarification or manual rescue you still supplied. Improve only the missing operating procedure or context, then repeat the verification-only task once if those improvements are material.'
+        ],
+        evidence:'Your feature map, exact delegation prompt, agent artifact report, and an intervention record from the trial.',
+        questions:[
+          {id:'map',title:'Can another agent find and drive the feature?',prompt:'Write the labels feature map. Use real control names and selectors from your implementation. Include more than the happy path.',placeholder:'User entry points:\nPrerequisites:\nActions / selectors:\nSuccess / cancel / error / empty:\nPersistence proof:\nEvidence paths:'},
+          {id:'recipe',title:'How will it operate an owned instance?',prompt:'Give the launch/check/drive/observe/cleanup recipe. Explain how it avoids stale instances, shared data, and deleting its evidence.',placeholder:'Launch and readiness:\nIdentity / isolation:\nDrive and observe:\nCleanup:\nRetained evidence:'},
+          {id:'prompt',title:'What exact task will you delegate?',prompt:'Write the prompt you used. Define the goal, allowed actions, fixed success criteria, evidence requirements, and when the agent should stop/report.',placeholder:'Verify …\nYou may …\nRequired proof …\nDo not change …\nStop/report when …'},
+          {id:'trial',title:'What happened without the human relay?',prompt:'Record the returned paths and inspect them yourself. How many interventions were needed, why, and what did you improve? State what remains unproven.',placeholder:'Agent evidence:\nMy inspection:\nInterventions:\nImprovements / repeat result:\nStill unproven:'}
+        ],
+        rubric:['The map refers to the actual feature and its entry points.','The agent can operate isolated instances and retain evidence after cleanup.','Your conclusion comes from inspecting artifacts, not the agent’s completion message.']
+      },
+      {
+        id:'a7', title:'Design the controller', phase:'Design', time:'60–90 minutes',
+        objective:'Describe the deterministic rules around the worker: task state, evidence ownership, repair limits, and stopping conditions.',
+        resources:[['Controller boundary','../factory/README.md'],['Example request','../tickets/001-labels.json'],['Verifier','../scripts/verify.mjs'],['Verification contract','verification.md']],
+        tasks:[
+          'Draw a single-ticket state machine. Include preparation, worker execution, verification, bounded repair, review readiness, and a stopped/blocked report. Make failure transitions explicit.',
+          'Define the ticket and attempt record fields. Store controller state outside the worker’s writable checkout and outside the resettable application database.',
+          'Define who owns the accepted contract and verification runner. Protect required checks, verification scripts, package commands, and gate configuration from worker edits. New criteria must be reviewed separately. Explain how a trusted runner executes checks against the candidate app.',
+          'Set limits for your first controller: one worker at a time, at most three worker attempts, explicit worker/verifier timeouts, and no automatic merge or deployment. Distinguish failed product checks from invalid/missing/stale evidence.',
+          'Define the final result. Bind it to the tested candidate revision or snapshot. Require fresh verification after any integration/change that produces a different candidate.'
+        ],
+        evidence:'A state diagram or transition table, record shapes, ownership rules, decision conditions, and explicit limits.',
+        questions:[
+          {id:'states',title:'What are the states and allowed transitions?',prompt:'Use “state + event → next state + action”. Include a verifier failure, worker crash, timeout, missing artifacts, attempt exhaustion, and a candidate needing human review.',placeholder:'prepared + … → …\nworking + … → …\nverifying + … → …\nrepairing + … → …\n…',hint:'A worker’s “done” can be an event that starts verification. It must not itself create a successful terminal state.'},
+          {id:'records',title:'What must the controller remember?',prompt:'Define ticket and attempt fields. Include accepted contract identity, base/candidate identity, workspace/ports/database, process ownership, times, check results, artifacts, and reasons for decisions.',placeholder:'Ticket fields:\nAttempt fields:\nState location:\nCandidate/evidence binding:'},
+          {id:'trust',title:'Who controls the proof?',prompt:'Explain how you prevent the worker from relaxing required checks or substituting an older green report. What happens if the worker modifies a protected file or a required check is absent/skipped?',placeholder:'Accepted contract owner:\nTrusted runner / protected files:\nEvidence validation:\nMissing / skipped / modified behavior:'},
+          {id:'limits',title:'When does the loop stop?',prompt:'Write the three-attempt and timeout rules, repair inputs, review gate, and final report shape. How will cleanup retain evidence while stopping only owned processes?',placeholder:'Attempt / timeout limits:\nRepair feedback:\nReview / integration rule:\nStopped report:\nCleanup:'}
+        ],
+        rubric:['Every retry consumes a bounded attempt; terminal states have explicit conditions.','The worker owns implementation actions but not success criteria or completion state.','Stale, skipped, missing, or untrusted evidence cannot become a verified result.']
+      },
+      {
+        id:'a8', title:'Build one bounded loop', phase:'Build', time:'Several focused sessions',
+        objective:'Implement your design for one ticket, prove the controller’s decisions with a deterministic worker, then connect one actual AI worker.',
+        resources:[['Operating boundaries','../AGENTS.md'],['Controller responsibilities','../factory/README.md'],['Current verifier','../scripts/verify.mjs'],['Verification criteria','verification.md']],
+        tasks:[
+          'Begin with a controller-owned decision function and a deterministic test worker. The test worker emits planned outcomes; it is a fixture for controller behavior, not proof that the product feature works.',
+          'Write failing checks for the decision cases listed below before implementation. Implement the smallest state machine, append-only attempt evidence, timeouts, and owned cleanup that pass them.',
+          'Create one isolated worktree with distinct ports/database for a reviewed ticket. Pin the approved acceptance contract/runner outside the worker edit scope. Launch a worker through a narrow adapter: approved ticket/context in, exit status and candidate patch out. The controller then runs and validates the trusted verifier itself.',
+          'Connect one real AI worker using that adapter. Choose a small new ticket after labels, such as a clear-labels form action if it does not already exist. Define and review its contract first; use the existing full suite plus its fixed ticket checks.',
+          'Demonstrate a real change reaching review readiness with valid evidence. Also demonstrate a failure consuming repair attempts and stopping at the limit using the deterministic worker. Inspect the final diff and obtain independent review before committing. Stop before publication, merge, deployment, or non-disposable data operations unless authorized.'
+        ],
+        evidence:'Controller behavior-check results, a real candidate patch and trusted product verification, attempt history, final decision, review findings, and evidence retained after cleanup.',
+        questions:[
+          {id:'checks',title:'Which controller decisions did you prove?',prompt:'For each case, give the expected transition and actual check result: genuine pass, product failure then repair/pass, all commands green but a required check skipped, stale revision, missing report, protected-file edit, worker/verifier timeout, and three attempts exhausted.',placeholder:'Case | Expected transition | Actual result | Evidence\n…'},
+          {id:'implementation',title:'How is your controller implemented?',prompt:'Record entry point, commands, state/evidence location, worker adapter interface, verifier ownership, and timeout/cleanup handling. Show why the worker cannot declare success on its own.',placeholder:'Entry point / invocation:\nState / evidence:\nWorker interface:\nTrusted verifier:\nTimeouts / cleanup:\nCompletion authority:'},
+          {id:'real-run',title:'What happened in the first real AI run?',prompt:'Record the approved ticket/contract, worker attempts, candidate identity, trusted verification summary, final decision, diff, and review. State any human intervention and the limits of what this run establishes.',placeholder:'Ticket / accepted contract:\nAttempts / interventions:\nCandidate / artifacts:\nFinal decision / review:\nWhat this proves and does not prove:'},
+          {id:'retrospective',title:'What would you improve before adding a second worker?',prompt:'Choose at most three improvements based on observed failures or bottlenecks. Explain the evidence behind each. What would you measure across several tickets before increasing autonomy?',placeholder:'Observed problem → evidence → improvement\nMeasures for future runs:',hint:'Useful measures include first-attempt success, repair attempts, human interventions, stale/invalid evidence, and review findings. Throughput alone does not establish quality.'}
+        ],
+        rubric:['Controller checks establish correct decisions for both valid and misleading reports.','A real candidate is independently checked against fixed criteria and is ready for review; a test worker alone is not this milestone.','Attempts are bounded, cleanup touches owned processes only, and evidence survives.','You can explain the next improvement using observations from actual runs.']
+      }
+    ];
+    const workbookId = 'issue-tracker-engineering-loop-lab';
+    const storageKey = workbookId + ':v1';
+    const assignmentIds = new Set(assignments.map(item => item.id));
+    const answerIds = new Set(assignments.flatMap(item => item.questions.map(question => item.id + '-' + question.id)));
+    const freshState = () => ({version:1,workbookId,updatedAt:null,answers:{},ready:{},active:'a1'});
+    function validate(input) {
+      if (!input || input.version !== 1 || input.workbookId !== workbookId) throw new Error('This is not a compatible Loop Lab backup.');
+      if (!input.answers || typeof input.answers !== 'object' || Array.isArray(input.answers) || !input.ready || typeof input.ready !== 'object' || Array.isArray(input.ready)) throw new Error('The answer structure is invalid.');
+      const result = freshState();
+      for (const [key,value] of Object.entries(input.answers)) {
+        if (!answerIds.has(key) || typeof value !== 'string' || value.length > 100000) throw new Error('The backup contains an unknown or invalid answer.');
+        result.answers[key] = value;
+      }
+      for (const [key,value] of Object.entries(input.ready)) {
+        if (!assignmentIds.has(key) || typeof value !== 'boolean') throw new Error('The backup contains an invalid readiness value.');
+        result.ready[key] = value;
+      }
+      if (input.updatedAt !== null && (typeof input.updatedAt !== 'string' || !Number.isFinite(Date.parse(input.updatedAt)))) throw new Error('The saved timestamp is invalid.');
+      if (!assignmentIds.has(input.active)) throw new Error('The saved assignment is invalid.');
+      result.updatedAt = input.updatedAt;
+      result.active = input.active;
+      return result;
+    }
+    let state = freshState();
+    let restoredFrom = '';
+    try {
+      const embedded = validate(JSON.parse(document.getElementById('embedded-state').textContent));
+      if (embedded.updatedAt) { state = embedded; restoredFrom = 'this answered HTML copy'; }
+    } catch { /* An empty workbook remains usable if its embedded state is invalid. */ }
+    let storageAvailable = true;
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        const candidate = validate(JSON.parse(stored));
+        if ((Date.parse(candidate.updatedAt) || 0) > (Date.parse(state.updatedAt) || 0)) { state = candidate; restoredFrom = 'this browser'; }
+      }
+      const probeKey = storageKey + ':probe';
+      localStorage.setItem(probeKey,'1');
+      localStorage.removeItem(probeKey);
+    } catch { storageAvailable = false; }
+    const el = (tag,className,text) => {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text !== undefined) node.textContent = text;
+      return node;
+    };
+    const nav = document.getElementById('chapter-nav');
+    const container = document.getElementById('assignments');
+    const referenceBase = location.protocol === 'file:'
+      ? 'file:///Users/louis/issue-tracker/docs/learning-workbook.html'
+      : new URL('/docs/learning-workbook.html',location.href).href;
+    // Answered copies include the rendered page; rebuild it once from saved state.
+    nav.replaceChildren();
+    container.replaceChildren();
+    const panels = new Map();
+    const buttons = new Map();
+    assignments.forEach((assignment,index) => {
+      const number = String(index + 1).padStart(2,'0');
+      const button = el('button','chapter-button');
+      button.type = 'button';
+      button.setAttribute('aria-label',number + ' ' + assignment.title);
+      button.setAttribute('aria-controls',assignment.id);
+      button.append(el('span','chapter-number',number),el('span','',assignment.title));
+      const dot = el('span','ready-dot','');
+      dot.setAttribute('aria-hidden','true');
+      button.append(dot);
+      button.addEventListener('click',() => select(assignment.id,true));
+      nav.append(button);
+      buttons.set(assignment.id,button);
+      const panel = el('section','assignment');
+      panel.id = assignment.id;
+      panel.dataset.assignment = assignment.id;
+      panel.setAttribute('aria-labelledby',assignment.id + '-heading');
+      const header = el('div','assignment-header');
+      const meta = el('div','assignment-meta');
+      meta.append(el('span','phase',assignment.phase),el('span','',assignment.time),el('span','',number + ' / 08'));
+      const heading = el('h2','',assignment.title);
+      heading.id = assignment.id + '-heading';
+      heading.tabIndex = -1;
+      header.append(meta,heading,el('p','objective',assignment.objective));
+      const resources = el('div','resources');
+      resources.setAttribute('aria-label','Read these repository references');
+      assignment.resources.forEach(([label,path]) => {
+        const link = el('a','',label);
+        link.href = new URL(path,referenceBase).href;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        resources.append(link);
+      });
+      header.append(resources);
+      panel.append(header);
+      const tasks = el('div','task-section');
+      tasks.append(el('h3','','Your task'));
+      const list = el('ol');
+      assignment.tasks.forEach(text => list.append(el('li','',text)));
+      tasks.append(list);
+      if (assignment.commands) {
+        const pre = el('pre');
+        pre.append(el('code','',assignment.commands.join('\n')));
+        tasks.append(pre);
+      }
+      panel.append(tasks);
+      const evidence = el('div','evidence');
+      evidence.append(el('h3','','What to bring back'),el('p','',assignment.evidence));
+      panel.append(evidence);
+      assignment.questions.forEach((question,questionIndex) => {
+        const key = assignment.id + '-' + question.id;
+        const wrapper = el('div','question');
+        const label = el('label');
+        label.htmlFor = key;
+        label.append(el('span','question-number',number + '.' + (questionIndex + 1)),document.createTextNode(question.title));
+        const prompt = el('p','question-prompt',question.prompt);
+        prompt.id = key + '-prompt';
+        const textarea = el('textarea');
+        textarea.id = key;
+        textarea.dataset.answer = key;
+        textarea.placeholder = question.placeholder;
+        textarea.setAttribute('aria-describedby',prompt.id);
+        textarea.spellcheck = true;
+        textarea.value = state.answers[key] || '';
+        textarea.addEventListener('input',() => {
+          state.answers[key] = textarea.value;
+          persist();
+        });
+        wrapper.append(label,prompt,textarea);
+        if (question.hint) {
+          const details = el('details','hint');
+          details.append(el('summary','','Need a hint?'),el('p','',question.hint));
+          wrapper.append(details);
+        }
+        panel.append(wrapper);
+      });
+      const review = el('div','review-box');
+      review.append(el('h3','','Before you mark this ready'));
+      const rubric = el('ul');
+      assignment.rubric.forEach(text => rubric.append(el('li','',text)));
+      const readyLabel = el('label','ready-label');
+      const checkbox = el('input');
+      checkbox.type = 'checkbox';
+      checkbox.dataset.ready = assignment.id;
+      checkbox.checked = Boolean(state.ready[assignment.id]);
+      checkbox.addEventListener('change',() => { state.ready[assignment.id] = checkbox.checked; persist(); updateProgress(); });
+      readyLabel.append(checkbox,document.createTextNode('I can explain these answers and I am ready for review.'));
+      review.append(rubric,readyLabel,el('p','ready-explanation','This records your assessment. It does not certify correctness or replace independent review.'));
+      panel.append(review);
+      container.append(panel);
+      panels.set(assignment.id,panel);
+    });
+    const status = document.getElementById('save-status');
+    function setStatus(message) { status.textContent = message; }
+    function persist(message) {
+      state.updatedAt = new Date().toISOString();
+      try {
+        localStorage.setItem(storageKey,JSON.stringify(state));
+        storageAvailable = true;
+        setStatus(message || 'Saved in this browser at ' + new Date(state.updatedAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) + '. Save an answered HTML copy before ending your session.');
+      } catch {
+        storageAvailable = false;
+        setStatus('Browser autosave is unavailable. Your answers remain on this page; save an answered HTML copy to keep them.');
+      }
+    }
+    function updateProgress() {
+      const count = assignments.filter(item => state.ready[item.id]).length;
+      document.getElementById('progress-fill').style.width = (count / assignments.length * 100) + '%';
+      document.querySelector('[role="progressbar"]').setAttribute('aria-valuenow',String(count));
+      document.getElementById('progress-text').textContent = count + ' of 8 ready for review';
+      assignments.forEach(item => { buttons.get(item.id).querySelector('.ready-dot').textContent = state.ready[item.id] ? '✓' : ''; });
+    }
+    function select(id,save) {
+      state.active = id;
+      assignments.forEach(item => {
+        panels.get(item.id).hidden = item.id !== id;
+        if (item.id === id) buttons.get(item.id).setAttribute('aria-current','step');
+        else buttons.get(item.id).removeAttribute('aria-current');
+      });
+      const index = assignments.findIndex(item => item.id === id);
+      document.getElementById('previous').disabled = index === 0;
+      document.getElementById('next').disabled = index === assignments.length - 1;
+      document.getElementById('page-position').textContent = 'Assignment ' + (index + 1) + ' of 8';
+      if (save) {
+        persist();
+        document.getElementById(id + '-heading').focus({preventScroll:true});
+        panels.get(id).scrollIntoView({block:'start'});
+      }
+    }
+    function applyState() {
+      document.querySelectorAll('[data-answer]').forEach(node => { node.value = state.answers[node.dataset.answer] || ''; });
+      document.querySelectorAll('[data-ready]').forEach(node => { node.checked = Boolean(state.ready[node.dataset.ready]); });
+      updateProgress();
+      select(state.active,false);
+    }
+    function download(content,type,filename) {
+      const url = URL.createObjectURL(new Blob([content],{type}));
+      const link = el('a');
+      link.href = url;
+      link.download = filename;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url),1000);
+      setStatus('Download requested: ' + filename + '. Keep that file as your saved copy.');
+    }
+    const datedName = suffix => 'loop-lab-' + new Date().toISOString().slice(0,10) + suffix;
+    function safeJson(value) {
+      return JSON.stringify(value).replace(/</g,'\\u003c').replace(/>/g,'\\u003e').replace(/&/g,'\\u0026').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029');
+    }
+    document.getElementById('save-html').addEventListener('click',() => {
+      state.updatedAt = new Date().toISOString();
+      const copy = document.cloneNode(true);
+      copy.getElementById('embedded-state').textContent = safeJson(state);
+      copy.querySelectorAll('[data-answer]').forEach(node => { node.textContent = state.answers[node.dataset.answer] || ''; });
+      copy.querySelectorAll('[data-ready]').forEach(node => {
+        if (state.ready[node.dataset.ready]) node.setAttribute('checked','');
+        else node.removeAttribute('checked');
+      });
+      download('<!doctype html>\n' + copy.documentElement.outerHTML,'text/html;charset=utf-8',datedName('-answered.html'));
+    });
+    document.getElementById('export-json').addEventListener('click',() => {
+      state.updatedAt = new Date().toISOString();
+      download(JSON.stringify(state,null,2),'application/json',datedName('-answers.json'));
+    });
+    document.getElementById('export-review').addEventListener('click',() => {
+      const lines = ['# Engineering Loop Lab — answers','','Repository: /Users/louis/issue-tracker','Exported: ' + new Date().toISOString(),'','Readiness is the learner’s assessment; it is not an automatic grade.',''];
+      assignments.forEach((assignment,index) => {
+        lines.push('## ' + String(index + 1).padStart(2,'0') + ' — ' + assignment.title,'', 'Ready for review: ' + (state.ready[assignment.id] ? 'yes' : 'no'),'');
+        assignment.questions.forEach(question => {
+          lines.push('### ' + question.title,'',question.prompt,'','**Answer**','',state.answers[assignment.id + '-' + question.id] || '(Not answered yet.)','');
+        });
+      });
+      download(lines.join('\n'),'text/markdown;charset=utf-8',datedName('-review.md'));
+    });
+    document.getElementById('import-file').addEventListener('change',async event => {
+      const file = event.target.files[0];
+      if (!file) return;
+      try {
+        if (file.size > 1000000) throw new Error('The backup is larger than 1 MB.');
+        const imported = validate(JSON.parse(await file.text()));
+        state = imported;
+        applyState();
+        persist('Backup restored. Save an answered HTML copy to keep the restored work.');
+      } catch (error) { setStatus('Import failed: ' + error.message + ' Current answers were kept.'); }
+      finally { event.target.value = ''; }
+    });
+    document.getElementById('previous').addEventListener('click',() => {
+      const index = assignments.findIndex(item => item.id === state.active);
+      if (index > 0) select(assignments[index - 1].id,true);
+    });
+    document.getElementById('next').addEventListener('click',() => {
+      const index = assignments.findIndex(item => item.id === state.active);
+      if (index < assignments.length - 1) select(assignments[index + 1].id,true);
+    });
+    window.addEventListener('beforeprint',() => {
+      document.querySelectorAll('[data-answer]').forEach(node => { node.textContent = node.value; node.style.height = 'auto'; node.style.height = Math.max(120,node.scrollHeight) + 'px'; });
+    });
+    window.addEventListener('afterprint',() => { document.querySelectorAll('[data-answer]').forEach(node => { node.style.height = ''; }); });
+    applyState();
+    if (!storageAvailable) setStatus('Browser autosave is unavailable. Use Save answered HTML to preserve your answers.');
+    else if (restoredFrom) setStatus('Restored your latest answers from ' + restoredFrom + '. New edits autosave in this browser.');
+  })();
+  </script>
+</body>
+</html>

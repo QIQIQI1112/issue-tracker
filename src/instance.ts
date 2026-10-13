@@ -9,7 +9,7 @@ export function acquireDatabaseLock(databasePath: string, instanceId: string): (
   try { descriptor = openSync(lockPath, 'wx', 0o600); }
   catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
-      throw new Error(`Database is locked: ${lockPath}. Stop its owner before continuing. If it crashed, inspect this lock's PID before removing it.`);
+      throw new Error(`Database is locked: ${lockPath}. Stop its owner before continuing. If it crashed, inspect this lock's PID before removing it.`, { cause: error });
     }
     throw error;
   }

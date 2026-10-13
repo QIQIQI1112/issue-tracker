@@ -1,7 +1,6 @@
 import { existsSync, writeFileSync } from 'node:fs';
 import { test } from '../../acceptance/workspace.ts';
 
-// Selected only by the Node regression's disposable Playwright config.
 test('cleanup refuses a replacement target', async ({ workspace }) => {
   const ready = process.env.OWNED_SWAP_READY;
   const replaced = process.env.OWNED_SWAP_DONE;

@@ -14,10 +14,12 @@ for (let attempt = 0; attempt < 100; attempt += 1) {
     const health = await response.json();
     if (health.instanceId === process.env.INSTANCE_ID) {
       writeFileSync(process.env.OWNED_LEADER_RECORD, JSON.stringify({ leader: process.pid, api: child.pid, stubborn: stubborn.pid, stubbornReady: ack.ready, health }));
-      // Reproduce a watcher leader exiting without terminating its children.
       process.exit(17);
     }
-  } catch { /* Wait for the real API child to start. */ }
+  } catch {
+    await new Promise(resolve => setTimeout(resolve, 50));
+    continue;
+  }
   await new Promise(resolve => setTimeout(resolve, 50));
 }
 throw new Error('Owned API child did not become ready.');

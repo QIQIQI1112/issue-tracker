@@ -41,7 +41,10 @@ async function launch(port: number, path: string, identity: string) {
         const response = await fetch(`${url}/api/health`, { signal: AbortSignal.timeout(1000) });
         const health = await response.json();
         if (response.ok && health.instanceId === identity && health.databasePath === path) return { child, url, output: () => output };
-      } catch { /* The owned server is still starting. */ }
+      } catch {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        continue;
+      }
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     throw new Error(`Owned server did not become healthy: ${output}`);

@@ -11,7 +11,6 @@ export const test = base.extend<{ workspace: WorkspaceFixture; ownedTarget: stri
     if (typeof instanceId !== 'string' || typeof databasePath !== 'string') {
       throw new Error('UI tests require owned instanceId and databasePath metadata.');
     }
-    // Both browser and fixture request contexts retain this through page.route.
     await use({ ...extraHTTPHeaders, [targetHeader]: targetIdentity(instanceId, databasePath) });
   },
   ownedTarget: [async ({ request }, use, info) => {
@@ -31,7 +30,6 @@ export const test = base.extend<{ workspace: WorkspaceFixture; ownedTarget: stri
       } });
     } finally {
       await assertOwnedTarget(request, info);
-      // Remove only this test's own issues. Never reset a shared database.
       const response = await request.get(api);
       expect(response.status()).toBe(200);
       const body = await response.json() as { issues: Issue[] };

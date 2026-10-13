@@ -217,7 +217,6 @@ test('a real server validation error preserves draft values and allows retry', a
   await page.route('**/api/issues', async (route) => {
     if (invalidateNextPost && route.request().method() === 'POST') {
       invalidateNextPost = false;
-      // Inject invalid transport input; the actual backend produces the 400.
       await route.continue({ postData: JSON.stringify({ ...route.request().postDataJSON(), title: '' }) });
     } else await route.continue();
   });

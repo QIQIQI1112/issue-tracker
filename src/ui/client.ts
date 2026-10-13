@@ -4,7 +4,7 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
     response = await fetch(path, { ...options, headers: { ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...options.headers } });
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') throw error;
-    throw new Error('Could not reach the local server. Check that it is running and try again.');
+    throw new Error('Could not reach the local server. Check that it is running and try again.', { cause: error });
   }
   if (response.status === 204) return undefined as T;
   const data = await response.json().catch(() => null) as { error?: unknown } | null;

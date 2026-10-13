@@ -39,7 +39,6 @@ export function createApp(store: IssueStore, metadata: { instanceId: string; ver
       && expected !== undefined && expected !== ownedIdentity) {
       response.status(409).json({ error: 'Owned API target identity mismatch. Refusing mutation.' }); return;
     }
-    // No async gap between this check and the synchronous IssueStore writes.
     next();
   });
   app.post('/api/issues', (request, response) => {

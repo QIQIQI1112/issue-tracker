@@ -42,7 +42,6 @@ test('conditional writes reject mismatched identities before changing records or
         assert.match((await response.json()).error, /target identity mismatch/i);
       }
     }
-    // Matching conditional writes work; unguarded manual CRUD remains covered above.
     const headers = { 'content-type': 'application/json', 'x-issue-tracker-target': target('api-test', app.store.path) };
     const created = await fetch(`${app.base}/api/issues`, { ...json('POST', { title: 'Conditional issue' }), headers });
     assert.equal(created.status, 201);

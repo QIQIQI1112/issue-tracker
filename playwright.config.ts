@@ -10,7 +10,6 @@ const runDirectory = resolve(process.env.RUN_DIR ?? '.runs/browser');
 const apiPort = process.env.TEST_API_PORT ?? '14310';
 const uiPort = process.env.TEST_UI_PORT ?? '15173';
 const databasePath = resolve(runDirectory, 'acceptance.sqlite');
-// Playwright reloads config in each worker; carry the runner's launch identity.
 const instanceId = process.env.TEST_WORKER_INDEX === undefined
   ? `acceptance-${randomUUID()}` : process.env.ISSUE_TRACKER_OWNED_TEST_INSTANCE;
 if (!instanceId) throw new Error('Missing owned Playwright launch identity.');

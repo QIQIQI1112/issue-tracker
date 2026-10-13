@@ -38,7 +38,6 @@ export async function stopOwned(child: ChildProcess, graceMs = 5000): Promise<vo
   const closed = exited && streamsClosed ? Promise.resolve() : once(child, 'close');
   const deadline = Date.now() + graceMs;
   signalGroup(pid, 'SIGTERM');
-  // Stream closure and leader exit are not proof that the owned group is gone.
   const timer = setTimeout(() => signalGroup(pid, 'SIGKILL'), graceMs);
   try {
     await closed;
@@ -59,12 +58,10 @@ export async function run(command: string, args: string[], env: NodeJS.ProcessEn
   const graceMs = options.graceMs ?? 5000;
   let stopping: Promise<void> | undefined;
   const cleanup = () => stopping ??= stopOwned(child, graceMs);
-  // Observe rejections here; the main path awaits and reports the same promise.
   const startCleanup = () => { void cleanup().catch(() => {}); };
   child.once('exit', startCleanup);
   const timer = setTimeout(startCleanup, timeoutMs);
   try {
-    // close includes inherited output; cleanup also proves group disappearance.
     const [code, signal] = await closed;
     await cleanup();
     return { code, signal, output };

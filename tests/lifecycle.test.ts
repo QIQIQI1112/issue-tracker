@@ -90,7 +90,6 @@ test('dev cleans an exited owned leader group including surviving descendants', 
     assert.ok(record);
     assert.equal(record.stubbornReady, true, 'Watcher exited without its descendant readiness acknowledgement.');
     await waitUntil(() => !alive(record!.leader));
-    // Await the actual supervisor exit, not just the leader's exit event.
     await waitUntil(() => supervisor.exitCode !== null || supervisor.signalCode !== null);
     const [code] = await supervisorExit;
     assert.equal(code, 17);

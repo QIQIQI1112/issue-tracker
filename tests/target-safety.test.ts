@@ -27,7 +27,10 @@ async function ownedAPI(directory: string, instanceId = 'owned-wrong-target', da
           const { issue } = await response.json() as { issue: { id: number } };
           return { child, url, port, databasePath, issue, stop: async () => { await stopOwned(child); writeFileSync(join(directory, `${instanceId}-api.log`), output); } };
         }
-      } catch { /* Wait for this exact disposable API. */ }
+      } catch {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        continue;
+      }
       await new Promise(resolve => setTimeout(resolve, 50));
     }
     throw new Error(`Owned wrong-target API did not start: ${output}`);
@@ -37,7 +40,6 @@ async function ownedAPI(directory: string, instanceId = 'owned-wrong-target', da
 function snapshot(databasePath: string) {
   const database = new DatabaseSync(databasePath, { readOnly: true });
   try {
-    // The sequence catches writes even if UI fixture cleanup deletes the rows.
     return { issues: database.prepare('SELECT * FROM issues ORDER BY id').all(), sequence: database.prepare('SELECT * FROM sqlite_sequence').all() };
   } finally { database.close(); }
 }
@@ -61,7 +63,6 @@ test('browser writes reject replacement APIs with colliding numeric IDs', { time
       const replaced = join(directory, 'replacement-ready');
       const observed = join(directory, 'mutation-response.json');
       const restored = join(directory, 'original-restored');
-      // The real Vite frontend stays up while only its proxied API is replaced.
       writeFileSync(configPath, `import original from ${JSON.stringify(resolve('playwright.config.ts'))};\nexport default { ...original, testDir: ${JSON.stringify(resolve('tests/fixtures'))}, testMatch: 'browser-target.spec.ts', webServer: [{ ...original.webServer[1], cwd: ${JSON.stringify(process.cwd())}, url: 'http://127.0.0.1:${uiPort}', env: { API_PORT: '${original.port}', UI_PORT: '${uiPort}' } }], projects: original.projects.map(project => ({ ...project, metadata: { instanceId: 'owned-browser-original', databasePath: ${JSON.stringify(original.databasePath)} }, use: { ...original.use, ...project.use, baseURL: 'http://127.0.0.1:${uiPort}' } })) };\n`);
       const env: NodeJS.ProcessEnv = { ...process.env, RUN_DIR: directory, OWNED_MUTATION: method, OWNED_SWAP_READY: ready, OWNED_SWAP_DONE: replaced, OWNED_SWAP_OBSERVED: observed, OWNED_SWAP_RESTORED: restored };
       delete env.UI_TEST_URL;
@@ -172,7 +173,6 @@ test('verification rejects inherited UI_TEST_URL before gates without touching a
   const wrong = await ownedAPI(directory);
   const before = snapshot(wrong.databasePath);
   try {
-    // No npm on PATH: rejection must happen before attempting any gate.
     const result = await run(process.execPath, [resolve('scripts/verify.mjs')], { ...process.env, UI_TEST_URL: wrong.url, PATH: '', RUN_DIR: directory }, join(directory, 'verify.log'), directory);
     assert.notEqual(result.code, 0);
     assert.match(result.output, /UI_TEST_URL.*not supported/i);
