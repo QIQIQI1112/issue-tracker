@@ -24,6 +24,7 @@ const migrations = [
    CREATE TABLE jobs (id INTEGER PRIMARY KEY AUTOINCREMENT, repo_id INTEGER NOT NULL REFERENCES repos(id), requirement_id INTEGER REFERENCES requirements(id), issue_id INTEGER REFERENCES issues(id), kind TEXT NOT NULL, status TEXT NOT NULL, payload TEXT NOT NULL, run_id TEXT, reason TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
    CREATE TABLE work_runs (id TEXT PRIMARY KEY, job_id INTEGER NOT NULL REFERENCES jobs(id), repo_id INTEGER NOT NULL REFERENCES repos(id), requirement_id INTEGER REFERENCES requirements(id), issue_id INTEGER REFERENCES issues(id), status TEXT NOT NULL, evidence_path TEXT NOT NULL, reason TEXT, started_at TEXT NOT NULL, completed_at TEXT);
    CREATE INDEX job_queue ON jobs(status, id);`,
+  `CREATE TABLE plan_submissions (id TEXT PRIMARY KEY, requirement_id INTEGER NOT NULL UNIQUE REFERENCES requirements(id), plan_hash TEXT NOT NULL, plan TEXT NOT NULL, issue_ids TEXT NOT NULL, created_at TEXT NOT NULL);`,
 ];
 
 function issueRow(input: unknown): Issue {

@@ -12,7 +12,7 @@ export function git(cwd: string, args: string[]): string {
 }
 
 export function protectedPath(path: string, baselinePaths: Set<string>): boolean {
-  return /^(factory|scripts|tickets)\//.test(path) || /^(AGENTS\.md|package(-lock)?\.json|.*config\.(js|ts|mjs)|\.gitignore)$/.test(path) || baselinePaths.has(path) && /^(tests|acceptance)\//.test(path);
+  return /^(factory|scripts|tickets|\.agents)\//.test(path) || /^(AGENTS\.md|package(-lock)?\.json|.*config\.(js|ts|mjs)|\.gitignore)$/.test(path) || baselinePaths.has(path) && /^(tests|acceptance)\//.test(path);
 }
 
 export function prepareWorkspace(repository: string, runDirectory: string, baseRef?: string, useCurrentHarness = true): { path: string; baseCommit: string; baselineTree: string; sourceHash: string } {

@@ -54,7 +54,7 @@ test('version-one databases upgrade without losing existing records', () => {
     assert.deepEqual(store.update(7, { labels: ['migrated'] })?.labels, ['migrated']);
   } finally { store.close(); }
   const reopened = new DatabaseSync(path);
-  assert.equal((reopened.prepare('PRAGMA user_version').get() as { user_version: number }).user_version, 3);
+  assert.equal((reopened.prepare('PRAGMA user_version').get() as { user_version: number }).user_version, 4);
   reopened.close();
 });
 

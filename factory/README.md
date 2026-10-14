@@ -34,6 +34,8 @@ The baseline may already satisfy the task. Named checks then record `already_pas
 
 `AGENTS.md` supplies persistent agent conventions; `agent.ts` supplies phase-specific English prompts; runtime contracts and controller checks enforce the executable parts. A prose instruction alone cannot guarantee that a required check ran.
 
+Conversation-origin plans use the shared `src/submission.ts` runtime contract and `scripts/submit-plan.ts` client. Intake atomically preserves the submitted original goal, source, issue graph, and plan hash. Its `plan_review` job obtains independent coverage approval against exact target source before releasing existing child IDs. It does not invoke decomposition again. `startIssue` cannot bypass unapproved plan admission; HTTP retries only return existing work. See [conversation intake](../docs/conversation-intake.md).
+
 ## Ownership and evidence
 
 `.data/evidence/<task-id>-<uuid>/` is outside the worker checkout. Queue jobs use their durable run UUID under the application database's evidence directory. It contains `task.json`, `plan.json`, `baseline.json`, `accepted-checks.json`, `state.json`, per-phase prompts/schemas/output/process receipts, red-check reports, verifier logs/reports, and the final patch. `state.json` is updated atomically and records phases, attempt IDs, workspace, ports, source identity, review decisions, and failure reasons.

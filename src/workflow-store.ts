@@ -1,9 +1,10 @@
 import type { DatabaseSync } from 'node:sqlite';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import type { IssueStore } from './storage.ts';
-import type { Assignment, Job, Repo, Requirement, WorkRun } from './workflow.ts';
+import type { Assignment, Decomposition, Job, PlanSubmission, Repo, Requirement, SubmissionReceipt, WorkRun } from './workflow.ts';
 import { ConflictError } from './workflow.ts';
 import { ValidationError } from './domain.ts';
+import { parseSubmission } from './submission.ts';
 
 const repoColumns = 'id, name, path, target_branch AS targetBranch, created_at AS createdAt';
 const requirementColumns = 'id, repo_id AS repoId, title, goal, status, created_at AS createdAt, updated_at AS updatedAt';
@@ -28,8 +29,54 @@ export class WorkflowStore {
     const result = this.database.prepare('INSERT INTO repos (name, path, target_branch, created_at) VALUES (?, ?, ?, ?)').run(input.name, input.path, input.targetBranch, new Date().toISOString());
     return this.repo(Number(result.lastInsertRowid))!;
   }
-  requirements(): Requirement[] { return this.database.prepare(`SELECT ${requirementColumns} FROM requirements ORDER BY id DESC`).all() as Requirement[]; }
-  requirement(id: number): Requirement | undefined { return this.database.prepare(`SELECT ${requirementColumns} FROM requirements WHERE id = ?`).get(id) as Requirement | undefined; }
+  private enrichedRequirement(requirement: Requirement): Requirement {
+    const submission = this.submissionForRequirement(requirement.id);
+    return submission ? { ...requirement, submission: { id: submission.id, planHash: submission.planHash, source: submission.plan.source } } : requirement;
+  }
+  requirements(): Requirement[] { return (this.database.prepare(`SELECT ${requirementColumns} FROM requirements ORDER BY id DESC`).all() as Omit<Requirement, 'submission'>[]).map(item => this.enrichedRequirement(item)); }
+  requirement(id: number): Requirement | undefined {
+    const requirement = this.database.prepare(`SELECT ${requirementColumns} FROM requirements WHERE id = ?`).get(id) as Requirement | undefined;
+    return requirement ? this.enrichedRequirement(requirement) : undefined;
+  }
+  private submissionRow(row: unknown): PlanSubmission | undefined {
+    if (!row) return undefined;
+    const value = row as Omit<PlanSubmission, 'plan' | 'issueIds'> & { plan: string; issueIds: string };
+    return { ...value, plan: JSON.parse(value.plan), issueIds: JSON.parse(value.issueIds) };
+  }
+  submission(id: string): PlanSubmission | undefined {
+    return this.submissionRow(this.database.prepare('SELECT id, requirement_id AS requirementId, plan_hash AS planHash, plan, issue_ids AS issueIds, created_at AS createdAt FROM plan_submissions WHERE id=?').get(id));
+  }
+  private submissionForRequirement(id: number): PlanSubmission | undefined {
+    return this.submissionRow(this.database.prepare('SELECT id, requirement_id AS requirementId, plan_hash AS planHash, plan, issue_ids AS issueIds, created_at AS createdAt FROM plan_submissions WHERE requirement_id=?').get(id));
+  }
+  submissionReceipt(id: string): SubmissionReceipt | undefined {
+    return this.transaction(() => {
+      const submission = this.submission(id);
+      return submission ? { submission, requirement: this.requirement(submission.requirementId)!, issues: submission.plan.issues.map(item => ({ key: item.key, issue: this.issues.get(submission.issueIds[item.key])! })), jobs: this.jobs().filter(job => job.requirementId === submission.requirementId), runs: this.runs().filter(run => run.requirementId === submission.requirementId) } : undefined;
+    });
+  }
+  submitPlan(input: unknown): SubmissionReceipt & { replayed: boolean } {
+    const plan = parseSubmission(input);
+    const serialized = JSON.stringify(plan);
+    const planHash = createHash('sha256').update(serialized).digest('hex');
+    return this.transaction(() => {
+      const existing = this.submission(plan.submissionId);
+      if (existing) {
+        if (existing.planHash !== planHash) throw new ConflictError('Submission ID already belongs to a different immutable plan.');
+        return { ...this.submissionReceipt(existing.id)!, replayed: true };
+      }
+      const requirement = this.addRequirement({ repoId: plan.repoId, ...plan.requirement });
+      const created = this.createSlices(requirement, plan.issues);
+      const issueIds = Object.fromEntries([...created].map(([key, issue]) => [key, issue.id]));
+      this.database.prepare('INSERT INTO plan_submissions (id, requirement_id, plan_hash, plan, issue_ids, created_at) VALUES (?, ?, ?, ?, ?, ?)').run(plan.submissionId, requirement.id, planHash, serialized, JSON.stringify(issueIds), new Date().toISOString());
+      this.startRequirement(requirement.id);
+      return { ...this.submissionReceipt(plan.submissionId)!, replayed: false };
+    });
+  }
+  private approvedSubmission(id: number): boolean {
+    const review = this.jobs().filter(job => job.requirementId === id && job.kind === 'plan_review').at(-1);
+    return review?.status === 'completed' && this.runs().some(run => run.jobId === review.id && run.status === 'passed');
+  }
   addRequirement(input: Pick<Requirement, 'repoId' | 'title' | 'goal'>): Requirement {
     if (!this.repo(input.repoId)) throw new ValidationError('Repository not found.');
     const now = new Date().toISOString();
@@ -67,6 +114,8 @@ export class WorkflowStore {
     });
   }
   assertEditable(issueId: number): void {
+    const requirementId = this.context(issueId)?.requirementId;
+    if (requirementId && this.submissionForRequirement(requirementId)) throw new ConflictError('Submitted plan issues are immutable. Submit a new plan for revised work.');
     if (this.jobs().some(job => job.issueId === issueId && ['queued', 'running'].includes(job.status))) throw new ConflictError('Queued or running issues cannot be edited or deleted.');
     if (this.runs().some(run => run.issueId === issueId && run.status === 'merged')) throw new ConflictError('Merged issues are immutable. Create a follow-up issue.');
   }
@@ -89,6 +138,7 @@ export class WorkflowStore {
     return this.transaction(() => {
       const issue = this.issues.get(id);
       if (!issue?.work) throw new ValidationError('Assign a repository and acceptance conditions before starting the issue.');
+      if (issue.work.requirementId && this.submissionForRequirement(issue.work.requirementId) && !this.approvedSubmission(issue.work.requirementId)) throw new ConflictError('Submitted issues require independent plan approval before execution.');
       if (this.runs().some(run => run.issueId === id && run.status === 'merged')) throw new ConflictError('This issue has already been merged. Create a follow-up issue.');
       return this.enqueue('issue', issue.work.repoId, issue.work.requirementId, id, issue);
     });
@@ -99,24 +149,29 @@ export class WorkflowStore {
       if (!requirement) throw new ValidationError('Requirement not found.');
       if (requirement.status === 'done' || this.jobs().some(job => job.requirementId === id && ['queued', 'running'].includes(job.status))) throw new ConflictError('Requirement is completed or already active.');
       const issues = this.issues.list().filter(issue => issue.work?.requirementId === id);
-      const jobs = issues.length ? issues.filter(issue => !this.runs().some(run => run.issueId === issue.id && run.status === 'merged')).map(issue => this.startIssue(issue.id)) : [this.enqueue('decompose', requirement.repoId, id, null, requirement)];
+      const needsReview = this.submissionForRequirement(id) && !this.approvedSubmission(id);
+      const jobs = needsReview ? [this.enqueue('plan_review', requirement.repoId, id, null, requirement)] : issues.length ? issues.filter(issue => !this.runs().some(run => run.issueId === issue.id && run.status === 'merged')).map(issue => this.startIssue(issue.id)) : [this.enqueue('decompose', requirement.repoId, id, null, requirement)];
       if (issues.length && !jobs.length) jobs.push(this.enqueue('requirement_verify', requirement.repoId, id, null, requirement));
       this.database.prepare("UPDATE requirements SET status='queued', updated_at=? WHERE id=?").run(new Date().toISOString(), id);
       return jobs;
     });
   }
-  applyDecomposition(id: number, slices: { key: string; title: string; description: string; acceptance: string[]; dependsOn: string[] }[]): void {
+  private createSlices(requirement: Requirement, slices: Decomposition['issues']) {
+    const created = new Map(slices.map(slice => [slice.key, this.issues.create({ title: slice.title, description: slice.description, labels: [], status: 'open', priority: 'medium', work: { repoId: requirement.repoId, requirementId: requirement.id, dependsOn: [], acceptance: slice.acceptance } })]));
+    for (const slice of slices) {
+      const issue = created.get(slice.key)!;
+      const dependsOn = slice.dependsOn.map(key => { const dependency = created.get(key); if (!dependency) throw new ValidationError('Unknown dependency key.'); return dependency.id; });
+      this.assign(issue.id, { ...issue.work!, dependsOn });
+    }
+    return created;
+  }
+  applyDecomposition(id: number, slices: Decomposition['issues']): void {
     this.transaction(() => {
       this.decomposing = true;
       try {
         const requirement = this.requirement(id)!;
         if (this.issues.list().some(issue => issue.work?.requirementId === id)) throw new ConflictError('Requirement has already been decomposed.');
-        const created = new Map(slices.map(slice => [slice.key, this.issues.create({ title: slice.title, description: slice.description, labels: [], status: 'open', priority: 'medium', work: { repoId: requirement.repoId, requirementId: id, dependsOn: [], acceptance: slice.acceptance } })]));
-        for (const slice of slices) {
-          const issue = created.get(slice.key)!;
-          const dependsOn = slice.dependsOn.map(key => { const dependency = created.get(key); if (!dependency) throw new ValidationError('Unknown dependency key.'); return dependency.id; });
-          this.assign(issue.id, { ...issue.work!, dependsOn });
-        }
+        const created = this.createSlices(requirement, slices);
         for (const issue of created.values()) this.startIssue(issue.id);
       } finally { this.decomposing = false; }
     });
@@ -151,6 +206,7 @@ export class WorkflowStore {
       const now = new Date().toISOString();
       this.database.prepare('UPDATE work_runs SET status=?, reason=?, completed_at=? WHERE id=?').run(status, reason, now, id);
       this.database.prepare('UPDATE jobs SET status=?, reason=?, updated_at=? WHERE id=?').run(status === 'blocked' ? 'blocked' : 'completed', reason, now, job.id);
+      if (job.kind === 'plan_review' && status === 'passed') for (const issue of this.issues.list().filter(issue => issue.work?.requirementId === job.requirementId)) this.startIssue(issue.id);
       if (job.issueId !== null) this.database.prepare('UPDATE issues SET status=?, updated_at=? WHERE id=?').run(status === 'merged' ? 'done' : 'open', now, job.issueId);
       if (status === 'blocked') {
         let changed = true;
@@ -188,7 +244,7 @@ export class WorkflowStore {
       const merged = (id: number) => runs.some(run => run.issueId === id && run.status === 'merged');
       const latest = (kind: Job['kind'], issueId: number | null = null) => related.filter(job => job.kind === kind && job.issueId === issueId).at(-1);
       const final = latest('requirement_verify');
-      const failed = children.some(issue => !merged(issue.id) && latest('issue', issue.id)?.status === 'blocked') || !children.length && latest('decompose')?.status === 'blocked' || final?.status === 'blocked';
+      const failed = children.some(issue => !merged(issue.id) && latest('issue', issue.id)?.status === 'blocked') || !children.length && latest('decompose')?.status === 'blocked' || latest('plan_review')?.status === 'blocked' || final?.status === 'blocked';
       const completed = children.length > 0 && children.every(issue => merged(issue.id)) && final?.status === 'completed' && runs.some(run => run.jobId === final.id && run.status === 'passed');
       const active = related.filter(job => ['queued', 'running'].includes(job.status));
       const status: Requirement['status'] = failed ? 'blocked' : completed ? 'done' : active.some(job => job.status === 'running') ? 'running' : active.length ? 'queued' : 'blocked';

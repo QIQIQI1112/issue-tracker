@@ -12,6 +12,9 @@ This is a local autonomous development workbench with a reproducible verifier, a
 - Execute a bounded task: `npm run factory -- tickets/001-labels.json`.
 - Execute and integrate into an enrolled clean target: `npm run factory -- tickets/001-labels.json --merge main`.
 - Process one queued job: `npm run worker -- --once`.
+- Discover the conversation intake target: `npm run submit-plan -- --list`.
+- Submit an entire conversation plan: `npm run submit-plan -- <plan.json>`.
+- Read submitted work: `npm run submit-plan -- --status <submission-id>`.
 - Reset disposable demo data: stop the app, then `npm run reset -- --confirm`.
 
 ## Boundaries
@@ -19,6 +22,7 @@ This is a local autonomous development workbench with a reproducible verifier, a
 - `src/domain.ts` owns validation and issue types. It does not import HTTP, storage, or browser code.
 - `src/storage.ts` owns parameterized SQLite operations.
 - `src/workflow.ts` owns pure workbench types and validation; `src/workflow-store.ts` owns transactional metadata, admission, and claims.
+- `src/submission.ts` owns the shared pure decomposition and conversation-submission contract. `scripts/submit-plan.ts` owns the pinned local API client.
 - `src/api.ts` owns HTTP translation and error responses.
 - `src/server.ts` owns process startup, loopback binding, and database ownership.
 - `src/ui/` owns browser behavior. It may import domain types; it must not import the server or storage.
@@ -38,6 +42,9 @@ Do not weaken existing acceptance checks, disable verification steps, or alter r
 
 ## Autonomous execution
 
+- For new product behavior, use `.agents/skills/issue-tracker-submit/SKILL.md` to turn the authorized conversation into a complete submitted plan unless the user explicitly requests direct implementation. Harness/platform engineering and repository maintenance use the normal workflow above.
+- Persist one submission ID and the full original goal, source summary, acceptance conditions, defaults, and dependency graph before submitting. The platform independently reviews coverage before releasing implementation jobs. Do not run a second executor against submitted work.
+- Submission receipt and worker prose do not prove delivery. Read the platform's current run reports and whole-requirement outcome; HTTP replay must never restart blocked work.
 - Derive independently verifiable slices from the business goal. Map every acceptance ID to concrete behavior checks.
 - Choose reasonable defaults for ordinary implementation details, record each decision and reason, and continue without asking about every detail.
 - Ask only when an unresolved choice materially changes the business goal or exceeds the authorized scope.
@@ -57,5 +64,6 @@ Do not weaken existing acceptance checks, disable verification steps, or alter r
 - Next exercise: `docs/exercises.md`.
 - Automation boundary: `factory/README.md`.
 - Repository enrollment, queue operation, reports, and recovery: `docs/workbench.md`.
+- Codex conversation intake and versioned plan format: `docs/conversation-intake.md`.
 
 Give every parallel worker its own worktree, ports, and database. Never drive the user's live browser profile for acceptance tests. Never kill processes by name. Keep evidence after cleanup.
