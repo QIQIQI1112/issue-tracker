@@ -1,23 +1,32 @@
-# Exercise 001: issue labels
+# Closed-loop engineering practice
 
-## Goal
+## Completed practice: issue labels
 
-Add short labels to issues and let the user filter by a label. Keep the UI, API, and persistent state consistent.
+The business goal was to assign short labels and filter issues by one label while keeping UI, API, and persistence consistent. The agent selected ordinary defaults: trim and lowercase, preserve first-occurrence order, deduplicate, at most ten labels, and 1–20 Unicode code points per label. Commas and control characters are rejected because the form uses comma-separated input. See [labels](labels.md) for the complete behavior contract.
 
-## Work in vertical slices
+Implementation followed vertical slices: failing domain/API checks, domain and SQLite migrations, failing browser checks, UI editing/filtering, then a full server-restart proof. Existing required acceptance cases remain required; the original domain creation expectation was extended with `labels: []` rather than removing old assertions.
 
-1. Add a failing behavior check for assigning one label; run it and explain the failure.
-2. Implement the domain, storage, and API path for that one behavior. Re-run the check and existing suite.
-3. Add a failing browser check for editing labels and filtering by one label. Implement and verify it.
-4. Add a server-restart check that proves labels persist.
-5. Run `npm run verify`, inspect the result and diff, and obtain independent review.
+Retained local evidence:
 
-Acceptance: changing labels through the UI survives a full server restart; selecting a label filter shows matching issues only; empty/overlong labels are rejected; existing issue behavior still works. Do not change old required assertions to get a passing result.
+- `.runs/labels-node-red.log`: missing label behavior before implementation.
+- `.runs/labels-browser-red.log` and `.runs/labels-browser-red/`: the missing Labels form control before UI implementation.
+- `.runs/labels-node-green.log` and `.runs/labels-browser-green/`: focused passing checks.
+- `.runs/verify-2026-10-14T08-18-18-023Z-1dfcc0f9/summary.json`: completed labels run, 71 Node tests and all 14 required browser cases passed.
 
-## Observe the human bottleneck
+Later full runs include controller tests as well. Use `.runs/latest.json` to identify the current source snapshot rather than treating an older report as current evidence. Generated evidence is local and ignored by Git.
 
-Record every time you have to relay a log, find a command, explain an architecture boundary, or rescue stale state. Convert repeatable actions into scripts and missing context into repository documentation. Do not jump to many parallel agents yet.
+## Inspect the executable contract
 
-## Next milestone
+Read `tickets/001-labels.json`, `factory/contracts.ts`, `AGENTS.md`, and [the controller workflow](../factory/README.md). Trace one acceptance ID through the plan, named tests, verifier receipt, review response, and final decision. Distinguish what is requested, what a worker claims, and what the owner checked.
 
-A small controller reads one approved ticket, launches a worker in an isolated worktree, invokes a controller-owned acceptance contract, captures results, and either returns a verified patch or a blocked report. It must not accept the worker's 'done' message as completion.
+Run `node --import tsx --test tests/verifier.test.ts tests/controller.test.ts tests/agent.test.ts`. Inspect how missing/skipped reports, changing code, protected-check edits, timeouts, failed candidates, and review rejection lead to failure or bounded repair. Deterministic worker fixtures test the controller; they do not replace application acceptance or prove a real model's success rate.
+
+## Run a real worker
+
+The completed [controller integration pilot](controller-pilot.md) records a real Codex repair, the owner-run verification and independent review, and the earlier failures that improved the harness.
+
+Validate a reviewed ticket, then run `npm run factory -- <ticket.json>`. Keep one worker at a time. Review selected defaults and acceptance coverage before increasing autonomy. For an already completed labels ticket, the controller may correctly return a verified candidate without an implementation change.
+
+Choose a small next business request, let the agent propose testable slices, and evaluate the delivered behavior. When human acceptance reveals a missing rule, add it as a separately reviewed criterion and a reproducible check, then use it in future runs. Do not edit criteria to hide a failed candidate.
+
+Record actual human interventions, attempts, elapsed time, invalid evidence, review findings, and first-attempt success across several tasks. Use those observations to choose the next controller improvement. Integration, release, and non-disposable data access remain separate authorized actions.

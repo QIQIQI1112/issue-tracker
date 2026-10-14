@@ -1,0 +1,47 @@
+# Autonomous development workbench
+
+## Start and use
+
+Run `npm run dev`. The supervisor starts the loopback API, Vite, and one queue worker. Production use is `npm run build` followed by `npm start`; that supervisor starts the built application and the same queue worker. `npm run worker -- --once` processes at most one runnable job when no other worker owns the database.
+
+Open Development in the sidebar. The application registers its own checkout as the first repository when it starts on a branch. Register other local Git roots with an existing target branch. Create a requirement describing the business goal, then choose Start requirement. A read-only agent proposes issues, defaults, acceptance conditions, and dependencies. A fresh agent reviews coverage of the original goal before the owner creates and queues those issues.
+
+The queue runs one job at a time across enrolled repositories. An issue waits for verified merge receipts for every dependency, including dependencies that belong to another requirement in the same repository. A manually selected Done status does not satisfy execution dependencies. Queued and running issues are frozen; automatically merged issues are immutable. Use a new follow-up issue for later changes.
+
+Requirement membership is frozen after its first start. Only the owner-controlled decomposition transaction can create its initial children. Children cannot be added, removed, or moved into a requirement during final verification or after completion. A final admission transaction also requires merge evidence for every current child. Failed siblings and cross-requirement dependency failures keep the affected requirements Blocked; retries become available when their active work drains.
+
+Standalone issues can also be started from their details. Assign a repository, acceptance conditions, and optional dependency IDs in the issue editor. The UI uses the first enrolled repository by default. Existing records keep their values and receive a standalone assignment when the application initializes its first repository. This does not launch any work.
+
+## Execution and automatic merge
+
+Registered repositories currently use the lab's Node/Playwright verification profile: installed dependencies, `src/`, `tests/`, `acceptance/`, a package with lint/typecheck/test/build/test:e2e scripts, machine Node output, and `factory/verification-contract.json`. Other Git repositories can be tracked, but execution needs that profile. New stack profiles are separate harness changes.
+
+Automatic execution starts from the exact target commit and requires a clean enrollment checkout. It does not include uncommitted edits or borrow a different branch's harness. Each issue gets an owned detached worktree, distinct ports, and a disposable database. Its frozen task snapshot records the approved goal and conditions. Ordinary implementation defaults are recorded by the planning agent.
+
+The controller prepares or reuses behavior checks, proves useful red assertions, freezes reviewed checks, implements within scope, reads owner-run machine reports, and obtains independent agent review. A worker cannot weaken existing checks or change harness configuration. Issue workers are limited to application, tests, acceptance, and documentation paths. Harness improvements are separately reviewed changes to the control system.
+
+Before merge, the owner applies the patch to the latest target in another disposable worktree. The combined result receives full verification and a fresh read-only review. The owner checks source identity throughout and records the exact Git tree and proposed commit before advancing the target. Local integration is fast-forward only. A target ref that moves during verification triggers a new integration attempt, up to three attempts. Conflicts, dirty checkouts, rejected reviews, failed checks, and exhausted budgets block completion.
+
+Repository integration uses an exclusive `loop-integration.lock` file in its common Git directory with the owner's PID, run ID, and start time. A copy is retained as `integration-owner.json`. A database queue lock also prevents two worker processes from owning the same queue. After a crash, inspect the recorded owner and stop any surviving owned processes before removing that exact stale lock; do not remove a live lock. This is a cooperative local ownership protocol; unrelated tools must not edit enrolled checkouts or refs during integration. No external Git push is needed for local completion.
+
+All child issues must have successful merge receipts before a whole-requirement verification job is queued. That job verifies the latest target and obtains a fresh review against the original business goal and all deliveries. Only then does the requirement become Done. Human sampling is optional and does not gate execution or completion.
+
+## Records, reports, and evidence
+
+SQLite schema version 3 adds repositories, requirements, issue assignments, persistent jobs, and run indexes. API and queue processes share transactional SQLite operations. Claims are atomic; only one job can be running. Job payloads are frozen snapshots. Dependency cycles, missing references, cross-repository dependencies, and duplicate active starts are rejected.
+
+Each execution writes outside its candidate checkout to `.data/evidence/<run-id>/` beside the application database. Direct factory runs default to the repository's `.data/evidence/`. Every successful or blocked controller execution generates `delivery.json` and `delivery.md` from owner records. The report includes the goal, the implementation worker's result summary, defaults and reasons, changed files grouped by application/tests/harness/documentation, named planned behavior checks, real gate and case results, attempts, independent review, verified source hash, baseline, integration commit, limitations, and a hashed evidence manifest. The result summary is explanatory prose; readiness still comes from owner verification and review.
+
+Issue details show execution history and render the report in reading order. Development also shows decomposition and whole-requirement reports. Evidence downloads are limited to manifest entries, resolve inside the run directory, and must match their delivery hash. Source worktrees, dependencies, and the trusted verifier checkout are excluded from the downloadable inventory. Logs, prompts, structured responses, red proofs, machine results, review receipts, and patches remain available. Trace ZIPs are retained only for failed browser tests.
+
+`.runs/` holds verification and scratch artifacts. Clearing it does not remove application evidence. Keep `.data/` out of Git and back up the application database with its evidence directory. Reset replaces the backlog, repository registry, job history, and demo records; it refuses both a live API owner and a live queue owner. It leaves evidence files intact.
+
+## Failure and recovery
+
+Issue execution allows three implementation attempts, five minutes per agent phase, and one hour total. Planning/review responses for requirements have at most one protocol-repair attempt with separate retained logs. Each process has timeout and output budgets. Cancellation terminates only owned process groups.
+
+An issue failure blocks queued dependents and marks its requirement Blocked. Start the blocked requirement again after resolving the cause; already merged issues are preserved. The new execution receives a new run ID. Independent review failures and infrastructure limitations remain visible in reports.
+
+On startup, interrupted executions are blocked unless durable integration verification, review, tree, and commit receipts prove that their merge is already on the enrolled target. Proven merges are reconciled into the database instead of being repeated. Queue locks left by a crash require inspecting and stopping their recorded owner before removing them. This prototype does not promise hostile-worker isolation or automatic recovery of arbitrary detached processes.
+
+The deterministic queue and integration tests prove orchestration using disposable Git repositories and real Node/Playwright reports. Browser acceptance exercises enrollment, requirement launch, completed issue reports, evidence download, ownership, and dependency rejection through the actual application. Those deterministic worker adapters do not measure model quality; live Codex pilots provide separate evidence.

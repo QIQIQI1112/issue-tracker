@@ -1,6 +1,6 @@
 # Loop — local issue tracker
 
-A small local application for learning closed-loop engineering. It has a real React UI, an HTTP API, and SQLite persistence. Its verification harness starts isolated app instances and records evidence. It is not an autonomous coding factory yet.
+A local development workbench for learning closed-loop engineering. It tracks repositories, business requirements, issues, dependencies, executions, and delivery reports. A persistent serial queue dispatches Codex workers, independently verifies and reviews candidates, automatically integrates passing changes, and checks the complete business goal.
 
 ## Quick start
 
@@ -12,22 +12,28 @@ npm run reset -- --confirm
 npm run dev
 ```
 
-Open http://127.0.0.1:5173. The API runs at http://127.0.0.1:4310. Both bind to loopback only. Demo records are explicitly disposable sample data, not a real engineering backlog. The app also works with an empty database.
+Open http://127.0.0.1:5173. The API runs at http://127.0.0.1:4310. Both bind to loopback only. Development starts a separate queue worker. Open Development to register repositories and start requirements; use issue IDs to inspect deliveries. Reset is for disposable data only. Read [the workbench workflow](docs/workbench.md) before executing tasks.
 
 ## Commands
 
 | Command | Purpose |
 | --- | --- |
 | `npm run setup` | Install locked dependencies and Chromium for browser checks. |
-| `npm run dev` | Start the API and Vite together; Ctrl+C stops both. |
+| `npm run dev` | Start the API, Vite, and queue worker; Ctrl+C stops their owned processes. |
 | `npm run doctor` | Confirm API identity, database path, and package version. |
 | `npm run reset -- --confirm` | Replace the stopped local database with demo records. Refuses a locked database. |
 | `npm test` | Run domain, SQLite, API, and ownership tests. |
 | `npm run test:e2e` | Start separate test servers and exercise the browser. Run `npm run build` first for the restart acceptance check. |
 | `npm run verify` | Lint, typecheck, tests, build, and browser checks; nonzero exit on failure. |
+| `npm run factory -- tickets/001-labels.json --validate` | Validate the task contract without launching a worker. |
+| `npm run factory -- tickets/001-labels.json` | Run a bounded Codex task in an owned worktree; requires an authenticated Codex CLI. |
+| `npm run factory -- tickets/001-labels.json --merge main` | Independently verify/review and automatically integrate into a clean local target. |
+| `npm run worker -- --once` | Process at most one runnable queued job without starting the app. |
 | `npm run build && npm start` | Serve the built UI and API together at http://127.0.0.1:4310. |
 
-Verification writes `.runs/verify-*/summary.json`, logs, a browser report, and traces. `.runs/latest.json` points to the latest summary. The summary records the Git commit and whether the checkout was dirty. A passing result with `dirty: true` does not attest to an immutable commit.
+Verification writes `.runs/verify-*/summary.json`, Node and browser reports, logs, and traces for failed tests only. `.runs/latest.json` points to the latest summary. Success requires complete reports, all required browser cases, no skips, and unchanged source and contract snapshots. The summary records file hashes as well as the Git commit and dirty flag. Read [verification](docs/verification.md) for budgets and evidence rules.
+
+Issues support normalized labels, combined label/status/search filters, and migration of existing databases. The defaults and acceptance checks are documented in [labels](docs/labels.md).
 
 ## Stack
 
@@ -36,7 +42,7 @@ Verification writes `.runs/verify-*/summary.json`, logs, a browser report, and t
 - **Vite** for the frontend development server and production bundle. `/api` is proxied locally during development, so the browser uses one origin.
 - **Express** for a thin HTTP boundary. Request validation stays in `src/domain.ts`.
 - **SQLite via Node's built-in `node:sqlite`** for persistent local data without a database service, ORM, or native addon build.
-- **Node's test runner** for behavior, persistence, and HTTP checks. **Playwright** drives Chromium through actual user-facing controls and records traces.
+- **Node's test runner** for behavior, persistence, and HTTP checks. **Playwright** drives Chromium through actual user-facing controls and retains traces for failed tests.
 - **ESLint** for code checks and a few mechanically enforced import boundaries.
 
 SQLite access is synchronous. That is deliberate for this single-user learning app, not a design for a high-throughput multi-user service. Node 24+ is required for the built-in database API. TypeScript is pinned to a version compatible with the ESLint toolchain rather than blindly selecting the newest release.
@@ -54,13 +60,13 @@ SQLite access is synchronous. That is deliberate for this single-user learning a
 
 For another checkout, give it distinct ports and a distinct database path. Browser contexts do not isolate backend data. `.data/`, `.runs/`, and dependencies are ignored by Git.
 
-The server holds an exclusive `<database>.lock` containing its PID and instance ID. Graceful shutdown removes it. A crash can leave a stale lock: inspect its PID and stop any surviving owner before manually removing the lock. Automatic crash recovery is a later exercise, not something this version claims to implement.
+API and queue processes hold separate `<database>.lock` and `<database>.queue.lock` files with their PID and instance identity. Graceful shutdown removes them. After a crash, inspect and stop the recorded owner before removing a stale lock. Queue startup reconciles interrupted runs with durable merge evidence; automatic stale-lock removal is not implemented.
 
 ## Learning path
 
 1. Read [AGENTS.md](AGENTS.md) and [architecture](docs/architecture.md).
 2. Run the app and verification harness.
-3. Try [exercise 001](docs/exercises.md): add issue labels using test-first vertical slices.
-4. Add a deterministic ticket controller only after a single agent can implement and prove one change.
+3. Study the completed [labels practice](docs/exercises.md), including the failing checks and persistence proof.
+4. Run the controller decision tests, inspect [the controller workflow](factory/README.md), then try one approved task.
 
-Use GitHub Issues for real development requests once you publish this repository. `tickets/001-labels.json` is a portable example brief, not a second authoritative backlog. The local app's records are product data, not controller state.
+The local workbench is the authoritative backlog. `tickets/001-labels.json` remains a portable CLI example. Jobs contain frozen request snapshots; controller evidence has a separate owner and is retained under `.data/evidence/`. Human review is an optional audit after automatic completion.

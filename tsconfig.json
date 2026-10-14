@@ -25,6 +25,7 @@
   },
   "include": [
     "src",
+    "factory",
     "tests",
     "acceptance",
     "scripts/*.ts",

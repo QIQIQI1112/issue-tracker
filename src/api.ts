@@ -3,6 +3,10 @@ import type { ErrorRequestHandler } from 'express';
 import { parseCreateIssue, parsePatchIssue, ValidationError } from './domain.ts';
 import type { IssueStore } from './storage.ts';
 import { targetHeader, targetIdentity } from './target-safety.ts';
+import { parseRepository } from './repository.ts';
+import { boundedText, ConflictError, positiveId, record } from './workflow.ts';
+import { evidenceFile, readDelivery } from './evidence-files.ts';
+import { basename } from 'node:path';
 
 function issueId(input: string): number {
   if (!/^[1-9]\d*$/.test(input) || !Number.isSafeInteger(Number(input))) {
@@ -33,7 +37,7 @@ export function createApp(store: IssueStore, metadata: { instanceId: string; ver
   });
   app.get('/api/issues', (_request, response) => response.json({ issues: store.list() }));
   const ownedIdentity = targetIdentity(metadata.instanceId, store.path);
-  app.use('/api/issues', (request, response, next) => {
+  app.use('/api', (request, response, next) => {
     const expected = request.get(targetHeader);
     if (['POST', 'PATCH', 'DELETE'].includes(request.method)
       && expected !== undefined && expected !== ownedIdentity) {
@@ -41,8 +45,39 @@ export function createApp(store: IssueStore, metadata: { instanceId: string; ver
     }
     next();
   });
+  app.get('/api/workbench', (_request, response) => response.json({ repos: store.work.repos(), requirements: store.work.requirements(), jobs: store.work.jobs(), runs: store.work.runs() }));
+  app.get('/api/repos', (_request, response) => response.json({ repos: store.work.repos() }));
+  app.post('/api/repos', (request, response) => response.status(201).json({ repo: store.work.addRepo(parseRepository(request.body)) }));
+  app.get('/api/requirements', (_request, response) => response.json({ requirements: store.work.requirements() }));
+  app.post('/api/requirements', (request, response) => {
+    const value = record(request.body);
+    response.status(201).json({ requirement: store.work.addRequirement({ repoId: positiveId(value.repoId), title: boundedText(value.title, 'Title', 120), goal: boundedText(value.goal, 'Business goal') }) });
+  });
+  app.post('/api/requirements/:id/start', (request, response) => response.status(202).json({ jobs: store.work.startRequirement(issueId(request.params.id)) }));
+  app.get('/api/issues/:id', (request, response) => {
+    const issue = store.get(issueId(request.params.id));
+    if (!issue) { response.status(404).json({ error: 'Issue not found.' }); return; }
+    response.json({ issue, runs: store.work.runs().filter(run => run.issueId === issue.id) });
+  });
+  app.post('/api/issues/:id/start', (request, response) => response.status(202).json({ job: store.work.startIssue(issueId(request.params.id)) }));
+  app.get('/api/runs/:id', (request, response) => {
+    const run = store.work.run(request.params.id);
+    if (!run) { response.status(404).json({ error: 'Run not found.' }); return; }
+    response.json({ run, delivery: readDelivery(run.evidencePath) });
+  });
+  app.get('/api/runs/:id/evidence', (request, response) => {
+    const run = store.work.run(request.params.id);
+    if (!run) { response.status(404).json({ error: 'Run not found.' }); return; }
+    if (typeof request.query.file !== 'string') throw new ValidationError('Select a manifest evidence file.');
+    response.setHeader('Content-Security-Policy', "default-src 'none'");
+    const path = evidenceFile(run.evidencePath, request.query.file);
+    response.download(path, basename(path), { dotfiles: 'allow' });
+  });
   app.post('/api/issues', (request, response) => {
-    response.status(201).json({ issue: store.create(parseCreateIssue(request.body)) });
+    const input = parseCreateIssue(request.body);
+    const repo = store.work.repos()[0];
+    if (!input.work && repo) input.work = { repoId: repo.id, requirementId: null, dependsOn: [], acceptance: [input.title] };
+    response.status(201).json({ issue: store.create(input) });
   });
   app.patch('/api/issues/:id', (request, response) => {
     const issue = store.update(issueId(request.params.id), parsePatchIssue(request.body));
@@ -55,6 +90,7 @@ export function createApp(store: IssueStore, metadata: { instanceId: string; ver
   });
   app.use('/api', (_request, response) => response.status(404).json({ error: 'Endpoint not found.' }));
   const errors: ErrorRequestHandler = (error: unknown, _request, response, _next) => {
+    if (error instanceof ConflictError) { response.status(409).json({ error: error.message }); return; }
     if (error instanceof ValidationError) { response.status(400).json({ error: error.message }); return; }
     if (error instanceof SyntaxError) { response.status(400).json({ error: 'Malformed JSON body.' }); return; }
     if (error instanceof Error && 'status' in error && typeof error.status === 'number'

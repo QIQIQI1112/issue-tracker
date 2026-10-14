@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "requiredBrowserTests": [
+    {
+      "file": "persistence.spec.ts",
+      "title": "a UI rename survives a full server process restart"
+    },
+    {
+      "file": "ui.spec.ts",
+      "title": "workspace exposes labelled controls and the real local persistence hint"
+    },
+    {
+      "file": "ui.spec.ts",
+      "title": "create, reload, edit and confirmed deletion persist through the real API"
+    },
+    {
+      "file": "ui.spec.ts",
+      "title": "whitespace-only titles are rejected accessibly without a mutation"
+    },
+    {
+      "file": "ui.spec.ts",
+      "title": "title and description search, both status controls, and all sort orders operate on real issues"
+    },
+    {
+      "file": "ui.spec.ts",
+      "title": "an empty isolated workspace offers a working first-issue action"
+    },
+    {
+      "file": "ui.spec.ts",
+      "title": "loading is exposed while the real issue request is pending"
+    },
+    {
+      "file": "ui.spec.ts",
+      "title": "a failed list request announces an error and Retry reaches the real server"
+    },
+    {
+      "file": "ui.spec.ts",
+      "title": "a real server validation error preserves draft values and allows retry"
+    },
+    {
+      "file": "ui.spec.ts",
+      "title": "pending creation blocks duplicate submission and dialog dismissal"
+    },
+    {
+      "file": "ui.spec.ts",
+      "title": "phone layout keeps issue actions and dialogs in the viewport with no horizontal overflow"
+    },
+    {
+      "file": "labels.spec.ts",
+      "title": "labels can be created, edited, filtered, and cleared through the UI"
+    },
+    {
+      "file": "labels.spec.ts",
+      "title": "invalid label drafts are rejected accessibly without a write"
+    },
+    {
+      "file": "labels.spec.ts",
+      "title": "UI-assigned labels survive a full server restart"
+    },
+    {
+      "file": "workbench.spec.ts",
+      "title": "a requirement becomes automatically merged issues with inspectable delivery evidence"
+    },
+    {
+      "file": "workbench.spec.ts",
+      "title": "issue ownership and dependency edits persist and cyclic dependencies are rejected"
+    }
+  ]
+}

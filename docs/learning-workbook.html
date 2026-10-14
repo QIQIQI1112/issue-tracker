@@ -109,7 +109,7 @@
       <div class="main-inner">
         <div class="eyebrow">A workbook for /Users/louis/issue-tracker</div>
         <h1>Engineering Loop Lab</h1>
-        <p class="intro">Understand one change. Prove it. Give an agent the same tools. Then build a controller that decides what happens next.</p>
+        <p class="intro">Understand one change. Prove it. Give an agent the same tools. Then study the controller that decides what happens next. Labels and the bounded controller now have reference implementations; use disposable worktrees for experiments.</p>
         <div class="toolbar" aria-label="Save and export your work">
           <button class="button primary" id="save-html" type="button">Save answered HTML</button>
           <button class="button" id="export-review" type="button">Export answers for review</button>
@@ -153,12 +153,12 @@
     const assignments = [
       {
         id:'a1', title:'Map the system', phase:'Understand', time:'25–40 minutes',
-        objective:'Separate the product, the verification harness, and the future controller. Establish a baseline you can point to.',
+        objective:'Separate the product, the verification harness, and the bounded controller. Establish a baseline you can point to.',
         resources:[['README','../README.md'],['Repository rules','../AGENTS.md'],['Architecture','architecture.md'],['Controller boundary','../factory/README.md']],
         tasks:[
           'Read the four references. Draw a small map with three areas: application, verifier, controller. Name which areas contain executable code today.',
           'Run npm run verify from the repository root. Open .runs/latest.json, follow summaryPath, and inspect that run’s summary.json and browser-results.json.',
-          'Identify three different kinds of data: issues stored by the product, development requests such as the labels ticket, and a future controller’s attempt state. Decide where each belongs.'
+          'Identify three different kinds of data: issues stored by the product, development requests such as the labels ticket, and the controller’s attempt state. Decide where each belongs.'
         ],
         commands:['npm run verify'],
         evidence:'A system map plus the exact baseline summary path and tested Git revision. A screenshot alone is not sufficient.',

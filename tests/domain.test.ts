@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 test('creation trims title and sets defaults', async () => {
   const module = await import('../src/domain.ts').catch(() => null);
   assert.ok(module, 'Issue validation is not implemented yet');
-  assert.deepEqual(module.parseCreateIssue({ title: '  Fix refresh  ' }), { title: 'Fix refresh', description: '', status: 'open', priority: 'medium' });
+  assert.deepEqual(module.parseCreateIssue({ title: '  Fix refresh  ' }), { title: 'Fix refresh', description: '', status: 'open', priority: 'medium', labels: [] });
 });
 
 test('creation rejects blank and overlong titles', async () => {

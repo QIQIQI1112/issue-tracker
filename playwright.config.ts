@@ -21,7 +21,7 @@ export default defineConfig({
   retries: 0,
   reporter: [['list'], ['json', { outputFile: resolve(runDirectory, 'browser-results.json') }], ['html', { outputFolder: resolve(runDirectory, 'report'), open: 'never' }]],
   outputDir: resolve(runDirectory, 'artifacts'),
-  use: { baseURL: `http://127.0.0.1:${uiPort}`, trace: 'on', screenshot: 'only-on-failure', video: 'retain-on-failure' },
+  use: { baseURL: `http://127.0.0.1:${uiPort}`, trace: 'retain-on-failure', screenshot: 'only-on-failure', video: 'retain-on-failure' },
   projects: [{ name: 'chromium', metadata: { instanceId, databasePath }, use: { ...devices['Desktop Chrome'] } }],
   webServer: [
     { command: 'node node_modules/tsx/dist/cli.mjs src/server.ts', url: `http://127.0.0.1:${apiPort}/api/health`, reuseExistingServer: false, gracefulShutdown: { signal: 'SIGTERM', timeout: 5000 }, timeout: 30000, env: { DB_PATH: databasePath, API_PORT: apiPort, UI_PORT: uiPort, INSTANCE_ID: instanceId } },

@@ -1,0 +1,27 @@
+import { spawn } from 'node:child_process';
+
+export function launchServices(commands) {
+  const children = [];
+  let stopping = false;
+  function stop(code = 0) {
+    if (stopping) return;
+    stopping = true;
+    process.exitCode = code;
+    const signalOwnedGroups = signal => {
+      for (const child of children) {
+        if (!child.pid) continue;
+        try { process.kill(-child.pid, signal); } catch (error) { if (error.code !== 'ESRCH') throw error; }
+      }
+    };
+    signalOwnedGroups('SIGTERM');
+    setTimeout(() => signalOwnedGroups('SIGKILL'), 5000);
+  }
+  for (const command of commands) {
+    const child = spawn(process.execPath, command, { stdio: 'inherit', detached: true });
+    children.push(child);
+    child.on('error', error => { console.error(error.message); stop(1); });
+    child.on('exit', code => { if (!stopping) stop(code ?? 1); });
+  }
+  process.on('SIGINT', () => stop());
+  process.on('SIGTERM', () => stop());
+}

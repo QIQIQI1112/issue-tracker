@@ -1,13 +1,16 @@
 {
+  "schemaVersion": 1,
   "id": "exercise-001",
   "title": "Add issue labels and label filtering",
   "goal": "Assign short labels to issues through the UI and filter the issue list by one label.",
   "acceptance": [
-    "Labels assigned through the UI survive a full server restart.",
-    "A selected label filter shows only matching issues.",
-    "Empty and overlong labels are rejected.",
-    "Existing issue behaviors remain working."
+    { "id": "labels-persistence", "description": "Labels assigned through the UI survive a full server restart and existing databases upgrade without losing issues." },
+    { "id": "labels-filter", "description": "A selected label filter shows only matching issues and combines with existing search and status filters." },
+    { "id": "labels-validation", "description": "Empty, non-string, overlong, and excessive labels are rejected without writing records." },
+    { "id": "labels-regression", "description": "Existing issue behaviors remain working; omitted patch fields are preserved." }
   ],
+  "scope": ["src/", "tests/labels.test.ts", "acceptance/labels.spec.ts", "docs/labels.md"],
   "verificationCommand": "npm run verify",
-  "notes": "Example exercise brief only. No autonomous dispatcher consumes this file yet."
+  "budget": { "maxAttempts": 3, "workerTimeoutMs": 300000, "totalTimeoutMs": 1800000 },
+  "notes": "Portable learning task. Choose and record reasonable label defaults. Formal requests belong in GitHub Issues; the controller consumes an approved snapshot."
 }

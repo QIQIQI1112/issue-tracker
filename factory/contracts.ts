@@ -1,0 +1,121 @@
+export type Acceptance = { id: string; description: string };
+export type Task = { schemaVersion: 1; id: string; title: string; goal: string; acceptance: Acceptance[]; scope: string[]; verificationCommand: 'npm run verify'; budget: { maxAttempts: number; workerTimeoutMs: number; totalTimeoutMs: number }; notes: string };
+export type Check = { file: string; title: string };
+export type Plan = { schemaVersion: 1; taskId: string; assumptions: { decision: string; reason: string }[]; slices: { id: string; goal: string; acceptanceIds: string[]; checks: Check[] }[]; browserChecks: Check[] };
+export type WorkerReport = { schemaVersion: 1; taskId: string; summary: string; blockers: string[] };
+export type Review = { schemaVersion: 1; taskId: string; approved: boolean; summary: string; findings: string[] };
+
+function object(input: unknown, name: string): Record<string, unknown> {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error(`${name} must be an object.`);
+  return input as Record<string, unknown>;
+}
+
+function text(input: unknown, name: string): string {
+  if (typeof input !== 'string' || !input.trim() || input.length > 10000) throw new Error(`${name} must be a nonempty string of at most 10000 characters.`);
+  return input.trim();
+}
+
+function list(input: unknown, name: string): unknown[] {
+  if (!Array.isArray(input) || input.length > 100) throw new Error(`${name} must be an array of at most 100 items.`);
+  return input;
+}
+
+function id(input: unknown, name: string): string {
+  const value = text(input, name);
+  if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(value)) throw new Error(`${name} must be a short lowercase identifier.`);
+  return value;
+}
+
+function integer(input: unknown, name: string, minimum: number, maximum: number): number {
+  if (!Number.isSafeInteger(input) || Number(input) < minimum || Number(input) > maximum) throw new Error(`${name} must be between ${minimum} and ${maximum}.`);
+  return Number(input);
+}
+
+export function scoped(path: string, task: Task): boolean {
+  return task.scope.some(allowed => allowed.endsWith('/') ? path.startsWith(allowed) : path === allowed);
+}
+
+function path(input: unknown, name: string): string {
+  const value = text(input, name);
+  if (value.startsWith('/') || value.includes('\\') || value.replace(/\/$/, '').split('/').some(part => part === '..' || part === '.' || !part) || !/^(src|tests|acceptance|docs)\//.test(value)) throw new Error(`${name} must stay inside application, test, acceptance, or documentation paths.`);
+  return value;
+}
+
+export function parseTask(input: unknown): Task {
+  const value = object(input, 'Task');
+  if (value.schemaVersion !== 1) throw new Error('Unsupported task schema version.');
+  if (value.verificationCommand !== 'npm run verify') throw new Error('Task verification must use the controller-owned verification command.');
+  const acceptance = list(value.acceptance, 'acceptance').map(input => {
+    const item = object(input, 'Acceptance item');
+    return { id: id(item.id, 'Acceptance ID'), description: text(item.description, 'Acceptance description') };
+  });
+  if (!acceptance.length || new Set(acceptance.map(item => item.id)).size !== acceptance.length) throw new Error('Tasks require distinct acceptance items.');
+  const scope = list(value.scope, 'scope').map(item => path(item, 'Scope'));
+  if (!scope.length) throw new Error('Tasks need an explicit scope.');
+  const budget = object(value.budget, 'Budget');
+  const parsedBudget = { maxAttempts: integer(budget.maxAttempts, 'maxAttempts', 1, 5), workerTimeoutMs: integer(budget.workerTimeoutMs, 'workerTimeoutMs', 1000, 600000), totalTimeoutMs: integer(budget.totalTimeoutMs, 'totalTimeoutMs', 1000, 3600000) };
+  if (parsedBudget.totalTimeoutMs < parsedBudget.workerTimeoutMs) throw new Error('Total budget cannot be smaller than the worker budget.');
+  return { schemaVersion: 1, id: id(value.id, 'Task ID'), title: text(value.title, 'Title'), goal: text(value.goal, 'Goal'), acceptance, scope, verificationCommand: 'npm run verify', budget: parsedBudget, notes: typeof value.notes === 'string' ? value.notes : '' };
+}
+
+export function parsePlan(input: unknown, task: Task): Plan {
+  const value = object(input, 'Plan');
+  if (value.schemaVersion !== 1 || value.taskId !== task.id) throw new Error('Plan version or task identity mismatch.');
+  const assumptions = list(value.assumptions, 'assumptions').map(input => {
+    const item = object(input, 'Assumption');
+    return { decision: text(item.decision, 'Decision'), reason: text(item.reason, 'Reason') };
+  });
+  const covered = new Set<string>();
+  const sliceIds = new Set<string>();
+  const slices = list(value.slices, 'slices').map(input => {
+    const item = object(input, 'Slice');
+    const sliceId = id(item.id, 'Slice ID');
+    if (sliceIds.has(sliceId)) throw new Error('Duplicate slice ID.');
+    sliceIds.add(sliceId);
+    const acceptanceIds = list(item.acceptanceIds, 'acceptanceIds').map(input => {
+      const value = id(input, 'Acceptance ID');
+      if (!task.acceptance.some(item => item.id === value)) throw new Error('Plan references unknown acceptance.');
+      covered.add(value);
+      return value;
+    });
+    const checks = list(item.checks, 'checks').map(input => {
+      const check = object(input, 'Check');
+      const file = path(check.file, 'Check file');
+      if (!file.startsWith('tests/') || !file.endsWith('.test.ts') || !scoped(file, task)) throw new Error('Slice checks must be scoped Node behavior tests.');
+      return { file, title: text(check.title, 'Check title') };
+    });
+    if (!acceptanceIds.length || !checks.length) throw new Error('Each slice needs acceptance IDs and executable checks.');
+    return { id: sliceId, goal: text(item.goal, 'Slice goal'), acceptanceIds, checks };
+  });
+  if (!slices.length || task.acceptance.some(item => !covered.has(item.id))) throw new Error('Plan must cover every acceptance item.');
+  const browserChecks = list(value.browserChecks, 'browserChecks').map(input => {
+    const check = object(input, 'Browser check');
+    const file = text(check.file, 'Browser file').replace(/^acceptance\//, '');
+    if (file.includes('/') || file.includes('\\') || !file.endsWith('.spec.ts') || !scoped(`acceptance/${file}`, task)) throw new Error('Browser checks must use scoped acceptance specs.');
+    return { file, title: text(check.title, 'Browser title') };
+  });
+  if (!browserChecks.length) throw new Error('Plan needs externally observable browser acceptance.');
+  return { schemaVersion: 1, taskId: task.id, assumptions, slices, browserChecks };
+}
+
+export function parseWorkerReport(input: unknown, task: Task): WorkerReport {
+  const value = object(input, 'Worker report');
+  if (value.schemaVersion !== 1 || value.taskId !== task.id) throw new Error('Worker report identity mismatch.');
+  return { schemaVersion: 1, taskId: task.id, summary: text(value.summary, 'Summary'), blockers: list(value.blockers, 'blockers').map(item => text(item, 'Blocker')) };
+}
+
+export function parseReview(input: unknown, task: Pick<Task, 'id'>): Review {
+  const value = object(input, 'Review');
+  if (value.schemaVersion !== 1 || value.taskId !== task.id || typeof value.approved !== 'boolean') throw new Error('Review identity or approval is invalid.');
+  const findings = list(value.findings, 'findings').map(item => text(item, 'Finding'));
+  if (value.approved && findings.length) throw new Error('Approved reviews cannot contain blocking findings.');
+  return { schemaVersion: 1, taskId: task.id, approved: value.approved, summary: text(value.summary, 'Summary'), findings };
+}
+
+const string = { type: 'string' };
+const strings = { type: 'array', items: string };
+const recordSchema = (properties: Record<string, unknown>) => ({ type: 'object', additionalProperties: false, properties, required: Object.keys(properties) });
+const checkSchema = recordSchema({ file: string, title: string });
+export const planSchema = recordSchema({ schemaVersion: { type: 'integer', const: 1 }, taskId: string, assumptions: { type: 'array', items: recordSchema({ decision: string, reason: string }) }, slices: { type: 'array', items: recordSchema({ id: string, goal: string, acceptanceIds: strings, checks: { type: 'array', items: checkSchema } }) }, browserChecks: { type: 'array', items: checkSchema } });
+export const workerSchema = recordSchema({ schemaVersion: { type: 'integer', const: 1 }, taskId: string, summary: string, blockers: strings });
+export const reviewSchema = recordSchema({ schemaVersion: { type: 'integer', const: 1 }, taskId: string, approved: { type: 'boolean' }, summary: string, findings: strings });
