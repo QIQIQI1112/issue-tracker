@@ -59,13 +59,15 @@ export class SerialQueue {
       return true;
     } finally {
       if (claimed) {
-        const path = join(claimed.run.evidencePath, 'workspace');
-        if (existsSync(join(path, '.git'))) {
-          let safe = true;
-          try { assertRunQuiescent(claimed.run.evidencePath); }
-          catch (error) { safe = false; writeJson(join(claimed.run.evidencePath, 'cleanup-error.json'), { reason: String(error), workspace: path }); }
-          try { if (safe) git(this.store.work.repo(claimed.job.repoId)!.path, ['worktree', 'remove', '--force', path]); }
-          catch (error) { writeJson(join(claimed.run.evidencePath, 'cleanup-error.json'), { reason: error instanceof Error ? error.message : String(error), workspace: path }); }
+        for (const name of ['workspace', 'integration-workspace']) {
+          const path = join(claimed.run.evidencePath, name);
+          if (existsSync(join(path, '.git'))) {
+            let safe = true;
+            try { assertRunQuiescent(claimed.run.evidencePath); }
+            catch (error) { safe = false; writeJson(join(claimed.run.evidencePath, 'cleanup-error.json'), { reason: String(error), workspace: path }); }
+            try { if (safe) git(this.store.work.repo(claimed.job.repoId)!.path, ['worktree', 'remove', '--force', path]); }
+            catch (error) { writeJson(join(claimed.run.evidencePath, 'cleanup-error.json'), { reason: error instanceof Error ? error.message : String(error), workspace: path }); }
+          }
         }
       }
       this.busy = false;

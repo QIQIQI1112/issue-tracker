@@ -95,3 +95,5 @@ Subprocess receipts record the exact spawned PID, all discovered owned process g
 ## Purpose-specific review
 
 See `docs/harness-reliability.md` for the current ordered protocol. Owner red proofs precede acceptance review. Ordinary integrated tasks receive one authoritative final code review against the latest verified target; delivery-only tasks retain candidate review. Candidate, integrated, and whole-goal full verification remain required. Source-bound receipts, phase timings, predecessor lineage, cumulative budgets, and invalidation reasons are included in JSON/Markdown deliveries and the issue report UI.
+
+Integration cleanup checks both the current controller settlement state and all recorded owned groups before removing its worktree. Both nested cleanup paths fail closed, retain `integration-workspace`, and write `integration-cleanup.json` when safety is unknown. Queue cleanup applies the same quiescence rule to both candidate and integration worktrees. An active controller uses the subprocess-only check; previous-run recovery additionally checks controller ownership and the full predecessor lineage.

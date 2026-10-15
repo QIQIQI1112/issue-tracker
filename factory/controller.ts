@@ -257,7 +257,7 @@ export async function runController(options: { repository: string; task: unknown
       if (options.mergeTarget) {
       try {
       state.phase = 'integrate'; save();
-      const receipt = await integrate({ repository, branch: options.mergeTarget, patchPath: join(runDirectory, 'patch.diff'), runDirectory, runId, validate: async (cwd, before, attempt) => {
+      const receipt = await integrate({ repository, branch: options.mergeTarget, patchPath: join(runDirectory, 'patch.diff'), runDirectory, runId, assertCleanupSafe: () => { if (!settled || state.cleanupSafe === false) throw new Error('Agent did not settle after cancellation.'); }, validate: async (cwd, before, attempt) => {
         state.phase = 'integration-verify';
         state.integration = { branch: options.mergeTarget!, before }; save();
         const latestContract = parseVerificationContract(readJson(join(cwd, 'factory/verification-contract.json')));

@@ -2,17 +2,27 @@ import { existsSync, readFileSync, symlinkSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { git } from './workspace.ts';
 import { snapshot, writeJson } from './evidence.ts';
+import { assertOwnedGroupsQuiescent } from './ownership.ts';
 import { acquireDatabaseLock } from '../src/instance.ts';
 
 export type IntegrationReceipt = { branch: string; before: string; commit: string; tree: string };
 
-export async function integrate(options: { repository: string; branch: string; patchPath: string; runDirectory: string; runId: string; validate: (workspace: string, before: string, attempt: number) => Promise<void> }): Promise<IntegrationReceipt> {
+export async function integrate(options: { repository: string; branch: string; patchPath: string; runDirectory: string; runId: string; assertCleanupSafe?: () => void; validate: (workspace: string, before: string, attempt: number) => Promise<void> }): Promise<IntegrationReceipt> {
   const { repository, branch, runDirectory } = options;
   if (branch.startsWith('-')) throw new Error('Invalid target branch.');
   const common = resolve(repository, git(repository, ['rev-parse', '--git-common-dir']).trim());
   const lock = join(common, 'loop-integration.lock');
   const release = acquireDatabaseLock(join(common, 'loop-integration'), options.runId);
   const workspace = join(runDirectory, 'integration-workspace');
+  const cleanup = () => {
+    if (!existsSync(workspace)) return;
+    try { options.assertCleanupSafe?.(); assertOwnedGroupsQuiescent(runDirectory); }
+    catch (error) {
+      writeJson(join(runDirectory, 'integration-cleanup.json'), { status: 'retained-unsafe', workspace, reason: error instanceof Error ? error.message : String(error), checkedAt: new Date().toISOString() });
+      throw new Error('Integration ownership is unsafe; retained the worktree for owner inspection.', { cause: error });
+    }
+    git(repository, ['worktree', 'remove', '--force', workspace]);
+  };
   try {
     writeJson(join(runDirectory, 'integration-owner.json'), JSON.parse(readFileSync(lock, 'utf8')));
     if (git(repository, ['status', '--porcelain']).trim()) throw new Error('Repository has uncommitted changes. Integration will not overwrite them.');
@@ -42,11 +52,11 @@ export async function integrate(options: { repository: string; branch: string; p
         if (git(repository, ['rev-parse', `refs/heads/${branch}`]).trim() !== commit) throw new Error('Target branch does not match the verified integration commit.');
         writeJson(join(runDirectory, 'integration.json'), receipt);
         return receipt;
-      } finally { git(repository, ['worktree', 'remove', '--force', workspace]); }
+      } finally { cleanup(); }
     }
     throw new Error('Target branch kept moving; integration retry budget exhausted.');
   } finally {
-    try { if (existsSync(workspace)) git(repository, ['worktree', 'remove', '--force', workspace]); }
+    try { cleanup(); }
     finally { release(); }
   }
 }

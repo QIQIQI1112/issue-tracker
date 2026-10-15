@@ -19,6 +19,18 @@ export function assertRunQuiescent(root: string, visited = new Set<string>()): v
     if (typeof value.directory !== 'string' || dirname(resolve(value.directory)) !== dirname(root)) throw new Error('Invalid recovery predecessor path.');
     assertRunQuiescent(value.directory, visited);
   }
+  assertOwnedGroupsQuiescent(root);
+  const ownerPath = join(root, 'controller-owner.json');
+  if (existsSync(ownerPath) && existsSync(join(root, 'state.json'))) {
+    const state = readJson(join(root, 'state.json')) as { status: string; cleanupSafe?: boolean };
+    if (state.cleanupSafe === false) throw new Error('Previous agent did not settle; owner cleanup is required.');
+    const owner = readJson(ownerPath) as { pid: number; identity?: string };
+    if (state.status === 'running' && processIdentity(owner.pid) && (!owner.identity || processIdentity(owner.pid) === owner.identity)) throw new Error('Previous controller is still running.');
+  }
+}
+
+export function assertOwnedGroupsQuiescent(root: string): void {
+  if (!existsSync(root)) return;
   const walk = (directory: string): string[] => readdirSync(directory, { withFileTypes: true }).flatMap(entry => {
     if (entry.isSymbolicLink() || ['workspace', 'trusted', 'integration-workspace'].includes(entry.name)) return [];
     const path = join(directory, entry.name);
@@ -33,12 +45,5 @@ export function assertRunQuiescent(root: string, visited = new Set<string>()): v
       catch (error) { if ((error as NodeJS.ErrnoException).code === 'ESRCH') continue; throw error; }
       throw new Error(`Previous owned process group ${pid} is still present. Inspect ${path} and stop its verified owner before resuming or cleaning up.`);
     }
-  }
-  const ownerPath = join(root, 'controller-owner.json');
-  if (existsSync(ownerPath) && existsSync(join(root, 'state.json'))) {
-    const state = readJson(join(root, 'state.json')) as { status: string; cleanupSafe?: boolean };
-    if (state.cleanupSafe === false) throw new Error('Previous agent did not settle; owner cleanup is required.');
-    const owner = readJson(ownerPath) as { pid: number; identity?: string };
-    if (state.status === 'running' && processIdentity(owner.pid) && (!owner.identity || processIdentity(owner.pid) === owner.identity)) throw new Error('Previous controller is still running.');
   }
 }
