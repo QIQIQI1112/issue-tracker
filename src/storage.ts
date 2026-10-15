@@ -27,6 +27,8 @@ const migrations = [
   `CREATE TABLE plan_submissions (id TEXT PRIMARY KEY, requirement_id INTEGER NOT NULL UNIQUE REFERENCES requirements(id), plan_hash TEXT NOT NULL, plan TEXT NOT NULL, issue_ids TEXT NOT NULL, created_at TEXT NOT NULL);`,
 ];
 
+export const DATABASE_SCHEMA_VERSION = migrations.length;
+
 function issueRow(input: unknown): Issue {
   const row = input as Omit<Issue, 'labels'> & { labels: string };
   try { return { ...row, labels: parseLabels(JSON.parse(row.labels)) }; }

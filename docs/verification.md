@@ -46,3 +46,7 @@ Required cases cover create/edit/status changes, validation, search/filter/sort,
 The default trace mode is `retain-on-failure`. Playwright still records each test, then discards successful traces; this reduces retained storage, not recording overhead. For targeted diagnosis, use `npm run test:e2e -- --trace on` to keep every trace in that run. With `retries: 0`, `on-first-retry` would not capture failures.
 
 Use `node node_modules/playwright/cli.js show-trace <trace.zip>` to inspect a trace. Routine process/worktree cleanup retains evidence; deleting run artifacts requires an explicit owner request. Port occupied: choose distinct `TEST_API_PORT` and `TEST_UI_PORT` or identify its owner. Database locked: inspect the lock PID and stop its owner; never delete a live lock. Missing Chromium: run `npm run setup` or `node node_modules/playwright/cli.js install chromium`.
+
+## Supported schema marker contract
+
+Maintenance issue #9 replaces the historical fixed marker `4` in the version-one migration check with the storage module's declared `DATABASE_SCHEMA_VERSION`. The expected behavior is that every configured migration completes and existing records survive. The supported-version declaration is separately checked against a real new database. Existing record-preservation, label-update, and unsupported-version rejection assertions remain unchanged. This is an owner-reviewed acceptance-contract revision required by additive metadata migrations, not permission to skip a migration or lower its data guarantees.
