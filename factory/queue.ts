@@ -38,7 +38,7 @@ export class SerialQueue {
       writeJson(join(run.evidencePath, 'job.json'), job);
       if (job.kind === 'issue') {
         const issue = JSON.parse(job.payload) as Issue;
-        const task = parseTask({ schemaVersion: 1, id: `issue-${issue.id}`, title: issue.title, goal: issue.description || issue.title, acceptance: issue.work!.acceptance.map((description, index) => ({ id: `criterion-${index + 1}`, description })), scope: ['src/', 'tests/', 'acceptance/', 'docs/'], verificationCommand: 'npm run verify', budget: { maxAttempts: 3, workerTimeoutMs: 300000, totalTimeoutMs: 3600000 }, notes: `Repository ${repo.name}; target ${repo.targetBranch}. Complete only after independent review and automatic integration.` });
+        const task = parseTask({ schemaVersion: 1, id: `issue-${issue.id}`, title: issue.title, goal: issue.description || issue.title, acceptance: issue.work!.acceptance.map((description, index) => ({ id: `criterion-${index + 1}`, description })), scope: ['src/', 'tests/', 'acceptance/', 'docs/'], verificationCommand: 'npm run verify', budget: { maxAttempts: 3, workerTimeoutMs: 600000, totalTimeoutMs: 3600000 }, notes: `Repository ${repo.name}; target ${repo.targetBranch}. Complete only after independent review and automatic integration.` });
         const state = await runController({ repository: repo.path, task, agent: this.options.agent ?? codexAgent(process.env.FACTORY_CODEX_BIN ?? 'codex'), baseRef: repo.targetBranch, mergeTarget: repo.targetBranch, evidenceRoot: this.evidenceRoot, runId: run.id, signal: this.options.signal });
         this.store.work.finish(run.id, state.status === 'merged' ? 'merged' : 'blocked', state.reason ?? null);
       } else await this.requirementJob(job, run);

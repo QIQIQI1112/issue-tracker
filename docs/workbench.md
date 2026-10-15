@@ -42,7 +42,7 @@ Issue details show execution history and render the report in reading order. Dev
 
 ## Failure and recovery
 
-Issue execution allows three implementation attempts, five minutes per agent phase, and one hour total. Planning/review responses for requirements have at most one protocol-repair attempt with separate retained logs. Each process has timeout and output budgets. Cancellation terminates only owned process groups.
+Issue execution allows three implementation attempts, ten minutes per agent phase, and one hour total. This uses the existing task-contract maximum without changing acceptance criteria or verification budgets. Requirement planning/review phases retain their five-minute process budget and at most one protocol-repair attempt with separate retained logs. Each process has timeout and output budgets. Cancellation terminates only owned process groups.
 
 An issue failure blocks queued dependents and marks its requirement Blocked. Start the blocked requirement again after resolving the cause; already merged issues are preserved. The new execution receives a new run ID. Independent review failures and infrastructure limitations remain visible in reports.
 
