@@ -70,3 +70,5 @@ Do not weaken existing acceptance checks, disable verification steps, or alter r
 - Codex conversation intake and versioned plan format: `docs/conversation-intake.md`.
 
 Give every parallel worker its own worktree, ports, and database. Never drive the user's live browser profile for acceptance tests. Never kill processes by name. Keep evidence after cleanup.
+
+For review purpose, checkpoint reuse, cumulative budgets, and ownership recovery, follow `docs/harness-reliability.md`. Ordinary integration uses one final independent code review after full integrated verification; whole-requirement acceptance remains required. Tests are independently reviewed after owner red proofs and frozen before implementation. Every retry must retain ownership lineage and cannot reset its issue budget.

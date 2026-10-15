@@ -17,7 +17,7 @@ export function environmentIdentity(repository: string, engine: string): string 
   return digest(JSON.stringify({ controls, runtime }));
 }
 
-type Checkpoint = { schemaVersion: 1; runId: string; taskHash: string; environment: string; baselineTree: string; baseCommit: string; sourceHash: string; patchHash: string; accepted: boolean; plan?: Plan; acceptedChecks: { path: string; hash: string }[]; redChecks: ControllerState['redChecks']; proofs: { path: string; hash: string }[] };
+type Checkpoint = { schemaVersion: 1; runId: string; taskHash: string; environment: string; baselineTree: string; baseCommit: string; sourceHash: string; patchHash: string; accepted: boolean; plan?: Plan; acceptanceReceipt?: NonNullable<ControllerState['reviewReceipts']>[number]; acceptedChecks: { path: string; hash: string }[]; redChecks: ControllerState['redChecks']; proofs: { path: string; hash: string }[] };
 
 export function saveCheckpoint(state: ControllerState, task: Task, environment: string, accepted: boolean): void {
   if (!state.baselineTree || !state.baseCommit) return;
@@ -26,9 +26,11 @@ export function saveCheckpoint(state: ControllerState, task: Task, environment: 
   if (present.length) git(state.workspace, ['add', '-N', '--', ...present]);
   const patch = git(state.workspace, ['diff', '--binary', state.baselineTree, '--']);
   writeFileSync(join(state.runDirectory, 'checkpoint.patch.tmp'), patch);
+  const acceptanceReceipt = state.reviewReceipts?.filter(receipt => receipt.purpose === 'acceptance-coverage' && receipt.approved).at(-1);
   const paths = ['acceptance-review.json', ...state.redChecks.flatMap(check => [relative(state.runDirectory, check.logPath), relative(state.runDirectory, check.logPath).replace(/\.log$/, '.jsonl')])];
+  if (acceptanceReceipt) paths.push(acceptanceReceipt.evidencePath);
   const proofs = accepted ? paths.map(path => ({ path, hash: digest(readFileSync(join(state.runDirectory, path))) })) : [];
-  const checkpoint: Checkpoint = { schemaVersion: 1, runId: state.runId, taskHash: taskIdentity(task), environment, baselineTree: state.baselineTree, baseCommit: state.baseCommit, sourceHash: source.hash, patchHash: digest(patch), accepted, plan: state.plan, acceptedChecks: source.files.filter(file => /^(tests|acceptance)\//.test(file.path)), redChecks: state.redChecks, proofs };
+  const checkpoint: Checkpoint = { schemaVersion: 1, runId: state.runId, taskHash: taskIdentity(task), environment, baselineTree: state.baselineTree, baseCommit: state.baseCommit, sourceHash: source.hash, patchHash: digest(patch), accepted, plan: state.plan, acceptanceReceipt, acceptedChecks: source.files.filter(file => /^(tests|acceptance)\//.test(file.path)), redChecks: state.redChecks, proofs };
   renameSync(join(state.runDirectory, 'checkpoint.patch.tmp'), join(state.runDirectory, 'checkpoint.patch'));
   writeJson(join(state.runDirectory, 'checkpoint.json'), checkpoint);
 }
@@ -44,10 +46,16 @@ export function loadCheckpoint(directory: string, root: string, task: Task, envi
   value.plan = parsePlan(value.plan, task);
   if (!value.proofs.length || value.redChecks.length !== value.plan.slices.flatMap(slice => slice.checks).length) throw new Error('Checkpoint behavior proofs are incomplete.');
   for (const proof of value.proofs) {
-    if (relative(directory, resolve(directory, proof.path)) !== proof.path || proof.path.startsWith('..') || !/^(acceptance-review\.json|red-\d+\.(log|jsonl))$/.test(proof.path)) throw new Error('Invalid checkpoint proof path.');
+    if (relative(directory, resolve(directory, proof.path)) !== proof.path || proof.path.startsWith('..') || !/^(acceptance-review\.json|red-\d+(?:-\d+)?\.(log|jsonl)|review-receipt-[a-z0-9-]+\.json)$/.test(proof.path)) throw new Error('Invalid checkpoint proof path.');
     if (digest(readFileSync(join(directory, proof.path))) !== proof.hash) throw new Error('Checkpoint proof hash mismatch.');
   }
   const review = parseReview(readJson(join(directory, 'acceptance-review.json')), task);
+  if (!value.acceptanceReceipt?.approved || value.acceptanceReceipt.criteriaHash !== digest(JSON.stringify(task.acceptance)) || !value.proofs.some(proof => proof.path === value.acceptanceReceipt?.evidencePath)) throw new Error('Checkpoint has no source-bound acceptance receipt.');
+  const receipt = value.acceptanceReceipt;
+  if (receipt.planHash !== digest(JSON.stringify(value.plan))) throw new Error('Checkpoint plan identity does not match its acceptance approval.');
+  const bound = readJson(join(directory, receipt.evidencePath)) as typeof receipt & { response: unknown };
+  const fields = ['purpose', 'planHash', 'sourceHash', 'criteriaHash', 'contractHash', 'approved', 'summary', 'evidencePath'] as const;
+  if (receipt.purpose !== 'acceptance-coverage' || fields.some(field => receipt[field] !== bound[field]) || JSON.stringify(parseReview(bound.response, task)) !== JSON.stringify(review)) throw new Error('Checkpoint acceptance receipt metadata does not match its hashed proof.');
   if (!review.approved) throw new Error('Checkpoint acceptance review was not approved.');
   return value;
 }

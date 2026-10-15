@@ -196,3 +196,45 @@ test('accepted draft restoration preserves tracked deletions alongside added sou
     assert.equal(existsSync(join(second.workspace, 'src/replacement.ts')), true);
   } finally { git(repository, ['worktree', 'remove', '--force', second.workspace]); }
 });
+
+test('damaged acceptance receipt metadata cannot be reused against intact proof bytes', async () => {
+  const root = evidenceDirectory('receipt-metadata');
+  const repository = fixtureRepository(join(root, 'repo'));
+  const delegate = fixtureAgent();
+  const first = await runController({ repository, task: task(), evidenceRoot: root, agent: { run: async input => {
+    if (input.phase === 'implement') throw new Error('Stop with an acceptance receipt.');
+    return await delegate.run(input);
+  } } });
+  git(repository, ['worktree', 'remove', '--force', first.workspace]);
+  const path = join(first.runDirectory, 'checkpoint.json');
+  const checkpoint = JSON.parse(readFileSync(path, 'utf8'));
+  checkpoint.acceptanceReceipt.sourceHash = 'damaged metadata';
+  writeFileSync(path, JSON.stringify(checkpoint));
+  const second = await runController({ repository, task: task(), evidenceRoot: root, resumeFrom: first.runDirectory, agent: delegate });
+  try {
+    assert.equal(second.status, 'ready', second.reason ?? 'No failure reason');
+    assert.equal(second.resume?.reused, false);
+    assert.match(second.resume?.reason ?? '', /receipt metadata/);
+  } finally { git(repository, ['worktree', 'remove', '--force', second.workspace]); }
+});
+
+test('a changed plan cannot inherit approval for different defaults or check mapping', async () => {
+  const root = evidenceDirectory('plan-identity');
+  const repository = fixtureRepository(join(root, 'repo'));
+  const delegate = fixtureAgent();
+  const first = await runController({ repository, task: task(), evidenceRoot: root, agent: { run: async input => {
+    if (input.phase === 'implement') throw new Error('Stop with an approved plan.');
+    return await delegate.run(input);
+  } } });
+  git(repository, ['worktree', 'remove', '--force', first.workspace]);
+  const path = join(first.runDirectory, 'checkpoint.json');
+  const checkpoint = JSON.parse(readFileSync(path, 'utf8'));
+  checkpoint.plan.assumptions[0].decision = 'Silently alter the approved default.';
+  writeFileSync(path, JSON.stringify(checkpoint));
+  const second = await runController({ repository, task: task(), evidenceRoot: root, resumeFrom: first.runDirectory, agent: delegate });
+  try {
+    assert.equal(second.status, 'ready', second.reason ?? 'No failure reason');
+    assert.equal(second.resume?.reused, false);
+    assert.match(second.resume?.reason ?? '', /plan identity/);
+  } finally { git(repository, ['worktree', 'remove', '--force', second.workspace]); }
+});
