@@ -2,6 +2,10 @@
 
 Discuss a business requirement with Codex and ask it to submit the complete plan to the workbench. The repo skill is `.agents/skills/issue-tracker-submit/SKILL.md`; explicitly invoke `$issue-tracker-submit` when useful. The website becomes an inspection surface while existing manual creation remains available. Repository skills are discovered under `.agents/skills` according to [official OpenAI documentation](https://learn.chatgpt.com/docs/build-skills).
 
+Workbench opens from the sidebar while Issues remains the initial view. Execution summary, requirements, queue, current blockers, and delivery history come first. Requirement cards retain the original business goal, repository, source summary, source reference, and submission ID under Conversation plan. Create requirement manually starts collapsed below execution content; repository registration remains available at the bottom. No website form or manual Start is needed for conversation submissions.
+
+Select a real run in Delivery history to read its associated report and download retained evidence. Historical failed reports remain available after a successful retry. The selected report explains loading, running without a report, terminal report unavailability, and request errors separately. Current blockers show unresolved latest attempts; inactive blocked requirements expose Retry requirement, preserving merged children and review gates. HTTP replay remains read-back and cannot retry blocked work.
+
 ## Commands
 
 Run commands from the platform checkout after `npm run dev`:
@@ -13,7 +17,7 @@ npm run submit-plan -- .runs/submissions/plan.json
 npm run submit-plan -- --status <submission-id>
 ```
 
-`--list` returns the running API identity and enrolled repositories without submitting work. Use its actual repository ID. `--validate` checks the complete contract offline. Submission creates and queues the plan automatically; no website form or Start button is required. `--status` reads the current Requirement, issues, jobs, runs, and report URLs. A successful command means its API operation succeeded; it does not assert completed development. Requirement status `done` is the final delivery outcome.
+`--list` returns the running API identity and enrolled repositories without submitting work. Use its actual repository ID. `--validate` checks the complete contract offline. Submission creates and queues the plan automatically; no website form or Start button is required. `--status` reads the current Requirement, issues, jobs, runs, and report URLs. A successful command means its API operation succeeded; it does not assert completed development. Inspect Workbench for delivery evidence: recorded child merges and the latest completed whole-goal verification must agree before the dashboard calls a goal verified. An editable Done status or passed plan review alone is insufficient.
 
 For another local instance, supply `--url http://127.0.0.1:<port>` and `--database /absolute/path/to/issues.sqlite`. The client verifies the API database and pins its instance identity on the mutation. It rejects remote origins in this local version. `--receipt <path>` selects the retained full response; by default receipts and normalized input are saved under `.runs/submissions/<submission-id>/`. Both accepted plans and controller evidence also remain in the platform database and `.data/evidence/`.
 

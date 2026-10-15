@@ -213,3 +213,37 @@ summary { cursor: pointer; }
   .persistence { position: absolute; right: 16px; top: 30px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; } }
+
+.workbench, .work-card, .selected-report, .requirement-card { min-width: 0; }
+.workbench h3, .detail-body h3, .work-card summary { overflow-wrap: anywhere; }
+.workbench .report-heading, .delivery .report-heading { flex-wrap: wrap; }
+.workbench .report-heading h3, .delivery .report-heading h3 { min-width: 0; flex: 1 1 180px; }
+.workbench .report-heading .status-pill { flex: 0 0 auto; }
+.execution-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0; }
+.execution-summary > div { padding: 14px; border: 1px solid var(--border); border-radius: 6px; background: #1d1c27; }
+.execution-summary dt { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.execution-summary dd { margin: 6px 0 0; font-size: 24px; font-variant-numeric: tabular-nums; }
+.requirement-progress { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-block: 12px; }
+.requirement-progress p { margin: 0; }
+.requirement-progress p:first-child { color: #d5d0ef; }
+.execution-list { padding-left: 20px; }
+.execution-list > li { border-bottom: 1px solid var(--border); padding-block: 12px; }
+.execution-list p { margin: 7px 0; }
+.manual-requirement > summary { font-size: 16px; font-weight: 500; }
+.workbench .text-button, .workbench .button, .detail-body .button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.work-form label, .work-card > label, .detail-body > label { min-width: 0; }
+.work-card > label select, .detail-body > label select { max-width: 100%; }
+.evidence-list a { min-width: 0; overflow-wrap: anywhere; }
+.detail-body dl { grid-template-columns: minmax(0, 110px) minmax(0, 1fr); }
+.detail-body .report-heading { flex-wrap: wrap; }
+@media (max-width: 800px) { .execution-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) {
+  .work-card { padding: 16px; }
+  .workbench .page-header p { max-width: none; }
+  .execution-summary > div { padding: 10px; }
+  .execution-summary dd { font-size: 21px; }
+  .workbench summary { min-height: 44px; padding-block: 10px; }
+  .workbench .text-button { min-height: 44px; }
+  .work-form input, .work-form textarea, .work-form select { font-size: 16px; }
+  .evidence-list li { flex-wrap: wrap; gap: 4px 12px; }
+}
