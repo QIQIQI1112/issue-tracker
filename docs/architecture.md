@@ -53,3 +53,7 @@ Automated callers may condition API mutations with `X-Issue-Tracker-Target: enco
 ## Explicit omissions
 
 No GitHub synchronization, remote publishing, authentication, cloud deployment, parallel scheduling, or automatic stale-lock removal. Enrolled local targets can merge automatically after machine verification and independent agent review. Candidate source, application metadata, and execution evidence have separate owners.
+
+## Issue inspection
+
+The issue title and LOC identifier open one read-only diagnostics dialog. The browser retains creation, deletion and list controls; repository/requirement administration uses the existing APIs and conversation CLI. There is no Workbench page or issue editing dialog. Diagnostics combine persisted issue metadata with owned jobs, issue runs and requirement audit runs from the existing APIs. Current execution reasons and limitations remain separate from selected historical reports. Manifest text evidence previews use the existing verified evidence endpoint, render escaped plain text, enforce a 1 MiB received-byte bound and abort obsolete loads. Every manifest artifact retains its download link. Missing report/review data cannot establish verified delivery.
