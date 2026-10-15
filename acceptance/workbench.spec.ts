@@ -13,12 +13,14 @@ test('a requirement becomes automatically merged issues with inspectable deliver
   test.setTimeout(60000);
   const repository = fixtureRepository(info.outputPath('owned-repository'));
   await page.goto(appUrl(info));
-  await page.getByRole('button', { name: 'Development', exact: true }).click();
+  await page.getByRole('button', { name: /^(Development|Workbench)$/ }).click();
   await page.getByText('Register a repository', { exact: true }).click();
   await page.getByLabel('Repository name', { exact: true }).fill('Acceptance repository');
   await page.getByLabel('Local repository path', { exact: true }).fill(repository);
   await page.getByRole('button', { name: 'Register repository', exact: true }).click();
   await expect(page.getByRole('status')).toContainText('Repository registered.');
+  const manualCreation = page.getByText('Create requirement manually', { exact: true });
+  if (await manualCreation.count()) await manualCreation.click();
   await page.getByLabel('Requirement repository', { exact: true }).selectOption({ label: 'Acceptance repository' });
   await page.getByLabel('Requirement title', { exact: true }).fill('Observable readiness');
   await page.getByLabel('Business goal', { exact: true }).fill('Return ready and prove the integrated behavior.');
@@ -71,7 +73,7 @@ test('a Codex conversation plan submitted through the CLI appears with provenanc
   const receipt = JSON.parse(readFileSync(receiptPath, 'utf8'));
   expect(receipt.jobs[0].kind).toBe('plan_review');
   await page.goto(appUrl(info));
-  await page.getByRole('button', { name: 'Development', exact: true }).click();
+  await page.getByRole('button', { name: /^(Development|Workbench)$/ }).click();
   const card = page.locator('.requirement-card').filter({ has: page.getByRole('heading', { name: 'Conversation readiness', exact: true }) });
   await expect(card).toContainText('queued');
   await card.getByText('Conversation plan', { exact: true }).click();

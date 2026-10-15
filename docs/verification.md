@@ -10,6 +10,8 @@ Node tests are discovered recursively under `tests/` and emit `node-results.json
 
 The browser manifest preserves the original 11 required cases, the three label cases, and the two workbench cases. The conversation-intake contract revision adds one case that submits through the real CLI and inspects imported provenance, issue IDs, and completed delivery in the browser. No prior case is removed or weakened. The migration regression now expects schema version 4 while preserving its existing record and label assertions. Review criteria changes separately from candidate implementation. `tests/verifier.test.ts` exercises skipped, missing, incomplete, timed-out, changed-source, and valid evidence using isolated executable fixtures.
 
+The dashboard UI revision has a separate owner-reviewed interaction compatibility change before product execution: workbench cases navigate using either the legacy Development label or the Workbench label, and the manual-creation case opens `Create requirement manually` when that disclosure exists. All original creation, repository selection, queue, persistence, merge, report, download, and ownership assertions remain in place. The product task must add positive checks for its new dashboard, default-collapsed manual entry, and responsive states; those checks are independently reviewed and frozen by the controller. This compatibility step does not remove required cases or permit missing dashboard behavior.
+
 ## Budgets
 
 | Variable | Default | Meaning |
