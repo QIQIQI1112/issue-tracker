@@ -96,13 +96,20 @@ export async function runController(options: { repository: string; task: unknown
     };
     state.plan = parsePlan(await readonly('plan', 0), task);
     writeJson(join(runDirectory, 'plan.json'), state.plan);
-    const testReport = parseWorkerReport(await invoke('tests', 0), task);
-    writeJson(join(runDirectory, 'test-report.json'), testReport);
-    if (testReport.blockers.length) throw new Error(testReport.blockers.join('\n'));
-    enforce(true);
-    const acceptanceReview = parseReview(await readonly('acceptance-review', 0), task);
-    writeJson(join(runDirectory, 'acceptance-review.json'), acceptanceReview);
-    if (!acceptanceReview.approved) throw new Error(`Acceptance review rejected the checks: ${acceptanceReview.findings.join('\n')}`);
+    let acceptanceFeedback = '';
+    for (let number = 1; number <= task.budget.maxAttempts; number += 1) {
+      const testReport = parseWorkerReport(await invoke('tests', number - 1, acceptanceFeedback), task);
+      writeJson(join(runDirectory, 'test-report.json'), testReport);
+      writeJson(join(runDirectory, `test-report-${number}.json`), testReport);
+      if (testReport.blockers.length) throw new Error(testReport.blockers.join('\n'));
+      enforce(true);
+      const acceptanceReview = parseReview(await readonly('acceptance-review', number - 1), task);
+      writeJson(join(runDirectory, 'acceptance-review.json'), acceptanceReview);
+      writeJson(join(runDirectory, `acceptance-review-${number}.json`), acceptanceReview);
+      if (acceptanceReview.approved) break;
+      acceptanceFeedback = `Independent acceptance review rejected the new checks: ${acceptanceReview.findings.join('\n')}\nRepair only the unapproved scoped checks. Preserve every original test byte, the plan, acceptance criteria, and implementation. All revised checks require another independent acceptance review.`;
+      if (number === task.budget.maxAttempts) throw new Error(`Acceptance review attempt budget exhausted. ${acceptanceFeedback}`);
+    }
     const accepted = snapshot(state.workspace);
     for (const file of accepted.files.filter(file => /^(tests|acceptance)\//.test(file.path))) protectedFiles.set(file.path, file.hash);
     checksFrozen = true;

@@ -25,7 +25,7 @@ The baseline may already satisfy the task. Named checks then record `already_pas
 
 1. **Prepare:** create a detached worktree, snapshot source and its baseline Git tree, allocate distinct loopback ports, and assign a disposable database.
 2. **Plan:** a read-only session records ordinary defaults and maps every acceptance ID to named Node checks and required browser cases.
-3. **Checks:** a worker adds missing scoped tests without changing implementation or any original test bytes. A fresh read-only session reviews their coverage. The controller freezes their file hashes.
+3. **Checks:** a worker adds missing scoped tests without changing implementation or any original test bytes. A fresh read-only session reviews their coverage. Rejected new checks receive the findings and may be repaired up to the task's `maxAttempts`, within the same total deadline. Each revision requires fresh review; exhaustion blocks implementation. The controller freezes file hashes only after approval. Numbered `test-report-*.json` and `acceptance-review-*.json` retain every decision alongside the latest report.
 4. **Red proof:** execute each named Node check. Require an assertion failure for missing behavior, or an actual named pass when already satisfied. Imports, environment failures, skipped tests, and absent names do not qualify.
 5. **Implement and verify:** a worker implements scoped slices. The owner runs a copied trusted verifier against the candidate, reads machine reports, and checks protected files and source identity.
 6. **Review or repair:** a fresh read-only session reviews the candidate and verification receipt. Failures feed a repair session within the attempt/time budget. Protected-file edits or invalid orchestration responses block the task immediately.
