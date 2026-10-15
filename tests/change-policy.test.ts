@@ -4,9 +4,6 @@ import { parseSubmission } from '../src/submission.ts';
 import { assignment } from '../src/workflow.ts';
 import { IssueStore } from '../src/storage.ts';
 import { protectedPath } from '../factory/workspace.ts';
-import { createElement } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
-import { Workbench } from '../src/ui/Workbench.tsx';
 
 const legacy = { schemaVersion: 1, submissionId: 'legacy-policy', repoId: 1, requirement: { title: 'Goal', goal: 'Deliver observable behavior.' }, source: { kind: 'codex', reference: 'conversation', summary: 'Authorized business goal.' }, assumptions: [], issues: [{ key: 'feature', title: 'Feature', description: 'Deliver behavior.', acceptance: ['Behavior is observable.'], dependsOn: [] }] };
 
@@ -37,8 +34,10 @@ test('maintenance issues remain separately queued and cannot run through the fea
     assert.equal(jobs.find(job => job.issueId === maintenance.id)!.kind, 'maintenance');
     assert.equal(store.work.claim('/evidence'), undefined, 'Ordinary queue cannot claim maintenance or its dependent.');
     assert.equal(store.get(maintenance.id)!.work!.changeKind, 'harness');
-    const html = renderToStaticMarkup(createElement(Workbench, { data: { repos: store.work.repos(), requirements: store.work.requirements(), jobs: store.work.jobs(), runs: [] }, issues: store.list(), refresh: () => {}, openIssue: () => {} }));
-    assert.match(html, /Awaiting maintenance verification/);
+    const waiting = jobs.find(job => job.issueId === maintenance.id)!;
+    assert.equal(waiting.status, 'queued');
+    assert.equal(waiting.runId, null);
+    assert.deepEqual(store.work.runs(), [], 'Waiting maintenance cannot fabricate execution or verification evidence.');
     assert.throws(() => store.work.startRequirement(req.id), /active/);
   } finally { store.close(); }
 });

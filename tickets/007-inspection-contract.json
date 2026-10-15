@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "recordType": "owner-maintenance",
+  "id": "inspection-contract",
+  "issueId": 12,
+  "requirementId": 3,
+  "changeKind": "acceptance_contract",
+  "dependsOn": [],
+  "goal": "Revise the explicitly retired editing and Workbench UI acceptance contract before implementing the read-only inspection interface.",
+  "acceptance": [
+    "Document retired UI interactions and replacement checks while preserving business, data and execution guarantees.",
+    "Keep all five verification gates, explicit required browser cases, owned targets and genuine machine evidence.",
+    "The revised checks pass against the unchanged application; the feature adds strict new behavior checks separately.",
+    "Activate only after complete verification and independent exact-source, issue-bound review and local integration."
+  ]
+}

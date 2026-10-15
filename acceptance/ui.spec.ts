@@ -1,6 +1,10 @@
-import { expect } from '@playwright/test';
+import { expect, test as ownedTest } from '@playwright/test';
+import { mkdirSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { Issue } from '../src/domain.ts';
 import { appUrl, test } from './workspace.ts';
+import { availablePort, launch, stop } from './owned-server.ts';
+import { targetHeader, targetIdentity } from '../src/target-safety.ts';
 
 test('workspace exposes labelled controls and the real local persistence hint', async ({ page }, info) => {
   await page.goto(appUrl(info));
@@ -33,7 +37,7 @@ test('workspace exposes labelled controls and the real local persistence hint', 
   await expect(opener).toBeFocused();
 });
 
-test('create, reload, edit and confirmed deletion persist through the real API', async ({ page, request, workspace }, info) => {
+test('create, reload, inspect API updates and confirmed deletion persist', async ({ page, request, workspace }, info) => {
   const title = `${workspace.prefix} Repair keyboard focus`;
   const editedTitle = `${workspace.prefix} Preserve keyboard focus`;
   const api = `${appUrl(info)}/api/issues`;
@@ -52,28 +56,25 @@ test('create, reload, edit and confirmed deletion persist through the real API',
   await expect(create).not.toBeVisible();
   await expect(page.getByRole('button', { name: 'New issue', exact: true })).toBeFocused();
   await page.getByLabel('Search issues', { exact: true }).fill(workspace.prefix);
-  await expect(page.getByRole('button', { name: `Edit ${title}`, exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: `View issue ${title}`, exact: true })).toBeVisible();
   const row = page.getByTestId(`issue-${issue.id}`);
   await expect(row.getByText(`LOC-${String(issue.id).padStart(3, '0')}`, { exact: true })).toBeVisible();
   await expect(row.getByText('In progress', { exact: true })).toBeVisible();
   await expect(row.getByText('High', { exact: true })).toBeVisible();
   await page.reload();
   await page.getByLabel('Search issues', { exact: true }).fill(workspace.prefix);
-  const editOpener = page.getByRole('button', { name: `Edit ${title}`, exact: true });
-  await expect(editOpener).toBeVisible();
-  await editOpener.click();
-  const edit = page.getByRole('dialog', { name: 'Edit issue', exact: true });
-  await expect(edit.getByLabel('Title', { exact: true })).toHaveValue(title);
-  await expect(edit.getByLabel('Description', { exact: true })).toHaveValue('Restore focus after closing the dialog.');
-  await expect(edit.getByLabel('Status', { exact: true })).toHaveValue('in_progress');
-  await expect(edit.getByLabel('Priority', { exact: true })).toHaveValue('high');
-  await edit.getByLabel('Title', { exact: true }).fill(editedTitle);
-  await edit.getByLabel('Description', { exact: true }).fill('Keyboard support verified.');
-  await edit.getByLabel('Status', { exact: true }).selectOption('done');
-  await edit.getByLabel('Priority', { exact: true }).selectOption('low');
-  await edit.getByRole('button', { name: 'Save changes', exact: true }).click();
-  await expect(edit).not.toBeVisible();
-  await expect(page.getByRole('button', { name: `Edit ${editedTitle}`, exact: true })).toBeFocused();
+  const detailOpener = page.getByRole('button', { name: `View issue ${title}`, exact: true });
+  await expect(detailOpener).toBeVisible();
+  await detailOpener.click();
+  const detail = page.getByRole('dialog', { name: `Issue #${issue.id}`, exact: true });
+  await expect(detail.getByRole('heading', { name: title, exact: true })).toBeVisible();
+  await expect(detail.getByText('Restore focus after closing the dialog.', { exact: true })).toBeVisible();
+  await expect(detail.getByLabel('Title', { exact: true })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(detail).not.toBeVisible();
+  await expect(detailOpener).toBeFocused();
+  const updated = await request.patch(`${api}/${issue.id}`, { data: { title: editedTitle, description: 'Keyboard support verified.', status: 'done', priority: 'low' } });
+  expect(updated.status()).toBe(200);
   const persisted = await request.get(api);
   expect(persisted.status()).toBe(200);
   const { issues } = await persisted.json() as { issues: Issue[] };
@@ -124,7 +125,7 @@ test('title and description search, both status controls, and all sort orders op
   await page.goto(appUrl(info));
   const search = page.getByLabel('Search issues', { exact: true });
   await search.fill(workspace.prefix);
-  const titles = page.getByRole('region', { name: 'Issue list', exact: true }).getByRole('button', { name: /^Edit / }).filter({ hasText: workspace.prefix });
+  const titles = page.getByRole('region', { name: 'Issue list', exact: true }).getByRole('button').filter({ hasText: workspace.prefix });
   await expect(titles).toHaveText([`${workspace.prefix} Beta layout`, `${workspace.prefix} Alpha keyboard`, `${workspace.prefix} Zulu routing`]);
   await page.getByLabel('Sort issues', { exact: true }).selectOption('priority');
   await expect(titles).toHaveText([`${workspace.prefix} Zulu routing`, `${workspace.prefix} Beta layout`, `${workspace.prefix} Alpha keyboard`]);
@@ -162,19 +163,28 @@ test('title and description search, both status controls, and all sort orders op
   await expect(titles).toHaveCount(3);
 });
 
-test('an empty isolated workspace offers a working first-issue action', async ({ page, request }, info) => {
-  const response = await request.get(`${appUrl(info)}/api/issues`);
-  expect(response.status()).toBe(200);
-  expect((await response.json() as { issues: Issue[] }).issues).toEqual([]);
-  await page.goto(appUrl(info));
-  await expect(page.getByRole('heading', { name: 'No issues yet', exact: true })).toBeVisible();
-  const opener = page.getByRole('button', { name: 'Create your first issue', exact: true });
-  await opener.click();
-  const dialog = page.getByRole('dialog', { name: 'Create issue', exact: true });
-  await expect(dialog).toBeVisible();
-  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await expect(dialog).not.toBeVisible();
-  await expect(opener).toBeFocused();
+ownedTest('an empty isolated workspace offers a working first-issue action', async ({ page, request }, info) => {
+  const directory = info.outputPath('owned-empty-instance');
+  mkdirSync(directory, { recursive: true });
+  const databasePath = resolve(directory, 'empty.sqlite');
+  const running = await launch(await availablePort(), databasePath, 'empty-workspace');
+  try {
+    await page.context().setExtraHTTPHeaders({ [targetHeader]: targetIdentity('empty-workspace', databasePath) });
+    const health = await (await request.get(`${running.url}/api/health`)).json();
+    expect(health).toMatchObject({ instanceId: 'empty-workspace', databasePath });
+    const response = await request.get(`${running.url}/api/issues`);
+    expect(response.status()).toBe(200);
+    expect((await response.json() as { issues: Issue[] }).issues).toEqual([]);
+    await page.goto(running.url);
+    await expect(page.getByRole('heading', { name: 'No issues yet', exact: true })).toBeVisible();
+    const opener = page.getByRole('button', { name: 'Create your first issue', exact: true });
+    await opener.click();
+    const dialog = page.getByRole('dialog', { name: 'Create issue', exact: true });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(dialog).not.toBeVisible();
+    await expect(opener).toBeFocused();
+  } finally { await stop(running.child); }
 });
 
 test('loading is exposed while the real issue request is pending', async ({ page, workspace }, info) => {
@@ -235,7 +245,7 @@ test('a real server validation error preserves draft values and allows retry', a
   await expect(dialog.getByRole('button', { name: 'Create issue', exact: true })).toBeEnabled();
   await dialog.getByRole('button', { name: 'Create issue', exact: true }).click();
   await expect(dialog).not.toBeVisible();
-  await expect(page.getByRole('button', { name: `Edit ${title}`, exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: `View issue ${title}`, exact: true })).toBeVisible();
 });
 
 test('pending creation blocks duplicate submission and dialog dismissal', async ({ page, request, workspace }, info) => {
@@ -272,7 +282,7 @@ test('pending creation blocks duplicate submission and dialog dismissal', async 
   } finally { release(); }
 });
 
-test('phone layout keeps issue actions and dialogs in the viewport with no horizontal overflow', async ({ page, workspace }, info) => {
+test('phone layout keeps issue actions and dialogs in the viewport with no horizontal overflow', async ({ page, request, workspace }, info) => {
   const issue = await workspace.create({ title: 'X'.repeat(72), description: 'd'.repeat(180), status: 'in_progress', priority: 'high' });
   await page.setViewportSize({ width: 390, height: 844 });
   const externalRequests: string[] = [];
@@ -281,21 +291,21 @@ test('phone layout keeps issue actions and dialogs in the viewport with no horiz
   await page.getByLabel('Search issues', { exact: true }).fill(workspace.prefix);
   const row = page.getByTestId(`issue-${issue.id}`);
   await expect(row).toBeVisible();
-  await expect(row.getByRole('button', { name: `Edit ${issue.title}`, exact: true })).toBeInViewport();
+  await expect(row.getByRole('button', { name: `View issue ${issue.title}`, exact: true })).toBeInViewport();
   await expect(row.getByRole('button', { name: `Delete ${issue.title}`, exact: true })).toBeInViewport();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  await row.getByRole('button', { name: `Edit ${issue.title}`, exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: 'Edit issue', exact: true });
-  await expect(dialog.getByLabel('Title', { exact: true })).toBeFocused();
-  await expect(dialog.getByRole('button', { name: 'Save changes', exact: true })).toBeInViewport();
+  await row.getByRole('button', { name: `View issue ${issue.title}`, exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: `Issue #${issue.id}`, exact: true });
+  await expect(dialog.getByRole('button', { name: 'Close dialog', exact: true })).toBeInViewport();
+  await expect(dialog.getByRole('heading', { name: issue.title, exact: true })).toBeVisible();
   const bounds = await dialog.boundingBox();
   expect(bounds).not.toBeNull();
   expect(bounds!.x >= 0 && bounds!.x + bounds!.width <= 390).toBe(true);
-  const title = `${workspace.prefix} Mobile layout verified`;
-  await dialog.getByLabel('Title', { exact: true }).fill(title);
-  await dialog.getByLabel('Status', { exact: true }).selectOption('done');
-  await dialog.getByRole('button', { name: 'Save changes', exact: true }).click();
+  await page.keyboard.press('Escape');
   await expect(dialog).not.toBeVisible();
+  const title = `${workspace.prefix} Mobile layout verified`;
+  expect((await request.patch(`${appUrl(info)}/api/issues/${issue.id}`, { data: { title, status: 'done' } })).status()).toBe(200);
+  await page.reload();
   await page.getByRole('navigation', { name: 'Workspace views' }).getByRole('button', { name: 'Done', exact: true }).click();
   await expect(row.getByText('Done', { exact: true })).toBeVisible();
   await page.screenshot({ path: info.outputPath('phone-workspace.png'), fullPage: true });
