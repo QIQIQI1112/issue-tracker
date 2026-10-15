@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "recordType": "owner-maintenance",
+  "id": "durable-retry",
+  "issueId": 7,
+  "requirementId": 2,
+  "changeKind": "harness",
+  "goal": "Retain and safely resume accepted source drafts with cumulative issue budgets and bounded integration repair.",
+  "acceptance": [
+    "Source checkpoints preserve new files outside disposable worktrees and bind accepted evidence identities.",
+    "Changed criteria, controls, runtime, or damaged proof cannot reuse approvals.",
+    "Retries preserve attempt and active-time budgets and refuse live process ownership conflicts.",
+    "Integration rejection feeds repair without advancing the target or modifying frozen checks."
+  ],
+  "execution": "Separate owner maintenance; this audit record does not grant feature-executor scope."
+}

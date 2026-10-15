@@ -15,6 +15,8 @@ import { controllerDelivery, saveDelivery } from './delivery.ts';
 import { runProcess } from './process.ts';
 import type { Verification } from './controller.ts';
 import { trustedVerifier } from './verifier.ts';
+import { captureInterruptedDraft } from './checkpoint.ts';
+import { assertRunQuiescent } from './ownership.ts';
 import { recoverMerge } from './recovery.ts';
 
 export class SerialQueue {
@@ -38,10 +40,12 @@ export class SerialQueue {
       writeJson(join(run.evidencePath, 'job.json'), job);
       if (job.kind === 'issue') {
         const issue = JSON.parse(job.payload) as Issue;
+        const issueHistory = this.store.work.runs().filter(item => item.id !== run.id && item.repoId === repo.id && item.issueId === issue.id);
+        for (const prior of issueHistory) assertRunQuiescent(prior.evidencePath);
         const previous = this.store.work.runs().filter(item => item.id !== run.id && item.repoId === repo.id && item.issueId === issue.id && item.status === 'blocked').sort((a, b) => b.jobId - a.jobId)[0];
         const feedback = previous ? `\nPrevious blocked attempt, diagnostic context only: ${JSON.stringify({ runId: previous.id, reason: previous.reason?.slice(0, 12000) ?? null })}. Address the recorded failure without changing the original goal, criteria, or review gates.` : '';
         const task = parseTask({ schemaVersion: 1, id: `issue-${issue.id}`, title: issue.title, goal: issue.description || issue.title, acceptance: issue.work!.acceptance.map((description, index) => ({ id: `criterion-${index + 1}`, description })), scope: ['src/', 'tests/', 'acceptance/', 'docs/'], verificationCommand: 'npm run verify', budget: { maxAttempts: 3, workerTimeoutMs: 600000, totalTimeoutMs: 3600000 }, notes: `Repository ${repo.name}; target ${repo.targetBranch}. Complete only after independent review and automatic integration.${feedback}` });
-        const state = await runController({ repository: repo.path, task, agent: this.options.agent ?? codexAgent(process.env.FACTORY_CODEX_BIN ?? 'codex'), baseRef: repo.targetBranch, mergeTarget: repo.targetBranch, evidenceRoot: this.evidenceRoot, runId: run.id, signal: this.options.signal });
+        const state = await runController({ repository: repo.path, task, agent: this.options.agent ?? codexAgent(process.env.FACTORY_CODEX_BIN ?? 'codex'), baseRef: repo.targetBranch, mergeTarget: repo.targetBranch, evidenceRoot: this.evidenceRoot, runId: run.id, signal: this.options.signal, resumeFrom: previous?.evidencePath, budgetKey: `repo-${repo.id}:issue-${issue.id}` });
         this.store.work.finish(run.id, state.status === 'merged' ? 'merged' : 'blocked', state.reason ?? null);
       } else await this.requirementJob(job, run);
       return true;
@@ -57,7 +61,10 @@ export class SerialQueue {
       if (claimed) {
         const path = join(claimed.run.evidencePath, 'workspace');
         if (existsSync(join(path, '.git'))) {
-          try { git(this.store.work.repo(claimed.job.repoId)!.path, ['worktree', 'remove', '--force', path]); }
+          let safe = true;
+          try { assertRunQuiescent(claimed.run.evidencePath); }
+          catch (error) { safe = false; writeJson(join(claimed.run.evidencePath, 'cleanup-error.json'), { reason: String(error), workspace: path }); }
+          try { if (safe) git(this.store.work.repo(claimed.job.repoId)!.path, ['worktree', 'remove', '--force', path]); }
           catch (error) { writeJson(join(claimed.run.evidencePath, 'cleanup-error.json'), { reason: error instanceof Error ? error.message : String(error), workspace: path }); }
         }
       }
@@ -78,7 +85,7 @@ export class SerialQueue {
     writeJson(join(run.evidencePath, 'failure.json'), { reason });
     if (existsSync(join(run.evidencePath, 'state.json')) && existsSync(join(run.evidencePath, 'task.json'))) {
       const state = readJson(join(run.evidencePath, 'state.json')) as ControllerState;
-      state.status = 'blocked'; state.phase = 'blocked'; state.reason = reason; state.completedAt = new Date().toISOString();
+      state.status = 'blocked'; state.failedPhase ??= state.phase; state.reason = reason; state.completedAt = new Date().toISOString();
       writeJson(join(run.evidencePath, 'state.json'), state);
       controllerDelivery(state, parseTask(readJson(join(run.evidencePath, 'task.json'))));
     } else {
@@ -91,8 +98,12 @@ export class SerialQueue {
 
   recover(): void {
     for (const run of this.store.work.runs().filter(run => run.status === 'running')) {
+      assertRunQuiescent(run.evidencePath);
       const merged = recoverMerge(this.store.work.repo(run.repoId)!.path, run.evidencePath);
       const reason = 'Queue worker was interrupted. Inspect retained evidence before retrying.';
+      if (!merged) {
+        try { captureInterruptedDraft(run.evidencePath); } catch (error) { writeJson(join(run.evidencePath, 'draft-recovery-error.json'), { reason: String(error) }); }
+      }
       if (!merged) this.blockedDelivery(this.store.work.jobs().find(job => job.id === run.jobId)!, run, reason);
       this.store.work.finish(run.id, merged ? 'merged' : 'blocked', merged ? null : reason);
     }

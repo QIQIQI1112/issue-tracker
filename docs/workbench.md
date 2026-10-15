@@ -59,3 +59,5 @@ The deterministic queue and integration tests prove orchestration using disposab
 ## Maintenance delivery
 
 Version-two plans can classify separate acceptance-contract and harness issues. Their `maintenance` jobs wait for owner evidence; ordinary workers cannot claim them. Feature dependents wait for recorded maintenance merges. Use the owner recorder described in factory/README.md after full verification, independent review, and actual local integration. Human audit remains optional. Classification never grants the feature executor control-plane write permission.
+
+Retries retain accepted checkpoints and bounded budgets across run IDs. Open the earlier and current delivery evidence to see the predecessor, reuse decision, failed phase, and checkpoint proof hashes. A changed goal, acceptance contract, original test, harness, dependency lock, or runtime invalidates reuse. Infrastructure/process ownership blockers require cleanup of the verified owner before retry; retry never relaxes tests or expands execution authority.

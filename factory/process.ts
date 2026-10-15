@@ -1,5 +1,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, appendFileSync } from 'node:fs';
+import { processIdentity } from './ownership.ts';
+import { writeJson } from './evidence.ts';
 import { dirname } from 'node:path';
 
 export type ProcessResult = { status: 'passed' | 'failed' | 'timeout' | 'cancelled' | 'output_limit'; pid: number | null; exitCode: number | null; signal: NodeJS.Signals | null; durationMs: number; output: string; error?: string };
@@ -18,6 +20,8 @@ export async function runProcess(options: ProcessOptions): Promise<ProcessResult
   mkdirSync(dirname(options.logPath), { recursive: true });
   writeFileSync(options.logPath, '');
   const child = spawn(options.command, options.args, { cwd: options.cwd, env: { ...(options.env ?? process.env), ISSUE_TRACKER_PARENT_GRACE_MS: String(Math.max(1, Math.floor(ownerGrace / 2))) }, detached: true, stdio: [options.input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'] });
+  const owner = { pid: child.pid ?? null, identity: child.pid ? processIdentity(child.pid) : '', cwd: options.cwd, command: options.command, args: options.args, groups: child.pid ? [child.pid] : [], settled: false };
+  writeJson(`${options.logPath}.owner.json`, owner);
   let status: ProcessResult['status'] | undefined;
   let errorMessage: string | undefined;
   let output = '';
@@ -34,6 +38,8 @@ export async function runProcess(options: ProcessOptions): Promise<ProcessResult
     const pending = [child.pid];
     for (let index = 0; index < pending.length; index += 1) for (const [pid, parent] of rows) if (parent === pending[index] && !descendants.has(pid)) { descendants.add(pid); pending.push(pid); }
     for (const [pid, , group] of rows) if (descendants.has(pid) && descendants.has(group)) ownedGroups.add(group);
+    owner.groups = [...ownedGroups];
+    writeJson(`${options.logPath}.owner.json`, owner);
   };
   const anyAlive = () => [...ownedGroups].some(alive);
   const signalGroup = (signal: NodeJS.Signals) => {
@@ -81,6 +87,8 @@ export async function runProcess(options: ProcessOptions): Promise<ProcessResult
       if (forcing) clearTimeout(forcing);
       options.signal?.removeEventListener('abort', abort);
       process.removeListener('SIGTERM', ownerStopped); process.removeListener('SIGINT', ownerStopped);
+      owner.settled = !anyAlive();
+      writeJson(`${options.logPath}.owner.json`, owner);
       resolve({ status: status ?? (exitCode === 0 ? 'passed' : 'failed'), pid: child.pid ?? null, exitCode, signal, durationMs: Date.now() - started, output, ...(errorMessage ? { error: errorMessage } : {}) });
     });
   });

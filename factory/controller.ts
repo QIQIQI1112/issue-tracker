@@ -8,15 +8,20 @@ import { parseVerificationContract, readJson, snapshot, writeJson } from './evid
 import { runProcess } from './process.ts';
 import { allocatePorts, git, prepareWorkspace, processEnvironment, protectedPath } from './workspace.ts';
 import { controllerDelivery } from './delivery.ts';
+import { environmentIdentity, loadCheckpoint, restoreCheckpoint, saveCheckpoint } from './checkpoint.ts';
+import { assertRunQuiescent, processIdentity } from './ownership.ts';
+import { executionBudget } from './budget.ts';
 import { integrate } from './integration.ts';
 
 export type Phase = 'plan' | 'tests' | 'acceptance-review' | 'implement' | 'repair' | 'review';
 export type AgentInput = { phase: Phase; task: Task; plan?: Plan; cwd: string; attempt: number; feedback: string; directory: string; timeoutMs: number; signal: AbortSignal; env: NodeJS.ProcessEnv };
 export type Agent = { run: (input: AgentInput) => Promise<unknown> };
 export type Verification = { status: string; snapshot: { hash: string }; runDirectory: string; checks: { name: string; status: string; durationMs?: number }[]; node?: { passed: number }; browser?: { passed: number }; error?: string };
-export type ControllerState = { schemaVersion: 1; taskId: string; runId: string; runDirectory: string; workspace: string; status: 'running' | 'ready' | 'merged' | 'blocked'; phase: string; startedAt: string; completedAt?: string; reason?: string; sourceHash?: string; baseCommit?: string; baselineTree?: string; plan?: Plan; redChecks: { file: string; title: string; status: string; logPath: string }[]; attempts: { id: string; number: number; verification?: Verification; review?: Review }[]; verification?: Verification; review?: Review; ports?: [string, string]; changes?: { path: string; status: string }[]; integration?: { branch: string; before: string; commit?: string; verification?: Verification; review?: Review } };
+class IntegrationRejected extends Error {}
 
-export async function runController(options: { repository: string; task: unknown; agent: Agent; baseRef?: string; evidenceRoot?: string; runId?: string; mergeTarget?: string; signal?: AbortSignal }): Promise<ControllerState> {
+export type ControllerState = { schemaVersion: 1; taskId: string; runId: string; failedPhase?: string; failureKind?: 'integrity' | 'timeout' | 'cancelled' | 'budget' | 'ownership' | 'verification' | 'review' | 'worker'; cleanupSafe?: boolean; budget?: { usedMs: number; implementationAttempts: number; acceptanceAttempts: number; maxAttempts: number; totalTimeoutMs: number }; resume?: { fromRunId?: string; reused: boolean; reason: string }; runDirectory: string; workspace: string; status: 'running' | 'ready' | 'merged' | 'blocked'; phase: string; startedAt: string; completedAt?: string; reason?: string; sourceHash?: string; baseCommit?: string; baselineTree?: string; plan?: Plan; redChecks: { file: string; title: string; status: string; logPath: string }[]; attempts: { id: string; number: number; verification?: Verification; review?: Review }[]; verification?: Verification; review?: Review; ports?: [string, string]; changes?: { path: string; status: string }[]; integration?: { branch: string; before: string; commit?: string; verification?: Verification; review?: Review } };
+
+export async function runController(options: { repository: string; task: unknown; agent: Agent; baseRef?: string; evidenceRoot?: string; runId?: string; mergeTarget?: string; signal?: AbortSignal; resumeFrom?: string; budgetKey?: string }): Promise<ControllerState> {
   const task = parseTask(options.task);
   const repository = resolve(options.repository);
   const runId = options.runId ?? `${task.id}-${randomUUID()}`;
@@ -24,7 +29,10 @@ export async function runController(options: { repository: string; task: unknown
   const runDirectory = join(options.evidenceRoot ?? join(repository, '.data', 'evidence'), runId);
   mkdirSync(runDirectory, { recursive: true });
   const state: ControllerState = { schemaVersion: 1, taskId: task.id, runId, runDirectory, workspace: join(runDirectory, 'workspace'), status: 'running', phase: 'prepare', startedAt: new Date().toISOString(), redChecks: [], attempts: [] };
-  const deadline = Date.now() + task.budget.totalTimeoutMs;
+  const engineRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  let budget: ReturnType<typeof executionBudget> | undefined;
+  let checkpoint: (() => void) | undefined;
+  let settled = true;
   const cancelled = new AbortController();
   const cancel = () => cancelled.abort();
   options.signal?.addEventListener('abort', cancel, { once: true });
@@ -36,7 +44,7 @@ export async function runController(options: { repository: string; task: unknown
   let env: NodeJS.ProcessEnv = {};
   const remaining = () => {
     if (cancelled.signal.aborted) throw new Error('Controller cancelled.');
-    const value = deadline - Date.now();
+    const value = budget?.remaining() ?? 0;
     if (value <= 0) throw new Error('Total task timeout exceeded.');
     return value;
   };
@@ -45,20 +53,50 @@ export async function runController(options: { repository: string; task: unknown
     const directory = join(runDirectory, `phase-${++counter}-${phase}`);
     mkdirSync(directory);
     const timeoutMs = Math.min(task.budget.workerTimeoutMs, remaining());
+    budget!.phase(timeoutMs);
     const abort = new AbortController();
     const onCancel = () => abort.abort();
     cancelled.signal.addEventListener('abort', onCancel, { once: true });
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let finished = false;
+    const work = options.agent.run({ phase, task, plan: state.plan, cwd, attempt, feedback, directory, timeoutMs, signal: abort.signal, env: { ...env, RUN_DIR: join(cwd, '.runs', 'worker-checks', `phase-${counter}`) } }).finally(() => { finished = true; });
+    work.catch(() => {});
     try {
       return await Promise.race([
-        options.agent.run({ phase, task, plan: state.plan, cwd, attempt, feedback, directory, timeoutMs, signal: abort.signal, env: { ...env, RUN_DIR: join(cwd, '.runs', 'worker-checks', `phase-${counter}`) } }),
+        work,
         new Promise<never>((_resolve, reject) => { timer = setTimeout(() => { abort.abort(); reject(new Error(`Agent ${phase} timed out.`)); }, timeoutMs); abort.signal.addEventListener('abort', () => reject(new Error(`Agent ${phase} cancelled or timed out.`)), { once: true }); }),
       ]);
-    } finally { if (timer) clearTimeout(timer); cancelled.signal.removeEventListener('abort', onCancel); }
+    } finally {
+      if (timer) clearTimeout(timer);
+      cancelled.signal.removeEventListener('abort', onCancel);
+      if (!finished) {
+        abort.abort();
+        await Promise.race([work.catch(() => {}), new Promise(done => setTimeout(done, 2500))]);
+        if (!finished) { settled = false; state.cleanupSafe = false; }
+      }
+      budget!.phase(0);
+    }
   };
   try {
+    budget = executionBudget(options.evidenceRoot ?? join(repository, '.data', 'evidence'), options.budgetKey ?? `${repository}:${task.id}`, task, runId);
+    remaining();
+    writeJson(join(runDirectory, 'controller-owner.json'), { pid: process.pid, identity: processIdentity(process.pid), runId });
+    const environment = environmentIdentity(repository, engineRoot);
+    let restored: ReturnType<typeof loadCheckpoint> | undefined;
+    if (options.resumeFrom) {
+      if (dirname(resolve(options.resumeFrom)) !== dirname(resolve(runDirectory)) || resolve(options.resumeFrom) === resolve(runDirectory)) throw new Error('Resume predecessor must be an earlier sibling run in the owned evidence root.');
+      writeJson(join(runDirectory, 'resume-parent.json'), { directory: resolve(options.resumeFrom) });
+      state.resume = { fromRunId: resolve(options.resumeFrom).split('/').at(-1), reused: false, reason: 'Checking predecessor ownership and checkpoint identity.' }; save();
+      assertRunQuiescent(options.resumeFrom);
+      try {
+        const previous = readJson(join(options.resumeFrom, 'state.json')) as ControllerState;
+        if (previous.cleanupSafe === false) throw new Error('Previous worker did not settle; owner cleanup is required.');
+        restored = loadCheckpoint(options.resumeFrom, options.evidenceRoot ?? join(repository, '.data', 'evidence'), task, environment);
+        state.resume = { fromRunId: restored.runId, reused: true, reason: 'Reused accepted checks and source draft; full verification and code review will run again.' };
+      } catch (error) { state.resume = { reused: false, reason: error instanceof Error ? error.message : String(error) }; }
+    }
     if (options.mergeTarget && git(repository, ['status', '--porcelain']).trim()) throw new Error('Automatic execution requires a clean repository. Commit or preserve local changes first.');
-    const workspace = prepareWorkspace(repository, runDirectory, options.baseRef ?? options.mergeTarget, !options.mergeTarget);
+    const workspace = prepareWorkspace(repository, runDirectory, restored?.baseCommit ?? options.baseRef ?? options.mergeTarget, restored ? false : !options.mergeTarget);
     state.workspace = workspace.path; state.baseCommit = workspace.baseCommit; state.baselineTree = workspace.baselineTree; state.sourceHash = workspace.sourceHash;
     state.ports = await allocatePorts();
     const [apiPort, uiPort] = state.ports;
@@ -69,6 +107,7 @@ export async function runController(options: { repository: string; task: unknown
     const protectedFiles = new Map(baseline.files.filter(file => protectedPath(file.path, baselinePaths)).map(file => [file.path, file.hash]));
     const originalChecks = new Map(baseline.files.filter(file => /^(tests|acceptance)\//.test(file.path)).map(file => [file.path, readFileSync(join(state.workspace, file.path))]));
     let checksFrozen = false;
+    let proofsComplete = false;
     const enforce = (testOnly = false) => {
       const current = snapshot(state.workspace);
       const currentFiles = new Map(current.files.map(file => [file.path, file.hash]));
@@ -94,10 +133,21 @@ export async function runController(options: { repository: string; task: unknown
       if (snapshot(state.workspace).hash !== before) throw new Error(`Read-only ${phase} changed the code snapshot.`);
       return value;
     };
+    checkpoint = () => { if (settled) { enforce(!checksFrozen); saveCheckpoint(state, task, environment, checksFrozen && proofsComplete); } };
+    if (restored) {
+      restoreCheckpoint(restored, options.resumeFrom!, state.workspace);
+      state.plan = restored.plan!;
+      state.redChecks = restored.redChecks.map(check => ({ ...check, logPath: join(runDirectory, check.logPath.split('/').at(-1)!) }));
+      for (const proof of restored.proofs) copyFileSync(join(options.resumeFrom!, proof.path), join(runDirectory, proof.path));
+      for (const file of restored.acceptedChecks) protectedFiles.set(file.path, file.hash);
+      checksFrozen = true; proofsComplete = true; enforce();
+      writeJson(join(runDirectory, 'accepted-checks.json'), restored.acceptedChecks);
+    } else {
     state.plan = parsePlan(await readonly('plan', 0), task);
     writeJson(join(runDirectory, 'plan.json'), state.plan);
     let acceptanceFeedback = '';
     for (let number = 1; number <= task.budget.maxAttempts; number += 1) {
+      budget.consume('acceptance');
       const testReport = parseWorkerReport(await invoke('tests', number - 1, acceptanceFeedback), task);
       writeJson(join(runDirectory, 'test-report.json'), testReport);
       writeJson(join(runDirectory, `test-report-${number}.json`), testReport);
@@ -114,9 +164,10 @@ export async function runController(options: { repository: string; task: unknown
     for (const file of accepted.files.filter(file => /^(tests|acceptance)\//.test(file.path))) protectedFiles.set(file.path, file.hash);
     checksFrozen = true;
     writeJson(join(runDirectory, 'accepted-checks.json'), [...protectedFiles].map(([path, hash]) => ({ path, hash })));
-    const engineRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+    }
+    checkpoint();
     const trustedRoot = join(runDirectory, 'trusted');
-    for (const path of ['scripts/verify.mjs', 'factory/process.ts', 'factory/evidence.ts', 'factory/node-reporter.mjs']) {
+    for (const path of ['scripts/verify.mjs', 'factory/process.ts', 'factory/ownership.ts', 'factory/evidence.ts', 'factory/node-reporter.mjs']) {
       const to = join(trustedRoot, path); mkdirSync(dirname(to), { recursive: true }); copyFileSync(join(engineRoot, path), to);
     }
     writeJson(join(trustedRoot, 'package.json'), { type: 'module' });
@@ -125,11 +176,13 @@ export async function runController(options: { repository: string; task: unknown
     for (const check of state.plan.slices.flatMap(slice => slice.checks)) if (!contract.requiredNodeTests.some(item => item.file === check.file && item.title === check.title)) contract.requiredNodeTests.push(check);
     const contractPath = join(trustedRoot, 'factory/verification-contract.json');
     writeJson(contractPath, contract);
+    if (!restored) {
     state.phase = 'red-checks'; save();
     for (const check of state.plan.slices.flatMap(slice => slice.checks)) {
       const logPath = join(runDirectory, `red-${state.redChecks.length}.log`);
       const reportPath = join(runDirectory, `red-${state.redChecks.length}.jsonl`);
       const escaped = check.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      budget.phase(Math.min(30000, remaining()));
       const result = await runProcess({ command: process.execPath, args: ['--import', 'tsx', '--test', `--test-name-pattern=^${escaped}$`, `--test-reporter=${join(trustedRoot, 'factory/node-reporter.mjs')}`, `--test-reporter-destination=${reportPath}`, check.file], cwd: state.workspace, env, logPath, timeoutMs: Math.min(30000, remaining()), signal: cancelled.signal });
       enforce(true);
       const records = readFileSync(reportPath, 'utf8').trim().split('\n').map(line => JSON.parse(line));
@@ -141,20 +194,25 @@ export async function runController(options: { repository: string; task: unknown
       else throw new Error(`Red check did not establish a named behavior assertion: ${check.file}#${check.title}`);
       save();
     }
-    let feedback = '';
+    }
+    proofsComplete = true;
+    checkpoint();
+    let feedback = options.resumeFrom ? `Repair the restored draft using the retained evidence from ${options.resumeFrom}. Preserve accepted checks.` : '';
     const alreadySatisfied = state.redChecks.every(check => check.status === 'already_passed');
     for (let number = 1; number <= task.budget.maxAttempts; number += 1) {
+      budget.consume('implementation');
       const attempt = { id: `${runId}-${number}`, number } as ControllerState['attempts'][number];
       state.attempts.push(attempt); save();
-      if (!alreadySatisfied || number > 1) {
-        const report = parseWorkerReport(await invoke(number === 1 ? 'implement' : 'repair', number, feedback), task);
+      if (restored || !alreadySatisfied || number > 1) {
+        const report = parseWorkerReport(await invoke(number === 1 && !restored ? 'implement' : 'repair', number, feedback), task);
         writeJson(join(runDirectory, `worker-${number}.json`), report);
         if (report.blockers.length) throw new Error(report.blockers.join('\n'));
       }
-      enforce();
+      enforce(); checkpoint();
       state.phase = 'verify'; save();
+      budget.phase(Math.min(600000, remaining()));
       const verificationDirectory = join(runDirectory, `verification-${number}`);
-      const execution = await runProcess({ command: process.execPath, args: [join(trustedRoot, 'scripts/verify.mjs')], cwd: state.workspace, env: { ...env, FACTORY_ATTEMPT_ID: attempt.id, VERIFY_RUN_DIR: verificationDirectory, VERIFY_CONTRACT_PATH: contractPath, VERIFY_TOTAL_TIMEOUT_MS: String(remaining()), VERIFY_STEP_TIMEOUT_MS: String(Math.min(180000, remaining())), VERIFY_GRACE_MS: '1000' }, logPath: join(runDirectory, `verification-${number}.log`), timeoutMs: remaining() + 3000, signal: cancelled.signal });
+      const execution = await runProcess({ command: process.execPath, args: [join(trustedRoot, 'scripts/verify.mjs')], cwd: state.workspace, env: { ...env, FACTORY_ATTEMPT_ID: attempt.id, VERIFY_RUN_DIR: verificationDirectory, VERIFY_CONTRACT_PATH: contractPath, VERIFY_TOTAL_TIMEOUT_MS: String(Math.min(600000, remaining())), VERIFY_STEP_TIMEOUT_MS: String(Math.min(180000, remaining())), VERIFY_GRACE_MS: '1000' }, logPath: join(runDirectory, `verification-${number}.log`), timeoutMs: Math.min(600000, remaining()) + 3000, signal: cancelled.signal });
       enforce();
       attempt.verification = readJson(join(verificationDirectory, 'summary.json')) as Verification;
       state.verification = attempt.verification; save();
@@ -171,10 +229,9 @@ export async function runController(options: { repository: string; task: unknown
       if (presentFiles.length) git(state.workspace, ['add', '-N', '--', ...presentFiles]);
       writeFileSync(join(runDirectory, 'patch.diff'), git(state.workspace, ['diff', '--binary', workspace.baselineTree, '--']));
       state.changes = git(state.workspace, ['diff', '--name-status', workspace.baselineTree, '--']).trim().split('\n').filter(Boolean).map(line => { const [status, ...paths] = line.split('\t'); return { status, path: paths.at(-1)! }; });
-      state.status = 'ready'; state.phase = 'ready'; break;
-    }
-    if (state.status !== 'ready') throw new Error(`Attempt budget exhausted. ${feedback}`);
-    if (options.mergeTarget) {
+      state.status = 'ready'; state.phase = 'ready';
+      if (options.mergeTarget) {
+      try {
       state.phase = 'integrate'; save();
       const receipt = await integrate({ repository, branch: options.mergeTarget, patchPath: join(runDirectory, 'patch.diff'), runDirectory, runId, validate: async (cwd, before, attempt) => {
         state.integration = { branch: options.mergeTarget!, before }; save();
@@ -182,21 +239,35 @@ export async function runController(options: { repository: string; task: unknown
         for (const check of contract.requiredBrowserTests) if (!latestContract.requiredBrowserTests.some(item => item.file === check.file && item.title === check.title)) latestContract.requiredBrowserTests.push(check);
         for (const check of contract.requiredNodeTests) if (!latestContract.requiredNodeTests.some(item => item.file === check.file && item.title === check.title)) latestContract.requiredNodeTests.push(check);
         const integrationContract = join(trustedRoot, `integration-contract-${attempt}.json`); writeJson(integrationContract, latestContract);
-        const directory = join(runDirectory, `integration-verification-${attempt}`);
-        const execution = await runProcess({ command: process.execPath, args: [join(trustedRoot, 'scripts/verify.mjs')], cwd, env: { ...env, VERIFY_RUN_DIR: directory, VERIFY_CONTRACT_PATH: integrationContract, VERIFY_TOTAL_TIMEOUT_MS: String(remaining()), VERIFY_STEP_TIMEOUT_MS: String(Math.min(180000, remaining())), VERIFY_GRACE_MS: '1000' }, logPath: join(runDirectory, `integration-verification-${attempt}.log`), timeoutMs: remaining() + 3000, signal: cancelled.signal });
+        const directory = join(runDirectory, `integration-verification-${number}-${attempt}`);
+        budget!.phase(Math.min(600000, remaining()));
+        const execution = await runProcess({ command: process.execPath, args: [join(trustedRoot, 'scripts/verify.mjs')], cwd, env: { ...env, VERIFY_RUN_DIR: directory, VERIFY_CONTRACT_PATH: integrationContract, VERIFY_TOTAL_TIMEOUT_MS: String(Math.min(600000, remaining())), VERIFY_STEP_TIMEOUT_MS: String(Math.min(180000, remaining())), VERIFY_GRACE_MS: '1000' }, logPath: join(runDirectory, `integration-verification-${number}-${attempt}.log`), timeoutMs: Math.min(600000, remaining()) + 3000, signal: cancelled.signal });
         state.integration.verification = readJson(join(directory, 'summary.json')) as Verification; save();
-        if (execution.status !== 'passed' || state.integration.verification.status !== 'passed' || snapshot(cwd).hash !== state.integration.verification.snapshot.hash) throw new Error('Integrated candidate failed independent verification.');
+        if (snapshot(cwd).hash !== state.integration.verification.snapshot.hash) throw new Error('Integrated source changed during verification.');
+        if (execution.status !== 'passed' || state.integration.verification.status !== 'passed') throw new IntegrationRejected(`Integrated candidate failed independent verification. See ${directory}. ${execution.output}`);
         const hash = snapshot(cwd).hash;
         state.integration.review = parseReview(await invoke('review', state.attempts.length, JSON.stringify({ baselineTree: git(cwd, ['rev-parse', `${before}^{tree}`]).trim(), verification: state.integration.verification, integratedCandidate: true }), cwd), task); save();
-        if (!state.integration.review.approved || snapshot(cwd).hash !== hash) throw new Error('Integrated candidate was rejected or changed during independent review.');
+        if (snapshot(cwd).hash !== hash) throw new Error('Integrated candidate changed during independent review.');
+        if (!state.integration.review.approved) throw new IntegrationRejected(`Integrated candidate rejected: ${state.integration.review.findings.join('; ')}`);
       } });
       state.integration = { ...state.integration!, ...receipt }; state.status = 'merged'; state.phase = 'merged';
+      } catch (error) {
+        if (!(error instanceof IntegrationRejected)) throw error;
+        feedback = error.message; state.status = 'running'; save(); checkpoint(); continue;
+      }
+      }
+      break;
     }
+    if (state.status !== 'ready' && state.status !== 'merged') throw new Error(`Attempt budget exhausted. ${feedback}`);
   } catch (error) {
-    state.status = 'blocked'; state.phase = 'blocked'; state.reason = error instanceof Error ? error.message : String(error);
+    state.failedPhase = state.phase;
+    try { checkpoint?.(); } catch (checkpointError) { writeJson(join(runDirectory, 'checkpoint-error.json'), { reason: String(checkpointError) }); }
+    state.status = 'blocked'; state.reason = error instanceof Error ? error.message : String(error);
+    state.failureKind = /protected|scope|changed during|changed after|read.only/i.test(state.reason) ? 'integrity' : /cancelled/i.test(state.reason) ? 'cancelled' : /timeout|timed out/i.test(state.reason) ? 'timeout' : /budget.*exhausted/i.test(state.reason) ? 'budget' : /owner|process group|locked/i.test(state.reason) ? 'ownership' : /verification/i.test(state.reason) ? 'verification' : /review/i.test(state.reason) ? 'review' : 'worker';
   } finally {
     process.removeListener('SIGINT', cancel); process.removeListener('SIGTERM', cancel);
     options.signal?.removeEventListener('abort', cancel);
+    if (budget) { state.budget = budget.report(); budget.close(); }
     state.completedAt = new Date().toISOString(); save();
     controllerDelivery(state, task);
   }
