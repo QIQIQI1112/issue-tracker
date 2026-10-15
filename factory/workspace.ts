@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { createServer } from 'node:net';
 import { once } from 'node:events';
 import { snapshot } from './evidence.ts';
+import { controlPlanePath } from './policy.ts';
 
 export function git(cwd: string, args: string[]): string {
   const result = spawnSync('git', args, { cwd, encoding: 'utf8', timeout: 10000, maxBuffer: 16 * 1024 * 1024 });
@@ -12,7 +13,7 @@ export function git(cwd: string, args: string[]): string {
 }
 
 export function protectedPath(path: string, baselinePaths: Set<string>): boolean {
-  return /^(factory|scripts|tickets|\.agents)\//.test(path) || /^(AGENTS\.md|package(-lock)?\.json|.*config\.(js|ts|mjs)|\.gitignore)$/.test(path) || baselinePaths.has(path) && /^(tests|acceptance)\//.test(path);
+  return controlPlanePath(path) || /^(factory|scripts|tickets|\.agents)\//.test(path) || /^(AGENTS\.md|package(-lock)?\.json|.*config\.(js|ts|mjs)|\.gitignore)$/.test(path) || baselinePaths.has(path) && /^(tests|acceptance)\//.test(path);
 }
 
 export function prepareWorkspace(repository: string, runDirectory: string, baseRef?: string, useCurrentHarness = true): { path: string; baseCommit: string; baselineTree: string; sourceHash: string } {

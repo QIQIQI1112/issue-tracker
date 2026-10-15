@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "recordType": "owner-maintenance",
+  "id": "change-policy",
+  "issueId": 6,
+  "requirementId": 2,
+  "changeKind": "harness",
+  "goal": "Classify changes without granting execution authority; separately track and attest verified maintenance deliveries.",
+  "acceptance": [
+    "Version-one submissions retain their canonical identity and existing records migrate without data loss.",
+    "Feature executors cannot edit control-plane files, claim maintenance work, or elevate scope through submitted metadata.",
+    "Maintenance completion requires actual full machine reports, independent approval of the same source, verified dependencies, and a commit on the enrolled target.",
+    "Rejected or duplicate attestations cannot create a completed run."
+  ],
+  "nodeChecks": [
+    "versioned change kinds preserve legacy identity and reject client execution authority",
+    "control-plane paths are protected independently of a task declaration",
+    "maintenance issues remain separately queued and cannot run through the feature executor",
+    "owner maintenance records only an independently approved verified merged source"
+  ],
+  "execution": "Use the separate owner maintenance workflow. This record is not a feature-executor task and grants no write scope."
+}

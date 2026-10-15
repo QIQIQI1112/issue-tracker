@@ -36,6 +36,20 @@ The baseline may already satisfy the task. Named checks then record `already_pas
 
 Conversation-origin plans use the shared `src/submission.ts` runtime contract and `scripts/submit-plan.ts` client. Intake atomically preserves the submitted original goal, source, issue graph, and plan hash. Its `plan_review` job obtains independent coverage approval against exact target source before releasing existing child IDs. It does not invoke decomposition again. `startIssue` cannot bypass unapproved plan admission; HTTP retries only return existing work. See [conversation intake](../docs/conversation-intake.md).
 
+## Maintenance ownership
+
+Feature code and additive checks share one issue, with checks independently reviewed and frozen before implementation. Acceptance-contract and harness changes use separate issues and dependencies. Version-two plans declare `changeKind` as `feature`, `acceptance_contract`, or `harness`; version-one plans retain their exact canonical representation.
+
+Declarations are descriptive. The ordinary queue cannot claim `maintenance` jobs. Protected control-plane source includes workflow admission, submission validation, evidence access, instance ownership, and target identity. Labels and submitted metadata never expand feature scope. Maintenance uses the owner inspect, red-proof, implement, full-verification, independent-review, and verified local integration workflow. The maintenance tickets are audit records, not inputs granting feature-executor scope. Pin the run's verifier identity and explicitly review contract revisions; activate revised controls only for later runs.
+
+After the independently reviewed commit is on the enrolled target, record its delivery with actual machine reports and a review receipt containing `approved`, an empty `findings` array, and matching `sourceHash` or `reviewedSourceHash`:
+
+```sh
+node --import tsx scripts/record-maintenance.ts --database <platform.sqlite> --issue <id> --commit <exact-sha> --verification <summary.json> --review <review.json>
+```
+
+The recorder validates committed hashes, required cases, gate results, executed counts, review identity, dependencies, and target ancestry before claiming work. It retains evidence and generates a standard indexed delivery. There is no HTTP attestation endpoint. This is a cooperative local ownership protocol, not hostile-worker isolation.
+
 ## Ownership and evidence
 
 `.data/evidence/<task-id>-<uuid>/` is outside the worker checkout. Queue jobs use their durable run UUID under the application database's evidence directory. It contains `task.json`, `plan.json`, `baseline.json`, `accepted-checks.json`, `state.json`, per-phase prompts/schemas/output/process receipts, red-check reports, verifier logs/reports, and the final patch. `state.json` is updated atomically and records phases, attempt IDs, workspace, ports, source identity, review decisions, and failure reasons.
@@ -65,3 +79,5 @@ The completed [live integration pilot](../docs/controller-pilot.md) records real
 This is an ownership protocol for cooperative local workers, not a security boundary against hostile code. Dependencies are shared through a symlink; the Git object store and host account are shared. File hashes detect changes at checkpoints but cannot prevent changing and restoring a file between them. A process that detaches and reparents before ownership inspection can still escape cleanup. Strong isolation needs separate dependencies and credentials, containers/OS boundaries, and an independently protected execution service.
 
 The local application is the authoritative requirement and issue source. `queue.ts` owns serial dispatch, dependency order, final requirement verification, and outcome indexing. `planner.ts` supplies read-only decomposition/review sessions with bounded structured-response repair. `integration.ts` owns serialized verified local merges, `delivery.ts` generates reports, and `recovery.ts` reconciles proven merges after interruption. There is no GitHub polling, remote publishing, credential broker, hostile-worker isolation, parallel queue, or statistical evidence across many model runs. `tickets/` remains a portable CLI snapshot format.
+
+Owner review receipts must include `coveredIssues: [{ issueId, contractHash }]`, using `maintenanceIdentity(issue)` for the exact title, goal, work assignment, and acceptance contract. A generic source approval cannot complete unrelated work.

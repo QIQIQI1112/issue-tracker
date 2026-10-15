@@ -84,7 +84,7 @@ export class SerialQueue {
     } else {
       const payload = JSON.parse(job.payload) as { title: string; goal?: string; description?: string };
       const review = existsSync(join(run.evidencePath, 'review.json')) ? readJson(join(run.evidencePath, 'review.json')) as { approved: boolean; summary: string } : null;
-      const defaults = existsSync(join(run.evidencePath, 'decomposition.json')) ? parseDecomposition(readJson(join(run.evidencePath, 'decomposition.json'))).assumptions : [];
+      const defaults = existsSync(join(run.evidencePath, 'decomposition.json')) ? parseDecomposition(readJson(join(run.evidencePath, 'decomposition.json')), 2).assumptions : [];
       saveDelivery(run.evidencePath, { schemaVersion: 1, runId: run.id, taskId: job.issueId ? `issue-${job.issueId}` : `requirement-${job.requirementId}`, title: payload.title, goal: payload.goal ?? payload.description ?? payload.title, status: 'blocked', startedAt: run.startedAt, completedAt: new Date().toISOString(), baseline: null, sourceHash: null, defaults, changes: [], checks: [], nodePassed: 0, browserPassed: 0, attempts: 0, review, integration: null, limitations: [reason] });
     }
   }
@@ -115,7 +115,7 @@ export class SerialQueue {
       const submitted = job.kind === 'plan_review' ? this.store.work.submission(requirement.submission!.id) : undefined;
       if (job.kind === 'plan_review' && (!submitted || submitted.planHash !== requirement.submission?.planHash || submitted.requirementId !== requirement.id)) throw new Error('Submitted plan identity mismatch.');
       if (submitted) writeJson(join(run.evidencePath, 'submission.json'), submitted);
-      const decomposition = submitted ? parseDecomposition({ assumptions: submitted.plan.assumptions, issues: submitted.plan.issues }) : parseDecomposition(await planner.decompose({ cwd: workspace.path, directory: phase('decompose'), requirement, evidence: '', env, signal: this.options.signal }));
+      const decomposition = submitted ? parseDecomposition({ assumptions: submitted.plan.assumptions, issues: submitted.plan.issues }, submitted.plan.schemaVersion) : parseDecomposition(await planner.decompose({ cwd: workspace.path, directory: phase('decompose'), requirement, evidence: '', env, signal: this.options.signal }));
       if (snapshot(workspace.path).hash !== before) throw new Error('Decomposition changed source files.');
       writeJson(join(run.evidencePath, 'decomposition.json'), decomposition);
       evidence = JSON.stringify(decomposition); assumptions = decomposition.assumptions;

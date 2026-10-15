@@ -55,3 +55,7 @@ Before implementation, rejected new behavior checks receive independent findings
 On startup, interrupted executions are blocked unless durable integration verification, review, tree, and commit receipts prove that their merge is already on the enrolled target. Proven merges are reconciled into the database instead of being repeated. Queue locks left by a crash require inspecting and stopping their recorded owner before removing them. This prototype does not promise hostile-worker isolation or automatic recovery of arbitrary detached processes.
 
 The deterministic queue and integration tests prove orchestration using disposable Git repositories and real Node/Playwright reports. Browser acceptance exercises enrollment, requirement launch, completed issue reports, evidence download, ownership, and dependency rejection through the actual application. Those deterministic worker adapters do not measure model quality; live Codex pilots provide separate evidence.
+
+## Maintenance delivery
+
+Version-two plans can classify separate acceptance-contract and harness issues. Their `maintenance` jobs wait for owner evidence; ordinary workers cannot claim them. Feature dependents wait for recorded maintenance merges. Use the owner recorder described in factory/README.md after full verification, independent review, and actual local integration. Human audit remains optional. Classification never grants the feature executor control-plane write permission.

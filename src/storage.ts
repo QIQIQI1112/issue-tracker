@@ -25,6 +25,7 @@ const migrations = [
    CREATE TABLE work_runs (id TEXT PRIMARY KEY, job_id INTEGER NOT NULL REFERENCES jobs(id), repo_id INTEGER NOT NULL REFERENCES repos(id), requirement_id INTEGER REFERENCES requirements(id), issue_id INTEGER REFERENCES issues(id), status TEXT NOT NULL, evidence_path TEXT NOT NULL, reason TEXT, started_at TEXT NOT NULL, completed_at TEXT);
    CREATE INDEX job_queue ON jobs(status, id);`,
   `CREATE TABLE plan_submissions (id TEXT PRIMARY KEY, requirement_id INTEGER NOT NULL UNIQUE REFERENCES requirements(id), plan_hash TEXT NOT NULL, plan TEXT NOT NULL, issue_ids TEXT NOT NULL, created_at TEXT NOT NULL);`,
+  `CREATE TABLE IF NOT EXISTS issue_change_kinds (issue_id INTEGER PRIMARY KEY REFERENCES issues(id) ON DELETE CASCADE, change_kind TEXT NOT NULL CHECK(change_kind IN ('feature','acceptance_contract','harness')));`,
 ];
 
 export const DATABASE_SCHEMA_VERSION = migrations.length;

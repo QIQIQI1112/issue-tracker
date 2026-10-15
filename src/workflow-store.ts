@@ -2,7 +2,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { createHash, randomUUID } from 'node:crypto';
 import type { IssueStore } from './storage.ts';
 import type { Assignment, Decomposition, Job, PlanSubmission, Repo, Requirement, SubmissionReceipt, WorkRun } from './workflow.ts';
-import { ConflictError } from './workflow.ts';
+import { changeKind, ConflictError } from './workflow.ts';
 import { ValidationError } from './domain.ts';
 import { parseSubmission } from './submission.ts';
 
@@ -85,9 +85,12 @@ export class WorkflowStore {
   }
   context(issueId: number): Assignment | undefined {
     const row = this.database.prepare('SELECT repo_id AS repoId, requirement_id AS requirementId, depends_on AS dependsOn, acceptance FROM issue_context WHERE issue_id = ?').get(issueId) as { repoId: number; requirementId: number | null; dependsOn: string; acceptance: string } | undefined;
-    return row ? { ...row, dependsOn: JSON.parse(row.dependsOn), acceptance: JSON.parse(row.acceptance) } : undefined;
+    if (!row) return undefined;
+    const kind = this.database.prepare('SELECT change_kind AS kind FROM issue_change_kinds WHERE issue_id=?').get(issueId) as { kind: string } | undefined;
+    return { ...row, dependsOn: JSON.parse(row.dependsOn), acceptance: JSON.parse(row.acceptance), ...(kind && kind.kind !== 'feature' ? { changeKind: changeKind(kind.kind) } : {}) };
   }
   validateContext(issueId: number | null, work: Assignment): void {
+    changeKind(work.changeKind ?? 'feature');
     if (!this.repo(work.repoId)) throw new ValidationError('Repository not found.');
     if (work.requirementId !== null && this.requirement(work.requirementId)?.repoId !== work.repoId) throw new ValidationError('Requirement must belong to the same repository.');
     const previous = issueId === null ? undefined : this.context(issueId);
@@ -111,6 +114,7 @@ export class WorkflowStore {
       this.assertEditable(issueId);
       this.validateContext(issueId, work);
       this.database.prepare('INSERT INTO issue_context (issue_id, repo_id, requirement_id, depends_on, acceptance) VALUES (?, ?, ?, ?, ?) ON CONFLICT(issue_id) DO UPDATE SET repo_id=excluded.repo_id, requirement_id=excluded.requirement_id, depends_on=excluded.depends_on, acceptance=excluded.acceptance').run(issueId, work.repoId, work.requirementId, JSON.stringify(work.dependsOn), JSON.stringify(work.acceptance));
+      this.database.prepare('INSERT INTO issue_change_kinds (issue_id,change_kind) VALUES (?,?) ON CONFLICT(issue_id) DO UPDATE SET change_kind=excluded.change_kind').run(issueId, work.changeKind ?? 'feature');
     });
   }
   assertEditable(issueId: number): void {
@@ -140,7 +144,7 @@ export class WorkflowStore {
       if (!issue?.work) throw new ValidationError('Assign a repository and acceptance conditions before starting the issue.');
       if (issue.work.requirementId && this.submissionForRequirement(issue.work.requirementId) && !this.approvedSubmission(issue.work.requirementId)) throw new ConflictError('Submitted issues require independent plan approval before execution.');
       if (this.runs().some(run => run.issueId === id && run.status === 'merged')) throw new ConflictError('This issue has already been merged. Create a follow-up issue.');
-      return this.enqueue('issue', issue.work.repoId, issue.work.requirementId, id, issue);
+      return this.enqueue(!issue.work.changeKind || issue.work.changeKind === 'feature' ? 'issue' : 'maintenance', issue.work.repoId, issue.work.requirementId, id, issue);
     });
   }
   startRequirement(id: number): Job[] {
@@ -157,7 +161,7 @@ export class WorkflowStore {
     });
   }
   private createSlices(requirement: Requirement, slices: Decomposition['issues']) {
-    const created = new Map(slices.map(slice => [slice.key, this.issues.create({ title: slice.title, description: slice.description, labels: [], status: 'open', priority: 'medium', work: { repoId: requirement.repoId, requirementId: requirement.id, dependsOn: [], acceptance: slice.acceptance } })]));
+    const created = new Map(slices.map(slice => [slice.key, this.issues.create({ title: slice.title, description: slice.description, labels: [], status: 'open', priority: 'medium', work: { repoId: requirement.repoId, requirementId: requirement.id, dependsOn: [], acceptance: slice.acceptance, ...(slice.changeKind ? { changeKind: slice.changeKind } : {}) } })]));
     for (const slice of slices) {
       const issue = created.get(slice.key)!;
       const dependsOn = slice.dependsOn.map(key => { const dependency = created.get(key); if (!dependency) throw new ValidationError('Unknown dependency key.'); return dependency.id; });
@@ -179,8 +183,20 @@ export class WorkflowStore {
   claim(evidenceRoot: string): { job: Job; run: WorkRun } | undefined {
     return this.transaction(() => {
       if (this.jobs().some(job => job.status === 'running')) return undefined;
-      const job = this.jobs().find(job => job.status === 'queued' && (job.kind !== 'issue' || this.context(job.issueId!)!.dependsOn.every(id => this.runs().some(run => run.issueId === id && run.status === 'merged'))));
+      const job = this.jobs().find(job => job.status === 'queued' && job.kind !== 'maintenance' && (job.kind !== 'issue' || this.context(job.issueId!)!.dependsOn.every(id => this.runs().some(run => run.issueId === id && run.status === 'merged'))));
       if (!job) return undefined;
+      return this.claimJob(job, evidenceRoot);
+    });
+  }
+  claimMaintenance(issueId: number, evidenceRoot: string): { job: Job; run: WorkRun } {
+    return this.transaction(() => {
+      if (this.jobs().some(job => job.status === 'running')) throw new ConflictError('An execution is already running.');
+      const job = this.jobs().find(job => job.status === 'queued' && job.kind === 'maintenance' && job.issueId === issueId);
+      if (!job || !this.context(issueId)!.dependsOn.every(id => this.runs().some(run => run.issueId === id && run.status === 'merged'))) throw new ConflictError('Maintenance must be queued with verified dependencies.');
+      return this.claimJob(job, evidenceRoot);
+    });
+  }
+  private claimJob(job: Job, evidenceRoot: string): { job: Job; run: WorkRun } {
       const id = randomUUID();
       const now = new Date().toISOString();
       this.database.prepare("UPDATE jobs SET status='running', run_id=?, updated_at=? WHERE id=?").run(id, now, job.id);
@@ -189,7 +205,6 @@ export class WorkflowStore {
       if (job.requirementId !== null) this.database.prepare("UPDATE requirements SET status='running', updated_at=? WHERE id=?").run(now, job.requirementId);
       this.refreshRequirements();
       return { job: { ...job, status: 'running', runId: id }, run: this.run(id)! };
-    });
   }
   finish(id: string, status: Exclude<WorkRun['status'], 'running'>, reason: string | null = null): void {
     this.transaction(() => {
@@ -221,7 +236,7 @@ export class WorkflowStore {
       }
       if (job.requirementId !== null) {
         if (status === 'blocked' || job.kind === 'requirement_verify') this.database.prepare('UPDATE requirements SET status=?, updated_at=? WHERE id=?').run(status === 'passed' ? 'done' : 'blocked', now, job.requirementId);
-        else if (job.kind === 'issue') {
+        else if (job.kind === 'issue' || job.kind === 'maintenance') {
           const children = this.issues.list().filter(issue => issue.work?.requirementId === job.requirementId);
           if (children.every(issue => this.runs().some(item => item.issueId === issue.id && item.status === 'merged'))) this.enqueue('requirement_verify', job.repoId, job.requirementId, null, this.requirement(job.requirementId));
         }
@@ -244,7 +259,7 @@ export class WorkflowStore {
       const merged = (id: number) => runs.some(run => run.issueId === id && run.status === 'merged');
       const latest = (kind: Job['kind'], issueId: number | null = null) => related.filter(job => job.kind === kind && job.issueId === issueId).at(-1);
       const final = latest('requirement_verify');
-      const failed = children.some(issue => !merged(issue.id) && latest('issue', issue.id)?.status === 'blocked') || !children.length && latest('decompose')?.status === 'blocked' || latest('plan_review')?.status === 'blocked' || final?.status === 'blocked';
+      const failed = children.some(issue => !merged(issue.id) && latest(issue.work?.changeKind && issue.work.changeKind !== 'feature' ? 'maintenance' : 'issue', issue.id)?.status === 'blocked') || !children.length && latest('decompose')?.status === 'blocked' || latest('plan_review')?.status === 'blocked' || final?.status === 'blocked';
       const completed = children.length > 0 && children.every(issue => merged(issue.id)) && final?.status === 'completed' && runs.some(run => run.jobId === final.id && run.status === 'passed');
       const active = related.filter(job => ['queued', 'running'].includes(job.status));
       const status: Requirement['status'] = failed ? 'blocked' : completed ? 'done' : active.some(job => job.status === 'running') ? 'running' : active.length ? 'queued' : 'blocked';

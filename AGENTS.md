@@ -53,6 +53,9 @@ Do not weaken existing acceptance checks, disable verification steps, or alter r
 - The queue may automatically integrate into its explicitly enrolled local target after a fresh full check and independent review of the integrated tree. Worker agents must not commit or merge. Completion requires a recorded verified merge; human sampling is not a gate.
 - Whole-requirement verification must prove the original business goal after all child merges. Dependency readiness requires merge evidence, not manually edited status.
 - Keep the controller-owned verification contract and existing required tests intact. New criteria become a separately reviewed contract revision.
+- Keep additive business checks with their feature issue and review them before implementation. Track acceptance-contract and harness changes as separate maintenance issues, with explicit dependencies and independent deliveries. Version-two plans may declare `changeKind`; declarations never grant scope or approval.
+- Ordinary executors cannot claim maintenance jobs or modify protected control-plane source. Use the owner maintenance workflow. Activate revised controls only after full verification, independent source-bound review, and local integration.
+- Record completed maintenance with the owner CLI and matching machine reports, source review, and target commit. Never mark an issue Done from labels, worker prose, or fabricated receipts.
 - Record assumptions, changes, run IDs, exact evidence paths, and unresolved blockers. Never reuse a passing report for changed code.
 - Write documentation, harness instructions, schemas, prompts, and reports in English.
 - Code comments and inline lint overrides are prohibited by the existing lint contract. Put design explanations in documentation.

@@ -27,14 +27,14 @@ export function currentBlockers(data: Workbench, issues: Issue[]): Job[] {
   return [...latest.values()].filter(job => {
     if (job.status !== 'blocked') return false;
     const issue = issues.find(issue => issue.id === job.issueId && issue.work?.repoId === job.repoId && issue.work.requirementId === job.requirementId);
-    if (job.kind === 'issue' && issue && mergedIssue(data, issue)) return false;
+    if ((job.kind === 'issue' || job.kind === 'maintenance') && issue && mergedIssue(data, issue)) return false;
     if (job.kind === 'decompose' && issues.some(issue => issue.work?.requirementId === job.requirementId && issue.work.repoId === job.repoId)) return false;
     return true;
   }).sort((a, b) => b.id - a.id);
 }
 
 export function waitingDependencies(data: Workbench, issues: Issue[], job: Job): number[] {
-  if (job.kind !== 'issue' || job.status !== 'queued') return [];
+  if (!['issue', 'maintenance'].includes(job.kind) || job.status !== 'queued') return [];
   return (issues.find(issue => issue.id === job.issueId)?.work?.dependsOn ?? []).filter(id => {
     const dependency = issues.find(issue => issue.id === id && issue.work?.repoId === job.repoId);
     return !dependency || !mergedIssue(data, dependency);
