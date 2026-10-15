@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "recordType": "owner-maintenance",
+  "id": "process-probe",
+  "issueId": 11,
+  "requirementId": null,
+  "relatedRequirementId": 2,
+  "changeKind": "harness",
+  "dependsOn": [10],
+  "goal": "Return structured cleanup outcomes when process-group inspection transiently fails, preserving the original cancellation contract.",
+  "acceptance": [
+    "EPERM and other unknown probe errors remain unsafe until ESRCH confirms absence.",
+    "Exit and close probes cannot escape as uncaught exceptions, and one final verdict determines both result and ownership settlement.",
+    "Persistent uncertainty retains an unsettled receipt and blocks recovery; transient errors retain diagnostic evidence.",
+    "The original four nested cancellation cases retain their assertions and grace limits."
+  ],
+  "execution": "Separate corrective maintenance delivery; original requirement membership and criteria remain frozen."
+}
