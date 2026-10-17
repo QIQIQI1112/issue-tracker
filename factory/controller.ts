@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync, lstatSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parsePlan, parseTask, parseReview, parseWorkerReport, scoped } from './contracts.ts';
+import { parsePlan, parseTask, parseReview, parseWorkerReport, parseRegressionReport, scoped } from './contracts.ts';
 import type { Task, Plan, Review } from './contracts.ts';
 import { parseVerificationContract, readJson, snapshot, writeJson } from './evidence.ts';
 import { runProcess } from './process.ts';
@@ -12,15 +12,17 @@ import { digest, environmentIdentity, loadCheckpoint, restoreCheckpoint, saveChe
 import { assertRunQuiescent, processIdentity } from './ownership.ts';
 import { executionBudget } from './budget.ts';
 import type { Delivery } from '../src/workflow.ts';
+import { enforceRegressionDraft, proveRegression } from './regression.ts';
+import type { PendingRegression, AcceptedRegression } from './regression.ts';
 import { integrate } from './integration.ts';
 
-export type Phase = 'plan' | 'tests' | 'acceptance-review' | 'implement' | 'repair' | 'review';
+export type Phase = 'plan' | 'tests' | 'regression-tests' | 'acceptance-review' | 'implement' | 'repair' | 'review';
 export type AgentInput = { phase: Phase; task: Task; plan?: Plan; cwd: string; attempt: number; feedback: string; directory: string; timeoutMs: number; signal: AbortSignal; env: NodeJS.ProcessEnv };
 export type Agent = { run: (input: AgentInput) => Promise<unknown> };
 export type Verification = { status: string; snapshot: { hash: string }; runDirectory: string; checks: { name: string; status: string; durationMs?: number }[]; node?: { passed: number }; browser?: { passed: number }; error?: string };
 class IntegrationRejected extends Error {}
 
-export type ControllerState = { schemaVersion: 1; taskId: string; runId: string; phases?: Delivery['phases']; reviewReceipts?: Delivery['reviewReceipts']; failedPhase?: string; failureKind?: 'integrity' | 'timeout' | 'cancelled' | 'budget' | 'ownership' | 'verification' | 'review' | 'worker'; cleanupSafe?: boolean; budget?: { usedMs: number; implementationAttempts: number; acceptanceAttempts: number; maxAttempts: number; totalTimeoutMs: number }; resume?: { fromRunId?: string; reused: boolean; reason: string }; runDirectory: string; workspace: string; status: 'running' | 'ready' | 'merged' | 'blocked'; phase: string; startedAt: string; completedAt?: string; reason?: string; sourceHash?: string; baseCommit?: string; baselineTree?: string; plan?: Plan; redChecks: { file: string; title: string; status: string; logPath: string; reportPath?: string }[]; attempts: { id: string; number: number; verification?: Verification; review?: Review }[]; verification?: Verification; review?: Review; ports?: [string, string]; changes?: { path: string; status: string }[]; integration?: { branch: string; before: string; commit?: string; verification?: Verification; review?: Review } };
+export type ControllerState = { schemaVersion: 1; taskId: string; runId: string; phases?: Delivery['phases']; reviewReceipts?: Delivery['reviewReceipts']; failedPhase?: string; failureKind?: 'integrity' | 'timeout' | 'cancelled' | 'budget' | 'ownership' | 'verification' | 'review' | 'worker'; cleanupSafe?: boolean; budget?: { usedMs: number; implementationAttempts: number; acceptanceAttempts: number; maxAttempts: number; totalTimeoutMs: number }; resume?: { fromRunId?: string; reused: boolean; reason: string }; runDirectory: string; workspace: string; status: 'running' | 'ready' | 'merged' | 'blocked'; phase: string; startedAt: string; completedAt?: string; reason?: string; sourceHash?: string; baseCommit?: string; baselineTree?: string; plan?: Plan; regressions?: AcceptedRegression[]; pendingRegression?: PendingRegression; redChecks: { file: string; title: string; status: string; logPath: string; reportPath?: string }[]; attempts: { id: string; number: number; verification?: Verification; review?: Review }[]; verification?: Verification; review?: Review; ports?: [string, string]; changes?: { path: string; status: string }[]; integration?: { branch: string; before: string; commit?: string; verification?: Verification; review?: Review } };
 
 export async function runController(options: { repository: string; task: unknown; agent: Agent; baseRef?: string; evidenceRoot?: string; runId?: string; mergeTarget?: string; signal?: AbortSignal; resumeFrom?: string; budgetKey?: string }): Promise<ControllerState> {
   const task = parseTask(options.task);
@@ -119,6 +121,7 @@ export async function runController(options: { repository: string; task: unknown
     const originalChecks = new Map(baseline.files.filter(file => /^(tests|acceptance)\//.test(file.path)).map(file => [file.path, readFileSync(join(state.workspace, file.path))]));
     let checksFrozen = false;
     let proofsComplete = false;
+    let regressionDraft = false;
     const enforce = (testOnly = false) => {
       const current = snapshot(state.workspace);
       const currentFiles = new Map(current.files.map(file => [file.path, file.hash]));
@@ -144,10 +147,17 @@ export async function runController(options: { repository: string; task: unknown
       if (snapshot(state.workspace).hash !== before) throw new Error(`Read-only ${phase} changed the code snapshot.`);
       return value;
     };
-    checkpoint = () => { if (settled) { enforce(!checksFrozen); saveCheckpoint(state, task, environment, checksFrozen && proofsComplete); } };
+    checkpoint = () => { if (settled && !regressionDraft) { enforce(!checksFrozen); saveCheckpoint(state, task, environment, checksFrozen && proofsComplete); } };
     if (restored) {
       restoreCheckpoint(restored, options.resumeFrom!, state.workspace);
       state.plan = restored.plan!;
+      state.regressions = restored.regressions ?? [];
+      state.pendingRegression = restored.pendingRegression;
+      for (const regression of state.regressions) {
+        state.reviewReceipts!.push({ ...regression.receipt, reusedFromRunId: restored.runId });
+        regression.redChecks = regression.redChecks.map(check => ({ ...check, logPath: join(runDirectory, check.logPath.split('/').at(-1)!), reportPath: join(runDirectory, check.reportPath!.split('/').at(-1)!) }));
+      }
+      if (state.pendingRegression) state.reviewReceipts!.push({ ...state.pendingRegression.receipt, reusedFromRunId: restored.runId });
       if (restored.acceptanceReceipt) state.reviewReceipts!.push({ ...restored.acceptanceReceipt, reusedFromRunId: restored.runId });
       state.redChecks = restored.redChecks.map(check => ({ ...check, logPath: join(runDirectory, check.logPath.split('/').at(-1)!), reportPath: join(runDirectory, check.logPath.split('/').at(-1)!.replace(/\.log$/, '.jsonl')) }));
       for (const proof of restored.proofs) copyFileSync(join(options.resumeFrom!, proof.path), join(runDirectory, proof.path));
@@ -164,6 +174,10 @@ export async function runController(options: { repository: string; task: unknown
     const contract = parseVerificationContract(readJson(join(options.mergeTarget ? state.workspace : repository, 'factory/verification-contract.json')));
     for (const check of state.plan.browserChecks) if (!contract.requiredBrowserTests.some(item => item.file === check.file && item.title === check.title)) contract.requiredBrowserTests.push(check);
     for (const check of state.plan.slices.flatMap(slice => slice.checks)) if (!contract.requiredNodeTests.some(item => item.file === check.file && item.title === check.title)) contract.requiredNodeTests.push(check);
+    for (const regression of state.regressions ?? []) {
+      contract.requiredNodeTests.push(...regression.checks);
+      contract.requiredBrowserTests.push(...regression.browserChecks);
+    }
     const contractPath = join(trustedRoot, 'factory/verification-contract.json');
     writeJson(contractPath, contract);
     const reviewCandidate = async (phase: 'acceptance-review' | 'review', purpose: string, attempt: number, feedback: Record<string, unknown>, cwd = state.workspace, effectiveContract = contract) => {
@@ -176,6 +190,45 @@ export async function runController(options: { repository: string; task: unknown
       if (!response.approved) state.phases!.at(-1)!.status = 'failed';
       save();
       return response;
+    };
+    const regressionLoop = async () => {
+      const pending = state.pendingRegression!;
+      const before = enforce();
+      if (before.hash !== pending.receipt.sourceHash) throw new Error('Regression request source differs from the reviewed candidate; owner rebase is required.');
+      checkpoint!();
+      regressionDraft = true;
+      let feedback = JSON.stringify({ review: pending.review, sourceHash: before.hash, evidencePath: pending.receipt.evidencePath });
+      for (let number = 1; number <= task.budget.maxAttempts; number += 1) {
+        const generation = budget!.consume('acceptance');
+        const report = parseRegressionReport(await invoke('regression-tests', generation, feedback), task);
+        writeJson(join(runDirectory, `regression-report-${generation}.json`), report);
+        if (report.blockers.length) throw new Error(report.blockers.join('\n'));
+        enforceRegressionDraft(before, enforce(), report);
+        state.phase = 'regression-red-checks'; save();
+        const redChecks = [];
+        for (const [browser, checks] of [[false, report.checks], [true, report.browserChecks]] as const) for (const check of checks) {
+          const timeoutMs = Math.min(browser ? 90000 : 30000, remaining());
+          budget!.phase(timeoutMs);
+          redChecks.push(await proveRegression({ check, browser, cwd: state.workspace, prefix: join(runDirectory, `regression-red-${generation}-${redChecks.length}`), env, reporter: join(trustedRoot, 'factory/node-reporter.mjs'), timeoutMs, signal: cancelled.signal }));
+          enforceRegressionDraft(before, enforce(), report);
+        }
+        const response = await reviewCandidate('acceptance-review', 'regression-coverage', generation, { baselineTree: state.baselineTree, review: pending.review, checks: report.checks, browserChecks: report.browserChecks, acceptedChecks: snapshot(state.workspace).files.filter(file => /^(tests|acceptance)\//.test(file.path)), redChecks, evidenceDirectory: runDirectory, acceptance: task.acceptance }, state.workspace, { ...contract, requiredNodeTests: [...contract.requiredNodeTests, ...report.checks], requiredBrowserTests: [...contract.requiredBrowserTests, ...report.browserChecks] });
+        if (!response.approved) { feedback = JSON.stringify({ review: pending.review, rejection: response, checks: report, redChecks }); continue; }
+        const receipt = state.reviewReceipts!.at(-1)!;
+        (state.regressions ??= []).push({ checks: report.checks, browserChecks: report.browserChecks, redChecks, receipt });
+        contract.requiredNodeTests.push(...report.checks); contract.requiredBrowserTests.push(...report.browserChecks);
+        writeJson(contractPath, contract);
+        for (const file of snapshot(state.workspace).files.filter(file => /^(tests|acceptance)\//.test(file.path))) protectedFiles.set(file.path, file.hash);
+        writeJson(join(runDirectory, 'accepted-checks.json'), [...protectedFiles].map(([path, hash]) => ({ path, hash })));
+        state.pendingRegression = undefined; regressionDraft = false; save(); checkpoint!();
+        return;
+      }
+      throw new Error('Regression acceptance review attempt budget exhausted.');
+    };
+    const requestRegression = async (review: Review) => {
+      if (!review.needsRegression) return;
+      state.pendingRegression = { review, receipt: state.reviewReceipts!.at(-1)! }; save();
+      await regressionLoop();
     };
     if (!restored) {
       let acceptanceFeedback = '';
@@ -219,6 +272,7 @@ export async function runController(options: { repository: string; task: unknown
     }
     proofsComplete = true;
     checkpoint();
+    if (state.pendingRegression) await regressionLoop();
     let feedback = options.resumeFrom ? `Repair the restored draft using the retained evidence from ${options.resumeFrom}. Preserve accepted checks.` : '';
     const alreadySatisfied = state.redChecks.every(check => check.status === 'already_passed');
     for (let number = 1; number <= task.budget.maxAttempts; number += 1) {
@@ -243,7 +297,7 @@ export async function runController(options: { repository: string; task: unknown
       if (!options.mergeTarget) {
         attempt.review = await reviewCandidate('review', 'delivery-code', number, { baselineTree: state.baselineTree, verification: attempt.verification, evidenceDirectory: verificationDirectory });
         state.review = attempt.review; save();
-        if (!attempt.review.approved) { feedback = `Independent review rejected the candidate: ${attempt.review.findings.join('\n')}`; continue; }
+        if (!attempt.review.approved) { await requestRegression(attempt.review); feedback = `Independent review rejected the candidate: ${attempt.review.findings.join('\n')}`; continue; }
         if (attempt.verification.snapshot.hash !== snapshot(state.workspace).hash) throw new Error('Code changed after review.');
       }
       const presentFiles = snapshot(state.workspace).files.filter(file => {
@@ -273,12 +327,17 @@ export async function runController(options: { repository: string; task: unknown
         const hash = snapshot(cwd).hash;
         state.integration.review = await reviewCandidate('review', 'integrated-code', state.attempts.length, { baselineTree: git(cwd, ['rev-parse', `${before}^{tree}`]).trim(), verification: state.integration.verification, evidenceDirectory: directory, integratedCandidate: true }, cwd, latestContract); save();
         if (snapshot(cwd).hash !== hash) throw new Error('Integrated candidate changed during independent review.');
-        if (!state.integration.review.approved) throw new IntegrationRejected(`Integrated candidate rejected: ${state.integration.review.findings.join('; ')}`);
+        if (!state.integration.review.approved) {
+          if (state.integration.review.needsRegression) { state.pendingRegression = { review: state.integration.review, receipt: state.reviewReceipts!.at(-1)! }; save(); }
+          throw new IntegrationRejected(`Integrated candidate rejected: ${state.integration.review.findings.join('; ')}`);
+        }
       } });
       state.integration = { ...state.integration!, ...receipt }; state.status = 'merged'; state.phase = 'merged';
       } catch (error) {
         if (!(error instanceof IntegrationRejected)) throw error;
-        feedback = error.message; state.phases!.at(-1)!.status = 'failed'; state.status = 'running'; state.phase = 'repair-pending'; save(); checkpoint(); continue;
+        state.phases!.at(-1)!.status = 'failed'; state.status = 'running';
+        if (state.pendingRegression) await regressionLoop();
+        feedback = error.message; state.phase = 'repair-pending'; save(); checkpoint(); continue;
       }
       }
       break;

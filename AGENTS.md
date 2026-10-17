@@ -72,3 +72,5 @@ Do not weaken existing acceptance checks, disable verification steps, or alter r
 Give every parallel worker its own worktree, ports, and database. Never drive the user's live browser profile for acceptance tests. Never kill processes by name. Keep evidence after cleanup.
 
 For review purpose, checkpoint reuse, cumulative budgets, and ownership recovery, follow `docs/harness-reliability.md`. Ordinary integration uses one final independent code review after full integrated verification; whole-requirement acceptance remains required. Tests are independently reviewed after owner red proofs and frozen before implementation. Every retry must retain ownership lineage and cannot reset its issue budget.
+
+When independent code review identifies a reproducible defect missing deterministic coverage, request regression tests before repair. The tests role adds new scoped test files only; controller-owned red proofs and independent acceptance review precede freezing and repair. Existing files, accepted assertions, roles, full verification gates, and cumulative retry budgets remain protected. See `docs/harness-reliability.md` for the pending and accepted checkpoint rules.

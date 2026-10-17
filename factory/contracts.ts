@@ -3,7 +3,7 @@ export type Task = { schemaVersion: 1; id: string; title: string; goal: string; 
 export type Check = { file: string; title: string };
 export type Plan = { schemaVersion: 1; taskId: string; assumptions: { decision: string; reason: string }[]; slices: { id: string; goal: string; acceptanceIds: string[]; checks: Check[] }[]; browserChecks: Check[] };
 export type WorkerReport = { schemaVersion: 1; taskId: string; summary: string; blockers: string[] };
-export type Review = { schemaVersion: 1; taskId: string; approved: boolean; summary: string; findings: string[] };
+export type Review = { schemaVersion: 1; taskId: string; approved: boolean; needsRegression?: boolean; summary: string; findings: string[] };
 
 function object(input: unknown, name: string): Record<string, unknown> {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error(`${name} must be an object.`);
@@ -109,7 +109,9 @@ export function parseReview(input: unknown, task: Pick<Task, 'id'>): Review {
   if (value.schemaVersion !== 1 || value.taskId !== task.id || typeof value.approved !== 'boolean') throw new Error('Review identity or approval is invalid.');
   const findings = list(value.findings, 'findings').map(item => text(item, 'Finding'));
   if (value.approved && findings.length) throw new Error('Approved reviews cannot contain blocking findings.');
-  return { schemaVersion: 1, taskId: task.id, approved: value.approved, summary: text(value.summary, 'Summary'), findings };
+  if ('needsRegression' in value && typeof value.needsRegression !== 'boolean') throw new Error('Regression request must be boolean.');
+  if (value.needsRegression && (value.approved || !findings.length)) throw new Error('Regression requests require blocking review findings.');
+  return { schemaVersion: 1, taskId: task.id, approved: value.approved, ...('needsRegression' in value ? { needsRegression: value.needsRegression as boolean } : {}), summary: text(value.summary, 'Summary'), findings };
 }
 
 const string = { type: 'string' };
@@ -118,4 +120,22 @@ const recordSchema = (properties: Record<string, unknown>) => ({ type: 'object',
 const checkSchema = recordSchema({ file: string, title: string });
 export const planSchema = recordSchema({ schemaVersion: { type: 'integer', const: 1 }, taskId: string, assumptions: { type: 'array', items: recordSchema({ decision: string, reason: string }) }, slices: { type: 'array', items: recordSchema({ id: string, goal: string, acceptanceIds: strings, checks: { type: 'array', items: checkSchema } }) }, browserChecks: { type: 'array', items: checkSchema } });
 export const workerSchema = recordSchema({ schemaVersion: { type: 'integer', const: 1 }, taskId: string, summary: string, blockers: strings });
-export const reviewSchema = recordSchema({ schemaVersion: { type: 'integer', const: 1 }, taskId: string, approved: { type: 'boolean' }, summary: string, findings: strings });
+export const reviewSchema = recordSchema({ schemaVersion: { type: 'integer', const: 1 }, taskId: string, approved: { type: 'boolean' }, needsRegression: { type: 'boolean' }, summary: string, findings: strings });
+
+export type RegressionReport = WorkerReport & { checks: Check[]; browserChecks: Check[] };
+export function parseRegressionReport(input: unknown, task: Task): RegressionReport {
+  const value = object(input, 'Regression report');
+  const report = parseWorkerReport(input, task);
+  const parseChecks = (input: unknown, browser: boolean) => list(input, 'Regression checks').map(input => {
+    const check = object(input, 'Regression check');
+    const file = text(check.file, 'Regression file');
+    if (!(browser ? /^[a-zA-Z0-9_-]+\.spec\.ts$/ : /^tests\/[a-zA-Z0-9_-]+\.test\.ts$/).test(file) || !scoped(browser ? `acceptance/${file}` : file, task)) throw new Error('Regression checks must use new scoped test files.');
+    return { file, title: text(check.title, 'Regression title') };
+  });
+  const checks = parseChecks(value.checks, false);
+  const browserChecks = parseChecks(value.browserChecks, true);
+  const keys = [...checks.map(check => `${check.file}#${check.title}`), ...browserChecks.map(check => `${check.file}#${check.title}`)];
+  if (!keys.length || new Set(keys).size !== keys.length) throw new Error('Regression report requires distinct named checks.');
+  return { ...report, checks, browserChecks };
+}
+export const regressionSchema = recordSchema({ ...workerSchema.properties, checks: { type: 'array', items: checkSchema }, browserChecks: { type: 'array', items: checkSchema } });
