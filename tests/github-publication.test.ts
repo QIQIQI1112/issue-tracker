@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { describe, test } from 'node:test';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { processIdentity } from '../factory/ownership.ts';
@@ -90,183 +90,185 @@ async function prepared(mode = 'pending', rejectWhole = false) {
 
 const tick = () => new Promise(resolve => setTimeout(resolve, 5));
 
-test('GitHub requirements isolate child merges and complete only after exact-source CI and remote merge', { timeout: 60000 }, async () => {
-  const f = await prepared();
-  try {
-    const requirement = f.store.work.requirement(f.requirement.id)!;
-    assert.notEqual(requirement.status, 'done', 'Local whole-goal acceptance must not claim GitHub delivery.');
-    assert.ok(requirement.publication?.branch.startsWith('codex/requirement-'));
-    assert.equal(git(f.repository, ['rev-parse', 'main']).trim(), f.initial);
-    const childRuns = f.store.work.runs().filter(run => run.issueId !== null);
-    for (const run of childRuns) assert.equal(JSON.parse(readFileSync(join(run.evidencePath, 'delivery.json'), 'utf8')).integration.branch, requirement.publication!.branch);
-    assert.equal(f.host.calls.length, 0, 'Publishing must follow complete whole-goal acceptance.');
-    assert.equal(f.host.pushes, 0, 'Remote push must follow complete whole-goal acceptance.');
-    assert.equal(await f.queue.processNext(), true);
-    assert.equal(f.store.work.requirement(f.requirement.id)?.publication?.state, 'awaiting_ci');
-    assert.equal(f.host.mergeCalls, 0);
-    const reopened = new IssueStore(f.store.path);
-    assert.equal(reopened.work.requirement(f.requirement.id)?.publication?.url, 'https://github.com/fixture/project/pull/1'); reopened.close();
-    f.host.mode = 'success'; await tick();
-    assert.equal(await new SerialQueue(f.store, f.options).processNext(), true);
-    const delivered = f.store.work.requirement(f.requirement.id)!;
-    assert.equal(delivered.status, 'done'); assert.equal(delivered.publication?.state, 'merged');
-    assert.equal(delivered.publication?.mergeCommit, git(f.repository, ['rev-parse', 'main']).trim());
-    assert.equal(f.host.mergeCalls, 1); assert.equal(f.host.calls.filter(call => call.method === 'POST').length, 1);
-    const report = JSON.parse(readFileSync(join(f.store.work.runs()[0].evidencePath, 'delivery.json'), 'utf8'));
-    assert.equal(report.publication.mergeCommit, delivered.publication?.mergeCommit);
-    assert.equal(await f.queue.processNext(), false);
-  } finally { f.store.close(); }
-});
-
-for (const mode of ['missing', 'stale', 'failure', 'skipped', 'newer-failed', 'other-check-failed', 'changed-head', 'closed', 'unprotected', 'wrong-base']) test(`GitHub ${mode} evidence cannot authorize a requirement merge`, { timeout: 60000 }, async () => {
-  const f = await prepared(mode);
-  try {
-    assert.equal(await f.queue.processNext(), true);
-    assert.notEqual(f.store.work.requirement(f.requirement.id)?.status, 'done', 'Missing or rejected publication proof must keep the requirement unfinished.');
-    assert.equal(f.host.mergeCalls, 0);
-    assert.equal(git(f.repository, ['rev-parse', 'main']).trim(), f.initial);
-    assert.ok(f.host.calls.some(call => call.method === 'POST'), 'The failure is checked against a real fixture PR.');
-    assert.equal(f.store.work.requirement(f.requirement.id)?.publication?.state, ['missing', 'stale'].includes(mode) ? 'awaiting_ci' : 'blocked');
-  } finally { f.store.close(); }
-});
-
-for (const phase of ['create', 'merge']) test(`publication retry reconciles a lost ${phase} response without duplicate PRs or development`, { timeout: 60000 }, async () => {
-  const f = await prepared('success');
-  try {
-    f.host.loseCreate = phase === 'create'; f.host.loseMerge = phase === 'merge';
-    assert.equal(await f.queue.processNext(), true);
-    assert.equal(f.store.work.requirement(f.requirement.id)?.status, 'blocked', 'An uncertain external result needs reconciliation.');
-    const childCount = f.store.work.runs().filter(run => run.issueId !== null).length;
-    f.store.work.startRequirement(f.requirement.id);
-    assert.equal(await new SerialQueue(f.store, f.options).processNext(), true);
-    assert.equal(f.store.work.requirement(f.requirement.id)?.status, 'done');
-    assert.equal(f.store.work.runs().filter(run => run.issueId !== null).length, childCount);
-    assert.equal(f.host.calls.filter(call => call.method === 'POST').length, 1);
-    assert.equal(f.host.mergeCalls, 1);
-  } finally { f.store.close(); }
-});
-
-test('publication restart resumes an interrupted poll and rejects a moved target without another merge', { timeout: 60000 }, async () => {
-  const f = await prepared();
-  try {
-    assert.equal(await f.queue.processNext(), true);
-    await tick();
-    const interrupted = f.store.work.claim(join(f.root, 'evidence'))!;
-    assert.equal(interrupted.job.kind, 'requirement_publish');
-    const queue = new SerialQueue(f.store, f.options); queue.recover();
-    assert.ok(f.store.work.jobs().some(job => job.kind === 'requirement_publish' && job.status === 'queued'));
-    assert.equal(f.store.work.runs().filter(run => run.issueId !== null).length, 2);
-    f.host.mode = 'success';
-    git(f.repository, ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@localhost', 'commit', '--allow-empty', '-qm', 'External base change']);
-    git(f.repository, ['push', 'origin', 'main']);
-    await tick(); assert.equal(await queue.processNext(), true);
-    assert.equal(f.store.work.requirement(f.requirement.id)?.status, 'blocked');
-    assert.equal(f.host.mergeCalls, 0);
-    assert.match(f.store.work.runs()[0].reason ?? '', /base|target/i);
-  } finally { f.store.close(); }
-});
-
-test('publication enrollment is snapshotted and cross-requirement dependencies wait for GitHub delivery', { timeout: 60000 }, async () => {
-  const f = await prepared();
-  try {
-    const other = f.store.work.addRequirement({ repoId: f.repo.id, title: 'Next requirement', goal: 'Use the published prerequisite.' });
-    assert.notEqual(other.publication?.branch, f.store.work.requirement(f.requirement.id)?.publication?.branch, 'Every requirement needs its own persistent branch.');
-    const prerequisite = f.store.list().find(issue => issue.title === 'Confirm readiness')!;
-    const dependent = f.store.create({ title: 'Dependent', description: 'Use the prerequisite.', labels: [], status: 'open', priority: 'medium', work: { repoId: f.repo.id, requirementId: other.id, dependsOn: [prerequisite.id], acceptance: ['Prerequisite is delivered.'] } });
-    f.store.work.startRequirement(other.id);
-    assert.equal(await f.queue.processNext(), true); await tick();
-    assert.equal(f.store.work.claim(join(f.root, 'probe'))?.job.kind, 'requirement_publish', 'A local child merge cannot release work in another requirement.');
-    assert.equal(f.store.work.jobs().find(job => job.issueId === dependent.id)?.status, 'queued');
-    const resumed = new SerialQueue(f.store, f.options); resumed.recover();
-    f.host.mode = 'success'; await tick();
-    assert.equal(await resumed.processNext(), true);
-    assert.equal(f.store.work.requirement(f.requirement.id)?.status, 'done');
-    assert.equal(f.store.work.claim(join(f.root, 'released'))?.job.issueId, dependent.id, 'GitHub merge releases the waiting dependent.');
-  } finally { f.store.close(); }
-});
-
-for (const mode of ['whole-review-reject', 'local-head-moved']) test(`publication rejects ${mode} before contacting GitHub`, { timeout: 60000 }, async () => {
-  const f = await prepared('success', mode === 'whole-review-reject');
-  try {
-    if (mode === 'local-head-moved') {
-      const publication = f.store.work.requirement(f.requirement.id)?.publication;
-      assert.ok(publication, 'A GitHub requirement needs a frozen publication identity.');
-      const before = git(f.repository, ['rev-parse', publication.branch]).trim();
-      const tree = git(f.repository, ['rev-parse', `${before}^{tree}`]).trim();
-      const changed = git(f.repository, ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@localhost', 'commit-tree', tree, '-p', before, '-m', 'Unreviewed head']).trim();
-      git(f.repository, ['update-ref', `refs/heads/${publication.branch}`, changed, before]);
+describe('GitHub requirement publication', { concurrency: 4 }, () => {
+  test('GitHub requirements isolate child merges and complete only after exact-source CI and remote merge', { timeout: 60000 }, async () => {
+    const f = await prepared();
+    try {
+      const requirement = f.store.work.requirement(f.requirement.id)!;
+      assert.notEqual(requirement.status, 'done', 'Local whole-goal acceptance must not claim GitHub delivery.');
+      assert.ok(requirement.publication?.branch.startsWith('codex/requirement-'));
+      assert.equal(git(f.repository, ['rev-parse', 'main']).trim(), f.initial);
+      const childRuns = f.store.work.runs().filter(run => run.issueId !== null);
+      for (const run of childRuns) assert.equal(JSON.parse(readFileSync(join(run.evidencePath, 'delivery.json'), 'utf8')).integration.branch, requirement.publication!.branch);
+      assert.equal(f.host.calls.length, 0, 'Publishing must follow complete whole-goal acceptance.');
+      assert.equal(f.host.pushes, 0, 'Remote push must follow complete whole-goal acceptance.');
       assert.equal(await f.queue.processNext(), true);
+      assert.equal(f.store.work.requirement(f.requirement.id)?.publication?.state, 'awaiting_ci');
+      assert.equal(f.host.mergeCalls, 0);
+      const reopened = new IssueStore(f.store.path);
+      assert.equal(reopened.work.requirement(f.requirement.id)?.publication?.url, 'https://github.com/fixture/project/pull/1'); reopened.close();
+      f.host.mode = 'success'; await tick();
+      assert.equal(await new SerialQueue(f.store, f.options).processNext(), true);
+      const delivered = f.store.work.requirement(f.requirement.id)!;
+      assert.equal(delivered.status, 'done'); assert.equal(delivered.publication?.state, 'merged');
+      assert.equal(delivered.publication?.mergeCommit, git(f.repository, ['rev-parse', 'main']).trim());
+      assert.equal(f.host.mergeCalls, 1); assert.equal(f.host.calls.filter(call => call.method === 'POST').length, 1);
+      const report = JSON.parse(readFileSync(join(f.store.work.runs()[0].evidencePath, 'delivery.json'), 'utf8'));
+      assert.equal(report.publication.mergeCommit, delivered.publication?.mergeCommit);
+      assert.equal(await f.queue.processNext(), false);
+    } finally { f.store.close(); }
+  });
+
+  for (const mode of ['missing', 'stale', 'failure', 'skipped', 'newer-failed', 'other-check-failed', 'changed-head', 'closed', 'unprotected', 'wrong-base']) test(`GitHub ${mode} evidence cannot authorize a requirement merge`, { timeout: 60000 }, async () => {
+    const f = await prepared(mode);
+    try {
+      assert.equal(await f.queue.processNext(), true);
+      assert.notEqual(f.store.work.requirement(f.requirement.id)?.status, 'done', 'Missing or rejected publication proof must keep the requirement unfinished.');
+      assert.equal(f.host.mergeCalls, 0);
+      assert.equal(git(f.repository, ['rev-parse', 'main']).trim(), f.initial);
+      assert.ok(f.host.calls.some(call => call.method === 'POST'), 'The failure is checked against a real fixture PR.');
+      assert.equal(f.store.work.requirement(f.requirement.id)?.publication?.state, ['missing', 'stale'].includes(mode) ? 'awaiting_ci' : 'blocked');
+    } finally { f.store.close(); }
+  });
+
+  for (const phase of ['create', 'merge']) test(`publication retry reconciles a lost ${phase} response without duplicate PRs or development`, { timeout: 60000 }, async () => {
+    const f = await prepared('success');
+    try {
+      f.host.loseCreate = phase === 'create'; f.host.loseMerge = phase === 'merge';
+      assert.equal(await f.queue.processNext(), true);
+      assert.equal(f.store.work.requirement(f.requirement.id)?.status, 'blocked', 'An uncertain external result needs reconciliation.');
+      const childCount = f.store.work.runs().filter(run => run.issueId !== null).length;
+      f.store.work.startRequirement(f.requirement.id);
+      assert.equal(await new SerialQueue(f.store, f.options).processNext(), true);
+      assert.equal(f.store.work.requirement(f.requirement.id)?.status, 'done');
+      assert.equal(f.store.work.runs().filter(run => run.issueId !== null).length, childCount);
+      assert.equal(f.host.calls.filter(call => call.method === 'POST').length, 1);
+      assert.equal(f.host.mergeCalls, 1);
+    } finally { f.store.close(); }
+  });
+
+  test('publication restart resumes an interrupted poll and rejects a moved target without another merge', { timeout: 60000 }, async () => {
+    const f = await prepared();
+    try {
+      assert.equal(await f.queue.processNext(), true);
+      await tick();
+      const interrupted = f.store.work.claim(join(f.root, 'evidence'))!;
+      assert.equal(interrupted.job.kind, 'requirement_publish');
+      const queue = new SerialQueue(f.store, f.options); queue.recover();
+      assert.ok(f.store.work.jobs().some(job => job.kind === 'requirement_publish' && job.status === 'queued'));
+      assert.equal(f.store.work.runs().filter(run => run.issueId !== null).length, 2);
+      f.host.mode = 'success';
+      git(f.repository, ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@localhost', 'commit', '--allow-empty', '-qm', 'External base change']);
+      git(f.repository, ['push', 'origin', 'main']);
+      await tick(); assert.equal(await queue.processNext(), true);
+      assert.equal(f.store.work.requirement(f.requirement.id)?.status, 'blocked');
+      assert.equal(f.host.mergeCalls, 0);
+      assert.match(f.store.work.runs()[0].reason ?? '', /base|target/i);
+    } finally { f.store.close(); }
+  });
+
+  test('publication enrollment is snapshotted and cross-requirement dependencies wait for GitHub delivery', { timeout: 60000 }, async () => {
+    const f = await prepared();
+    try {
+      const other = f.store.work.addRequirement({ repoId: f.repo.id, title: 'Next requirement', goal: 'Use the published prerequisite.' });
+      assert.notEqual(other.publication?.branch, f.store.work.requirement(f.requirement.id)?.publication?.branch, 'Every requirement needs its own persistent branch.');
+      const prerequisite = f.store.list().find(issue => issue.title === 'Confirm readiness')!;
+      const dependent = f.store.create({ title: 'Dependent', description: 'Use the prerequisite.', labels: [], status: 'open', priority: 'medium', work: { repoId: f.repo.id, requirementId: other.id, dependsOn: [prerequisite.id], acceptance: ['Prerequisite is delivered.'] } });
+      f.store.work.startRequirement(other.id);
+      assert.equal(await f.queue.processNext(), true); await tick();
+      assert.equal(f.store.work.claim(join(f.root, 'probe'))?.job.kind, 'requirement_publish', 'A local child merge cannot release work in another requirement.');
+      assert.equal(f.store.work.jobs().find(job => job.issueId === dependent.id)?.status, 'queued');
+      const resumed = new SerialQueue(f.store, f.options); resumed.recover();
+      f.host.mode = 'success'; await tick();
+      assert.equal(await resumed.processNext(), true);
+      assert.equal(f.store.work.requirement(f.requirement.id)?.status, 'done');
+      assert.equal(f.store.work.claim(join(f.root, 'released'))?.job.issueId, dependent.id, 'GitHub merge releases the waiting dependent.');
+    } finally { f.store.close(); }
+  });
+
+  for (const mode of ['whole-review-reject', 'local-head-moved']) test(`publication rejects ${mode} before contacting GitHub`, { timeout: 60000 }, async () => {
+    const f = await prepared('success', mode === 'whole-review-reject');
+    try {
+      if (mode === 'local-head-moved') {
+        const publication = f.store.work.requirement(f.requirement.id)?.publication;
+        assert.ok(publication, 'A GitHub requirement needs a frozen publication identity.');
+        const before = git(f.repository, ['rev-parse', publication.branch]).trim();
+        const tree = git(f.repository, ['rev-parse', `${before}^{tree}`]).trim();
+        const changed = git(f.repository, ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@localhost', 'commit-tree', tree, '-p', before, '-m', 'Unreviewed head']).trim();
+        git(f.repository, ['update-ref', `refs/heads/${publication.branch}`, changed, before]);
+        assert.equal(await f.queue.processNext(), true);
+      }
+      assert.equal(f.store.work.requirement(f.requirement.id)?.status, 'blocked');
+      assert.equal(f.host.calls.length, 0);
+      assert.equal(f.host.pushes, 0);
+      assert.equal(f.host.mergeCalls, 0);
+    } finally { f.store.close(); }
+  });
+
+  test('standalone issues in a GitHub-enrolled repository retain their local integration target', { timeout: 60000 }, async () => {
+    const f = await prepared();
+    try {
+      f.options.publicationPollMs = 60000;
+      assert.equal(await f.queue.processNext(), true);
+      const standalone = f.store.create({ title: 'Standalone maintenance behavior', description: 'Return ready locally.', labels: [], status: 'open', priority: 'medium', work: { repoId: f.repo.id, requirementId: null, dependsOn: [], acceptance: ['The value is ready.'] } });
+      f.store.work.startIssue(standalone.id);
+      assert.equal(await f.queue.processNext(), true);
+      const run = f.store.work.runs().find(run => run.issueId === standalone.id)!;
+      assert.equal(run.status, 'merged');
+      assert.equal(JSON.parse(readFileSync(join(run.evidencePath, 'delivery.json'), 'utf8')).integration.branch, 'main');
+      assert.equal(f.store.work.requirement(f.requirement.id)?.publication?.state, 'awaiting_ci');
+      assert.equal(f.host.mergeCalls, 0);
+    } finally { f.store.close(); }
+  });
+
+  test('GitHub verification workflows remain protected even when a task declares that directory in scope', () => {
+    assert.equal(protectedPath('.github/workflows/verify.yml', new Set()), true, 'Ordinary executors cannot edit their GitHub verifier.');
+  });
+
+  for (const mode of ['other-check-pending', 'commit-status-pending']) test(`publication keeps polling ${mode} and merges after it succeeds`, { timeout: 60000 }, async () => {
+    const f = await prepared(mode);
+    try {
+      assert.equal(await f.queue.processNext(), true);
+      assert.equal(f.store.work.requirement(f.requirement.id)?.status, 'queued', 'Unfinished CI must defer observation, not require manual retry.');
+      assert.equal(f.store.work.requirement(f.requirement.id)?.publication?.state, 'awaiting_ci');
+      assert.equal(f.host.mergeCalls, 0);
+      f.host.mode = 'success'; await tick();
+      assert.equal(await f.queue.processNext(), true);
+      assert.equal(f.store.work.requirement(f.requirement.id)?.status, 'done');
+      assert.equal(f.host.calls.filter(call => call.method === 'POST').length, 1);
+      assert.equal(f.host.mergeCalls, 1);
+    } finally { f.store.close(); }
+  });
+
+  test('an unsettled publication owner blocks another job in the shared repo until ownership is settled', { timeout: 60000 }, async () => {
+    const f = await prepared();
+    const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { detached: true, stdio: 'ignore' });
+    await once(child, 'spawn');
+    try {
+      f.options.publicationPollMs = 60000;
+      assert.equal(await f.queue.processNext(), true);
+      const previous = f.store.work.runs()[0];
+      const receipt = join(previous.evidencePath, 'unsettled-github.owner.json');
+      const owner = { pid: child.pid!, identity: processIdentity(child.pid!), groups: [child.pid!], settled: false };
+      writeFileSync(receipt, JSON.stringify(owner));
+      const standalone = f.store.create({ title: 'Wait for publication ownership', description: 'Do not race an unresolved GitHub process.', labels: [], status: 'open', priority: 'medium', work: { repoId: f.repo.id, requirementId: null, dependsOn: [], acceptance: ['The value is ready.'] } });
+      f.store.work.startIssue(standalone.id);
+      let phases = 0;
+      const delegate = fixtureAgent();
+      const queue = new SerialQueue(f.store, { ...f.options, agent: { run: async input => { phases += 1; return delegate.run(input); } } });
+      assert.equal(await queue.processNext(), true);
+      assert.equal(f.store.work.runs().find(run => run.issueId === standalone.id)?.status, 'blocked', 'Shared repository operations must wait for the previous publisher.');
+      assert.equal(phases, 0);
+      assert.equal(git(f.repository, ['rev-parse', 'main']).trim(), f.initial);
+      const exited = once(child, 'exit'); process.kill(-child.pid!, 'SIGTERM'); await exited;
+      writeFileSync(receipt, JSON.stringify({ ...owner, settled: true }));
+      f.store.work.startIssue(standalone.id);
+      assert.equal(await queue.processNext(), true);
+      assert.equal(f.store.work.runs().filter(run => run.issueId === standalone.id)[0].status, 'merged');
+      assert.ok(phases > 0);
+    } finally {
+      if (child.exitCode === null && child.signalCode === null) { const exited = once(child, 'exit'); process.kill(-child.pid!, 'SIGTERM'); await exited; }
+      f.store.close();
     }
-    assert.equal(f.store.work.requirement(f.requirement.id)?.status, 'blocked');
-    assert.equal(f.host.calls.length, 0);
-    assert.equal(f.host.pushes, 0);
-    assert.equal(f.host.mergeCalls, 0);
-  } finally { f.store.close(); }
-});
-
-test('standalone issues in a GitHub-enrolled repository retain their local integration target', { timeout: 60000 }, async () => {
-  const f = await prepared();
-  try {
-    f.options.publicationPollMs = 60000;
-    assert.equal(await f.queue.processNext(), true);
-    const standalone = f.store.create({ title: 'Standalone maintenance behavior', description: 'Return ready locally.', labels: [], status: 'open', priority: 'medium', work: { repoId: f.repo.id, requirementId: null, dependsOn: [], acceptance: ['The value is ready.'] } });
-    f.store.work.startIssue(standalone.id);
-    assert.equal(await f.queue.processNext(), true);
-    const run = f.store.work.runs().find(run => run.issueId === standalone.id)!;
-    assert.equal(run.status, 'merged');
-    assert.equal(JSON.parse(readFileSync(join(run.evidencePath, 'delivery.json'), 'utf8')).integration.branch, 'main');
-    assert.equal(f.store.work.requirement(f.requirement.id)?.publication?.state, 'awaiting_ci');
-    assert.equal(f.host.mergeCalls, 0);
-  } finally { f.store.close(); }
-});
-
-test('GitHub verification workflows remain protected even when a task declares that directory in scope', () => {
-  assert.equal(protectedPath('.github/workflows/verify.yml', new Set()), true, 'Ordinary executors cannot edit their GitHub verifier.');
-});
-
-for (const mode of ['other-check-pending', 'commit-status-pending']) test(`publication keeps polling ${mode} and merges after it succeeds`, { timeout: 60000 }, async () => {
-  const f = await prepared(mode);
-  try {
-    assert.equal(await f.queue.processNext(), true);
-    assert.equal(f.store.work.requirement(f.requirement.id)?.status, 'queued', 'Unfinished CI must defer observation, not require manual retry.');
-    assert.equal(f.store.work.requirement(f.requirement.id)?.publication?.state, 'awaiting_ci');
-    assert.equal(f.host.mergeCalls, 0);
-    f.host.mode = 'success'; await tick();
-    assert.equal(await f.queue.processNext(), true);
-    assert.equal(f.store.work.requirement(f.requirement.id)?.status, 'done');
-    assert.equal(f.host.calls.filter(call => call.method === 'POST').length, 1);
-    assert.equal(f.host.mergeCalls, 1);
-  } finally { f.store.close(); }
-});
-
-test('an unsettled publication owner blocks another job in the shared repo until ownership is settled', { timeout: 60000 }, async () => {
-  const f = await prepared();
-  const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { detached: true, stdio: 'ignore' });
-  await once(child, 'spawn');
-  try {
-    f.options.publicationPollMs = 60000;
-    assert.equal(await f.queue.processNext(), true);
-    const previous = f.store.work.runs()[0];
-    const receipt = join(previous.evidencePath, 'unsettled-github.owner.json');
-    const owner = { pid: child.pid!, identity: processIdentity(child.pid!), groups: [child.pid!], settled: false };
-    writeFileSync(receipt, JSON.stringify(owner));
-    const standalone = f.store.create({ title: 'Wait for publication ownership', description: 'Do not race an unresolved GitHub process.', labels: [], status: 'open', priority: 'medium', work: { repoId: f.repo.id, requirementId: null, dependsOn: [], acceptance: ['The value is ready.'] } });
-    f.store.work.startIssue(standalone.id);
-    let phases = 0;
-    const delegate = fixtureAgent();
-    const queue = new SerialQueue(f.store, { ...f.options, agent: { run: async input => { phases += 1; return delegate.run(input); } } });
-    assert.equal(await queue.processNext(), true);
-    assert.equal(f.store.work.runs().find(run => run.issueId === standalone.id)?.status, 'blocked', 'Shared repository operations must wait for the previous publisher.');
-    assert.equal(phases, 0);
-    assert.equal(git(f.repository, ['rev-parse', 'main']).trim(), f.initial);
-    const exited = once(child, 'exit'); process.kill(-child.pid!, 'SIGTERM'); await exited;
-    writeFileSync(receipt, JSON.stringify({ ...owner, settled: true }));
-    f.store.work.startIssue(standalone.id);
-    assert.equal(await queue.processNext(), true);
-    assert.equal(f.store.work.runs().filter(run => run.issueId === standalone.id)[0].status, 'merged');
-    assert.ok(phases > 0);
-  } finally {
-    if (child.exitCode === null && child.signalCode === null) { const exited = once(child, 'exit'); process.kill(-child.pid!, 'SIGTERM'); await exited; }
-    f.store.close();
-  }
+  });
 });
