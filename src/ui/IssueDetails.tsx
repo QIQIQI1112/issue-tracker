@@ -59,7 +59,7 @@ export function IssueDetails({ id, workbench, issues = [], metadataError = '', o
   const jobs = workbench.jobs.filter(job => owned(job) && job.issueId === id).sort((a, b) => b.id - a.id);
   const issueRuns = runs.filter(run => owned(run) && run.issueId === id).sort((a, b) => b.jobId - a.jobId || b.startedAt.localeCompare(a.startedAt));
   const requirement = workbench.requirements.find(item => item.id === issue?.work?.requirementId && item.repoId === issue?.work?.repoId);
-  const requirementRuns = requirement ? workbench.runs.filter(run => owned(run) && run.issueId === null && workbench.jobs.some(job => job.id === run.jobId && job.runId === run.id && owned(job) && job.issueId === null && ['decompose', 'plan_review', 'requirement_verify'].includes(job.kind))).sort((a, b) => b.jobId - a.jobId) : [];
+  const requirementRuns = requirement ? workbench.runs.filter(run => owned(run) && run.issueId === null && workbench.jobs.some(job => job.id === run.jobId && job.runId === run.id && owned(job) && job.issueId === null && ['decompose', 'plan_review', 'requirement_verify', 'requirement_publish'].includes(job.kind))).sort((a, b) => b.jobId - a.jobId) : [];
   const allRuns = [...issueRuns, ...requirementRuns];
   const runId = allRuns.some(run => run.id === selected) ? selected : issueRuns[0]?.id ?? requirementRuns[0]?.id;
   const latestJob = jobs[0];
@@ -82,7 +82,7 @@ export function IssueDetails({ id, workbench, issues = [], metadataError = '', o
   }
   const stage = (run: WorkRun) => {
     const kind = workbench.jobs.find(job => job.id === run.jobId && job.runId === run.id && owned(job))?.kind;
-    return kind === 'decompose' ? 'Decomposition' : kind === 'plan_review' ? 'Plan review' : kind === 'requirement_verify' ? 'Whole-goal verification' : 'Issue execution';
+    return kind === 'decompose' ? 'Decomposition' : kind === 'plan_review' ? 'Plan review' : kind === 'requirement_publish' ? 'GitHub publication' : kind === 'requirement_verify' ? 'Whole-goal verification' : 'Issue execution';
   };
   const option = (run: WorkRun) => <option key={run.id} value={run.id}>{stage(run)} · {run.id} · {run.startedAt} · {run.status}{run.completedAt ? ' · completed ' + run.completedAt : ''}</option>;
   return <div className="detail-body">
@@ -104,6 +104,15 @@ export function IssueDetails({ id, workbench, issues = [], metadataError = '', o
       <h4>Acceptance conditions</h4>{issue.work?.acceptance.length ? <ul>{issue.work.acceptance.map((text, index) => <li key={index}>{text}</li>)}</ul> : <p>No acceptance conditions recorded.</p>}
       {requirement && <section aria-label="Requirement context" className="diagnostic-section">
         <h3>Original requirement goal</h3><p>{requirement.goal}</p>
+        {requirement.publication && <div className="diagnostic-section">
+          <h4>GitHub delivery</h4><p>{({ pending: 'GitHub publication pending', awaiting_ci: 'Awaiting GitHub CI', blocked: 'GitHub publication blocked', merged: 'GitHub PR merged' })[requirement.publication.state]}</p>
+          <p>Branch <code>{requirement.publication.branch}</code></p>
+          {requirement.publication.url && <p><a href={requirement.publication.url} target="_blank" rel="noreferrer">GitHub PR #{requirement.publication.number}</a></p>}
+          {requirement.publication.ciUrl && <p><a href={requirement.publication.ciUrl} target="_blank" rel="noreferrer">GitHub CI run</a></p>}
+          {requirement.publication.headCommit && <p>Verified head <code>{requirement.publication.headCommit}</code></p>}
+          {requirement.publication.mergeCommit && <p>GitHub merge <code>{requirement.publication.mergeCommit}</code></p>}
+          {requirement.publication.reason && <p className="execution-warning">{requirement.publication.reason}</p>}
+        </div>}
         {requirement.submission ? <><h4>Conversation plan provenance</h4><dl>
           <dt>Submission</dt><dd>{requirement.submission.id}</dd><dt>Plan hash</dt><dd><code>{requirement.submission.planHash}</code></dd>
           <dt>Source kind</dt><dd>{requirement.submission.source.kind}</dd><dt>Source reference</dt><dd>{requirement.submission.source.reference}</dd><dt>Source summary</dt><dd>{requirement.submission.source.summary}</dd>

@@ -26,6 +26,11 @@ const migrations = [
    CREATE INDEX job_queue ON jobs(status, id);`,
   `CREATE TABLE plan_submissions (id TEXT PRIMARY KEY, requirement_id INTEGER NOT NULL UNIQUE REFERENCES requirements(id), plan_hash TEXT NOT NULL, plan TEXT NOT NULL, issue_ids TEXT NOT NULL, created_at TEXT NOT NULL);`,
   `CREATE TABLE IF NOT EXISTS issue_change_kinds (issue_id INTEGER PRIMARY KEY REFERENCES issues(id) ON DELETE CASCADE, change_kind TEXT NOT NULL CHECK(change_kind IN ('feature','acceptance_contract','harness')));`,
+  (database: DatabaseSync) => {
+    for (const [table, column, definition] of [['repos', 'github', 'TEXT CHECK(github IS NULL OR json_valid(github))'], ['requirements', 'publication', 'TEXT CHECK(publication IS NULL OR json_valid(publication))'], ['jobs', 'available_at', 'INTEGER NOT NULL DEFAULT 0']]) {
+      if (!database.prepare(`PRAGMA table_info(${table})`).all().some(row => row.name === column)) database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    }
+  },
 ];
 
 export const DATABASE_SCHEMA_VERSION = migrations.length;
@@ -51,7 +56,9 @@ export class IssueStore {
         const version = (this.database.prepare('PRAGMA user_version').get() as { user_version: number }).user_version;
         if (version > migrations.length) throw new Error('Database schema version is newer than this application.');
         for (let index = version; index < migrations.length; index += 1) {
-          this.database.exec(migrations[index]);
+          const migration = migrations[index];
+          if (typeof migration === 'string') this.database.exec(migration);
+          else migration(this.database);
           this.database.exec(`PRAGMA user_version = ${index + 1}`);
         }
         this.database.exec('COMMIT');
