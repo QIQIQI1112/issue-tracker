@@ -1,9 +1,10 @@
 import { describe, test } from 'node:test';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { processIdentity } from '../factory/ownership.ts';
+import { assertRunQuiescent, processIdentity } from '../factory/ownership.ts';
 import assert from 'node:assert/strict';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
 import { join } from 'node:path';
 import { IssueStore } from '../src/storage.ts';
 import { SerialQueue } from '../factory/queue.ts';
@@ -70,7 +71,7 @@ class FixtureGitHub implements GitHubHost {
   }
 }
 
-async function prepared(mode = 'pending', rejectWhole = false) {
+async function freshPrepared(mode = 'pending', rejectWhole = false) {
   const root = evidenceDirectory('requirement-github');
   const repository = fixtureRepository(join(root, 'repo'));
   const remote = join(root, 'remote.git'); mkdirSync(remote);
@@ -86,6 +87,45 @@ async function prepared(mode = 'pending', rejectWhole = false) {
   const initial = git(repository, ['rev-parse', 'main']).trim();
   for (let index = 0; index < 4; index += 1) assert.equal(await queue.processNext(), true);
   return { root, repository, store, repo, requirement, host, options, queue, initial };
+}
+
+let seed: ReturnType<typeof freshPrepared> | undefined;
+
+async function prepared(mode = 'pending', rejectWhole = false) {
+  if (mode === 'pending' || rejectWhole) return freshPrepared(mode, rejectWhole);
+  const original = await (seed ??= freshPrepared().then(fixture => {
+    fixture.store.close();
+    assertRunQuiescent(fixture.root);
+    assert.equal(git(fixture.repository, ['worktree', 'list', '--porcelain']).split('\n').filter(line => line.startsWith('worktree ')).join('\n'), `worktree ${realpathSync(fixture.repository)}`);
+    assert.equal(existsSync(join(fixture.repository, '.git', 'worktrees')), false);
+    const locks = (path: string): string[] => readdirSync(path, { withFileTypes: true }).flatMap(entry => entry.isSymbolicLink() ? [] : entry.isDirectory() ? locks(join(path, entry.name)) : entry.name.endsWith('.lock') ? [join(path, entry.name)] : []);
+    assert.deepEqual(locks(fixture.root), []);
+    return fixture;
+  }));
+  const root = evidenceDirectory('requirement-github-copy');
+  cpSync(original.root, root, { recursive: true, verbatimSymlinks: true });
+  const repository = join(root, 'repo');
+  git(repository, ['remote', 'set-url', 'origin', join(root, 'remote.git')]);
+  assert.equal(git(repository, ['remote', 'get-url', 'origin']).trim(), join(root, 'remote.git'));
+  assert.equal(git(repository, ['worktree', 'list', '--porcelain']).split('\n').filter(line => line.startsWith('worktree ')).join('\n'), `worktree ${realpathSync(repository)}`);
+  const database = new DatabaseSync(join(root, 'state.sqlite'));
+  try {
+    database.prepare('UPDATE repos SET path = ? WHERE id = ?').run(repository, original.repo.id);
+    for (const run of database.prepare('SELECT id, evidence_path FROM work_runs').all() as { id: string; evidence_path: string }[]) {
+      assert.ok(run.evidence_path.startsWith(original.root + '/'));
+      const path = join(root, run.evidence_path.slice(original.root.length + 1));
+      assert.equal(readFileSync(join(path, 'delivery.json'), 'utf8'), readFileSync(join(run.evidence_path, 'delivery.json'), 'utf8'));
+      database.prepare('UPDATE work_runs SET evidence_path = ? WHERE id = ?').run(path, run.id);
+    }
+  } finally { database.close(); }
+  const store = new IssueStore(join(root, 'state.sqlite'));
+  const repo = store.work.repo(original.repo.id)!;
+  const requirement = store.work.requirement(original.requirement.id)!;
+  const host = new FixtureGitHub(repository); host.mode = mode;
+  const options = { ...original.options, agent: fixtureAgent(), github: host };
+  const queue = new SerialQueue(store, options);
+  writeFileSync(join(root, 'fixture-provenance.json'), JSON.stringify({ seed: original.root, copiedCommittedSourceAndExecutedEvidence: true, rebound: ['repos.path', 'work_runs.evidence_path', 'origin'], mode }));
+  return { root, repository, store, repo, requirement, host, options, queue, initial: original.initial };
 }
 
 const tick = () => new Promise(resolve => setTimeout(resolve, 5));
