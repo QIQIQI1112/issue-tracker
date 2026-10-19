@@ -35,11 +35,12 @@ export function recordMaintenance(store: IssueStore, input: { issueId: number; c
   const issue = store.get(input.issueId);
   if (!issue?.work?.changeKind || issue.work.changeKind === 'feature') throw new Error('Only separately classified maintenance issues can use owner attestation.');
   const repo = store.work.repo(issue.work.repoId)!;
+  const targetBranch = issue.work.requirementId ? store.work.requirement(issue.work.requirementId)?.publication?.branch ?? repo.targetBranch : repo.targetBranch;
   const common = resolve(repo.path, git(repo.path, ['rev-parse', '--git-common-dir']).trim());
   const release = acquireDatabaseLock(join(common, 'loop-integration'), `maintenance-${input.issueId}`);
   let claim: ReturnType<IssueStore['work']['claimMaintenance']> | undefined;
   try {
-    git(repo.path, ['merge-base', '--is-ancestor', input.commit, `refs/heads/${repo.targetBranch}`]);
+    git(repo.path, ['merge-base', '--is-ancestor', input.commit, `refs/heads/${targetBranch}`]);
     const source = commitSnapshot(repo.path, input.commit);
     const verification = readJson(input.verificationPath) as { status: string; snapshot: { hash: string }; checks: Delivery['checks']; node: { passed: number }; browser: { passed: number } };
     const review = readJson(input.reviewPath) as { approved: boolean; sourceHash?: string; reviewedSourceHash?: string; findings: unknown[]; summary: string; coveredIssues?: { issueId: number; contractHash: string }[] };
@@ -61,7 +62,7 @@ export function recordMaintenance(store: IssueStore, input: { issueId: number; c
       const category = /^(tests|acceptance)\//.test(path) ? 'tests' : /^(factory|scripts|tickets|\.agents)\//.test(path) || controlPlanePath(path) || path === 'AGENTS.md' ? 'harness' : /^docs\//.test(path) ? 'documentation' : 'application';
       return { path, status, category } as Delivery['changes'][number];
     });
-    const delivery = saveDelivery(claim.run.evidencePath, { schemaVersion: 1, runId: claim.run.id, taskId: `maintenance-issue-${issue.id}`, title: issue.title, goal: issue.description, summary: review.summary, status: 'merged', startedAt: claim.run.startedAt, completedAt: new Date().toISOString(), baseline, sourceHash: source.hash, defaults: [{ decision: 'Use the separate owner maintenance workflow.', reason: 'Change classification does not grant the feature executor permission to modify its controls.' }], changes: paths, checks: verification.checks, nodePassed: node.passed, browserPassed: browser.passed, attempts: 1, review: { approved: true, summary: review.summary }, integration: { branch: repo.targetBranch, before: baseline, commit: input.commit }, limitations: [] });
+    const delivery = saveDelivery(claim.run.evidencePath, { schemaVersion: 1, runId: claim.run.id, taskId: `maintenance-issue-${issue.id}`, title: issue.title, goal: issue.description, summary: review.summary, status: 'merged', startedAt: claim.run.startedAt, completedAt: new Date().toISOString(), baseline, sourceHash: source.hash, defaults: [{ decision: 'Use the separate owner maintenance workflow.', reason: 'Change classification does not grant the feature executor permission to modify its controls.' }], changes: paths, checks: verification.checks, nodePassed: node.passed, browserPassed: browser.passed, attempts: 1, review: { approved: true, summary: review.summary }, integration: { branch: targetBranch, before: baseline, commit: input.commit }, limitations: [] });
     store.work.finish(claim.run.id, 'merged');
     return delivery;
   } catch (error) {

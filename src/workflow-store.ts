@@ -1,14 +1,14 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { createHash, randomUUID } from 'node:crypto';
 import type { IssueStore } from './storage.ts';
-import type { Assignment, Decomposition, Job, PlanSubmission, Repo, Requirement, SubmissionReceipt, WorkRun } from './workflow.ts';
-import { changeKind, ConflictError } from './workflow.ts';
+import type { Assignment, GitHubEnrollment, Publication, Decomposition, Job, PlanSubmission, Repo, Requirement, SubmissionReceipt, WorkRun } from './workflow.ts';
+import { changeKind, ConflictError, githubEnrollment } from './workflow.ts';
 import { ValidationError } from './domain.ts';
 import { parseSubmission } from './submission.ts';
 
-const repoColumns = 'id, name, path, target_branch AS targetBranch, created_at AS createdAt';
-const requirementColumns = 'id, repo_id AS repoId, title, goal, status, created_at AS createdAt, updated_at AS updatedAt';
-const jobColumns = 'id, repo_id AS repoId, requirement_id AS requirementId, issue_id AS issueId, kind, status, payload, run_id AS runId, reason, created_at AS createdAt, updated_at AS updatedAt';
+const repoColumns = 'github, id, name, path, target_branch AS targetBranch, created_at AS createdAt';
+const requirementColumns = 'publication, id, repo_id AS repoId, title, goal, status, created_at AS createdAt, updated_at AS updatedAt';
+const jobColumns = 'available_at AS availableAt, id, repo_id AS repoId, requirement_id AS requirementId, issue_id AS issueId, kind, status, payload, run_id AS runId, reason, created_at AS createdAt, updated_at AS updatedAt';
 const runColumns = 'id, job_id AS jobId, repo_id AS repoId, requirement_id AS requirementId, issue_id AS issueId, status, evidence_path AS evidencePath, reason, started_at AS startedAt, completed_at AS completedAt';
 
 export class WorkflowStore {
@@ -22,18 +22,33 @@ export class WorkflowStore {
     catch (error) { this.database.exec('ROLLBACK'); throw error; }
   }
 
-  repos(): Repo[] { return this.database.prepare(`SELECT ${repoColumns} FROM repos ORDER BY id`).all() as Repo[]; }
-  repo(id: number): Repo | undefined { return this.database.prepare(`SELECT ${repoColumns} FROM repos WHERE id = ?`).get(id) as Repo | undefined; }
+  repos(): Repo[] { return this.database.prepare(`SELECT ${repoColumns} FROM repos ORDER BY id`).all().map(row => this.repoRow(row)); }
+  private repoRow(row: unknown): Repo {
+    const { github, ...repo } = row as Omit<Repo, 'github'> & { github: string | null };
+    return { ...repo, ...(github ? { github: githubEnrollment(JSON.parse(github)) } : {}) };
+  }
+  repo(id: number): Repo | undefined { const row = this.database.prepare(`SELECT ${repoColumns} FROM repos WHERE id = ?`).get(id); return row ? this.repoRow(row) : undefined; }
+  configureGitHub(id: number, input: GitHubEnrollment): Repo {
+    if (!this.repo(id)) throw new ValidationError('Repository not found.');
+    const github = githubEnrollment(input);
+    this.database.prepare('UPDATE repos SET github=? WHERE id=?').run(JSON.stringify(github), id);
+    return this.repo(id)!;
+  }
   addRepo(input: Omit<Repo, 'id' | 'createdAt'>): Repo {
+    if (input.github) githubEnrollment(input.github);
     if (this.repos().some(repo => repo.path === input.path)) throw new ConflictError('Repository is already registered.');
     const result = this.database.prepare('INSERT INTO repos (name, path, target_branch, created_at) VALUES (?, ?, ?, ?)').run(input.name, input.path, input.targetBranch, new Date().toISOString());
-    return this.repo(Number(result.lastInsertRowid))!;
+    const id = Number(result.lastInsertRowid);
+    if (input.github) this.configureGitHub(id, input.github);
+    return this.repo(id)!;
   }
   private enrichedRequirement(requirement: Requirement): Requirement {
+    const { publication, ...plain } = requirement as unknown as Omit<Requirement, 'publication'> & { publication: string | null };
+    requirement = { ...plain, ...(publication ? { publication: JSON.parse(publication) as Publication } : {}) };
     const submission = this.submissionForRequirement(requirement.id);
     return submission ? { ...requirement, submission: { id: submission.id, planHash: submission.planHash, source: submission.plan.source } } : requirement;
   }
-  requirements(): Requirement[] { return (this.database.prepare(`SELECT ${requirementColumns} FROM requirements ORDER BY id DESC`).all() as Omit<Requirement, 'submission'>[]).map(item => this.enrichedRequirement(item)); }
+  requirements(): Requirement[] { return (this.database.prepare(`SELECT ${requirementColumns} FROM requirements ORDER BY id DESC`).all() as unknown as Omit<Requirement, 'submission'>[]).map(item => this.enrichedRequirement(item)); }
   requirement(id: number): Requirement | undefined {
     const requirement = this.database.prepare(`SELECT ${requirementColumns} FROM requirements WHERE id = ?`).get(id) as Requirement | undefined;
     return requirement ? this.enrichedRequirement(requirement) : undefined;
@@ -81,7 +96,43 @@ export class WorkflowStore {
     if (!this.repo(input.repoId)) throw new ValidationError('Repository not found.');
     const now = new Date().toISOString();
     const result = this.database.prepare("INSERT INTO requirements (repo_id, title, goal, status, created_at, updated_at) VALUES (?, ?, ?, 'draft', ?, ?)").run(input.repoId, input.title, input.goal, now, now);
-    return this.requirement(Number(result.lastInsertRowid))!;
+    const id = Number(result.lastInsertRowid);
+    const repo = this.repo(input.repoId)!;
+    if (repo.github) this.database.prepare('UPDATE requirements SET publication=? WHERE id=?').run(JSON.stringify({ ...repo.github, branch: `codex/requirement-${id}-${randomUUID().slice(0, 8)}`, baseBranch: repo.targetBranch, state: 'pending' }), id);
+    return this.requirement(id)!;
+  }
+  updatePublication(id: number, patch: Partial<Publication>): Publication {
+    const previous = this.requirement(id)?.publication;
+    if (!previous) throw new ConflictError('Requirement is not enrolled for GitHub publication.');
+    for (const key of ['repository', 'remote', 'workflow', 'branch', 'baseBranch', 'baseCommit', 'headCommit'] as const) if (previous[key] !== undefined && patch[key] !== undefined && previous[key] !== patch[key]) throw new ConflictError(`Publication identity is frozen: ${key}.`);
+    const publication = { ...previous, ...patch };
+    this.database.prepare('UPDATE requirements SET publication=?, updated_at=? WHERE id=?').run(JSON.stringify(publication), new Date().toISOString(), id);
+    return publication;
+  }
+  finishRequirementVerification(runId: string, headCommit: string): void {
+    this.transaction(() => {
+      const run = this.run(runId)!;
+      const job = this.jobs().find(job => job.id === run.jobId)!;
+      const publication = job.requirementId === null ? undefined : this.requirement(job.requirementId)?.publication;
+      if (!publication || job.kind !== 'requirement_verify' || run.status !== 'running') throw new ConflictError('Whole-goal approval requires the running owned verification.');
+      this.updatePublication(job.requirementId!, { headCommit, verifiedRunId: run.id, deadline: publication.deadline ?? Date.now() + 86400000, state: 'awaiting_ci', reason: '' });
+      this.finish(run.id, 'passed');
+    });
+  }
+  private dependencyReady(id: number, requirementId: number | null): boolean {
+    if (!this.runs().some(run => run.issueId === id && run.status === 'merged')) return false;
+    const owner = this.context(id)?.requirementId;
+    return !owner || owner === requirementId || !this.requirement(owner)?.publication || this.requirement(owner)?.publication?.state === 'merged';
+  }
+  deferPublication(runId: string, availableAt: number): void {
+    this.transaction(() => {
+      const run = this.run(runId)!;
+      const job = this.jobs().find(job => job.id === run.jobId)!;
+      if (job.kind !== 'requirement_publish') throw new ConflictError('Only publication polling can be deferred.');
+      this.finish(runId, 'passed');
+      const next = this.jobs().find(item => item.requirementId === job.requirementId && item.kind === 'requirement_publish' && item.status === 'queued');
+      if (next) this.database.prepare('UPDATE jobs SET available_at=? WHERE id=?').run(availableAt, next.id);
+    });
   }
   context(issueId: number): Assignment | undefined {
     const row = this.database.prepare('SELECT repo_id AS repoId, requirement_id AS requirementId, depends_on AS dependsOn, acceptance FROM issue_context WHERE issue_id = ?').get(issueId) as { repoId: number; requirementId: number | null; dependsOn: string; acceptance: string } | undefined;
@@ -155,7 +206,12 @@ export class WorkflowStore {
       const issues = this.issues.list().filter(issue => issue.work?.requirementId === id);
       const needsReview = this.submissionForRequirement(id) && !this.approvedSubmission(id);
       const jobs = needsReview ? [this.enqueue('plan_review', requirement.repoId, id, null, requirement)] : issues.length ? issues.filter(issue => !this.runs().some(run => run.issueId === issue.id && run.status === 'merged')).map(issue => this.startIssue(issue.id)) : [this.enqueue('decompose', requirement.repoId, id, null, requirement)];
-      if (issues.length && !jobs.length) jobs.push(this.enqueue('requirement_verify', requirement.repoId, id, null, requirement));
+      if (issues.length && !jobs.length) {
+        const accepted = requirement.publication?.verifiedRunId ? this.run(requirement.publication.verifiedRunId) : undefined;
+        const latest = this.jobs().filter(job => job.requirementId === id && job.kind === 'requirement_verify').at(-1);
+        const publish = accepted?.status === 'passed' && accepted.requirementId === id && accepted.repoId === requirement.repoId && accepted.jobId === latest?.id && latest.status === 'completed';
+        jobs.push(this.enqueue(publish ? 'requirement_publish' : 'requirement_verify', requirement.repoId, id, null, requirement));
+      }
       this.database.prepare("UPDATE requirements SET status='queued', updated_at=? WHERE id=?").run(new Date().toISOString(), id);
       return jobs;
     });
@@ -183,7 +239,7 @@ export class WorkflowStore {
   claim(evidenceRoot: string): { job: Job; run: WorkRun } | undefined {
     return this.transaction(() => {
       if (this.jobs().some(job => job.status === 'running')) return undefined;
-      const job = this.jobs().find(job => job.status === 'queued' && job.kind !== 'maintenance' && (job.kind !== 'issue' || this.context(job.issueId!)!.dependsOn.every(id => this.runs().some(run => run.issueId === id && run.status === 'merged'))));
+      const job = this.jobs().find(job => job.status === 'queued' && (job.availableAt ?? 0) <= Date.now() && job.kind !== 'maintenance' && (job.kind !== 'issue' || this.context(job.issueId!)!.dependsOn.every(id => this.dependencyReady(id, job.requirementId))));
       if (!job) return undefined;
       return this.claimJob(job, evidenceRoot);
     });
@@ -221,6 +277,11 @@ export class WorkflowStore {
       const now = new Date().toISOString();
       this.database.prepare('UPDATE work_runs SET status=?, reason=?, completed_at=? WHERE id=?').run(status, reason, now, id);
       this.database.prepare('UPDATE jobs SET status=?, reason=?, updated_at=? WHERE id=?').run(status === 'blocked' ? 'blocked' : 'completed', reason, now, job.id);
+      if (job.requirementId !== null) {
+        const publication = this.requirement(job.requirementId)?.publication;
+        if (publication && status === 'blocked') this.updatePublication(job.requirementId, { state: 'blocked', reason: reason ?? 'Execution blocked.' });
+        if (publication && status === 'passed' && (job.kind === 'requirement_verify' || job.kind === 'requirement_publish' && publication.state !== 'merged')) this.enqueue('requirement_publish', job.repoId, job.requirementId, null, this.requirement(job.requirementId));
+      }
       if (job.kind === 'plan_review' && status === 'passed') for (const issue of this.issues.list().filter(issue => issue.work?.requirementId === job.requirementId)) this.startIssue(issue.id);
       if (job.issueId !== null) this.database.prepare('UPDATE issues SET status=?, updated_at=? WHERE id=?').run(status === 'merged' ? 'done' : 'open', now, job.issueId);
       if (status === 'blocked') {
@@ -259,8 +320,8 @@ export class WorkflowStore {
       const merged = (id: number) => runs.some(run => run.issueId === id && run.status === 'merged');
       const latest = (kind: Job['kind'], issueId: number | null = null) => related.filter(job => job.kind === kind && job.issueId === issueId).at(-1);
       const final = latest('requirement_verify');
-      const failed = children.some(issue => !merged(issue.id) && latest(issue.work?.changeKind && issue.work.changeKind !== 'feature' ? 'maintenance' : 'issue', issue.id)?.status === 'blocked') || !children.length && latest('decompose')?.status === 'blocked' || latest('plan_review')?.status === 'blocked' || final?.status === 'blocked';
-      const completed = children.length > 0 && children.every(issue => merged(issue.id)) && final?.status === 'completed' && runs.some(run => run.jobId === final.id && run.status === 'passed');
+      const failed = children.some(issue => !merged(issue.id) && latest(issue.work?.changeKind && issue.work.changeKind !== 'feature' ? 'maintenance' : 'issue', issue.id)?.status === 'blocked') || !children.length && latest('decompose')?.status === 'blocked' || latest('plan_review')?.status === 'blocked' || final?.status === 'blocked' || latest('requirement_publish')?.status === 'blocked';
+      const completed = (!requirement.publication || requirement.publication.state === 'merged' && latest('requirement_publish')?.status === 'completed') && children.length > 0 && children.every(issue => merged(issue.id)) && final?.status === 'completed' && runs.some(run => run.jobId === final.id && run.status === 'passed');
       const active = related.filter(job => ['queued', 'running'].includes(job.status));
       const status: Requirement['status'] = failed ? 'blocked' : completed ? 'done' : active.some(job => job.status === 'running') ? 'running' : active.length ? 'queued' : 'blocked';
       if (status !== requirement.status) this.database.prepare('UPDATE requirements SET status=?, updated_at=? WHERE id=?').run(status, new Date().toISOString(), requirement.id);

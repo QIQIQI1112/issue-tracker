@@ -11,8 +11,8 @@ export function requirementProgress(data: Workbench, issues: Issue[], requiremen
   const children = issues.filter(issue => issue.work?.requirementId === requirement.id && issue.work.repoId === requirement.repoId);
   const merged = children.filter(issue => mergedIssue(data, issue)).length;
   const final = data.jobs.filter(job => job.repoId === requirement.repoId && job.requirementId === requirement.id && job.kind === 'requirement_verify' && job.issueId === null).sort((a, b) => b.id - a.id)[0];
-  const verified = children.length > 0 && merged === children.length && final?.status === 'completed' && data.runs.some(run => run.jobId === final.id && run.id === final.runId && run.repoId === requirement.repoId && run.requirementId === requirement.id && run.issueId === null && run.status === 'passed' && run.completedAt !== null);
-  const outcome = final && final.status !== 'completed'
+  const verified = (!requirement.publication || requirement.publication.state === 'merged') && children.length > 0 && merged === children.length && final?.status === 'completed' && data.runs.some(run => run.jobId === final.id && run.id === final.runId && run.repoId === requirement.repoId && run.requirementId === requirement.id && run.issueId === null && run.status === 'passed' && run.completedAt !== null);
+  const outcome = requirement.publication ? requirement.publication.state === 'merged' ? 'Whole goal verified and GitHub merged' : `GitHub delivery ${requirement.publication.state}` : final && final.status !== 'completed'
     ? `Whole-goal verification ${final.status}`
     : verified ? 'Whole goal verified' : 'Whole goal not yet verified';
   return { children, merged, verified, outcome };

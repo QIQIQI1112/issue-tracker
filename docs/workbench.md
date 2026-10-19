@@ -67,3 +67,7 @@ Version-two plans can classify separate acceptance-contract and harness issues. 
 Retries retain accepted checkpoints and bounded budgets across run IDs. Open the earlier and current delivery evidence to see the predecessor, reuse decision, failed phase, and checkpoint proof hashes. A changed goal, acceptance contract, original test, harness, dependency lock, or runtime invalidates reuse. Infrastructure/process ownership blockers require cleanup of the verified owner before retry; retry never relaxes tests or expands execution authority.
 
 Delivery reports now include an execution timeline, review purposes, cumulative budget, failed phase/category, and checkpoint reuse decision. The full review and recovery contract is in `docs/harness-reliability.md`. The new fields are optional so historical reports remain readable.
+
+## GitHub requirement publication
+
+An explicitly GitHub-enrolled repository snapshots publication settings for each new requirement. Child integration advances a dedicated requirement branch; whole-goal acceptance queues publication rather than completing delivery. The persistent serial publisher creates or reconciles one PR, admits only exact-head CI under strict GitHub protection, confirms the remote merge and records the result before completion. Issue diagnostics expose its branch, PR, CI, merge SHA and blockers. See [GitHub delivery](github-delivery.md) for enrollment, the unchanged local-only and standalone workflows, polling, and recovery.

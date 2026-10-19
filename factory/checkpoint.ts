@@ -20,20 +20,29 @@ export function environmentIdentity(repository: string, engine: string): string 
 
 type Checkpoint = { schemaVersion: 1; runId: string; taskHash: string; environment: string; baselineTree: string; baseCommit: string; sourceHash: string; patchHash: string; accepted: boolean; regressions?: AcceptedRegression[]; pendingRegression?: PendingRegression; plan?: Plan; acceptanceReceipt?: NonNullable<ControllerState['reviewReceipts']>[number]; acceptedChecks: { path: string; hash: string }[]; redChecks: ControllerState['redChecks']; proofs: { path: string; hash: string }[] };
 
+export function assertTestInventory(files: { path: string; hash: string }[], approved: { path: string; hash: string }[]): void {
+  const current = new Map(files.filter(file => /^(tests|acceptance)\//.test(file.path)).map(file => [file.path, file.hash]));
+  const expected = new Map(approved.filter(file => /^(tests|acceptance)\//.test(file.path)).map(file => [file.path, file.hash]));
+  for (const path of current.keys()) if (!expected.has(path)) throw new Error(`Protected test inventory contains an unapproved file: ${path}`);
+  for (const [path, hash] of expected) if (current.get(path) !== hash) throw new Error(`Protected test inventory changed: ${path}`);
+}
+
 export function saveCheckpoint(state: ControllerState, task: Task, environment: string, accepted: boolean): void {
   if (!state.baselineTree || !state.baseCommit) return;
   const source = snapshot(state.workspace);
+  const acceptedChecks = accepted ? (readJson(join(state.runDirectory, 'accepted-checks.json')) as { path: string; hash: string }[]).filter(file => /^(tests|acceptance)\//.test(file.path)) : source.files.filter(file => /^(tests|acceptance)\//.test(file.path));
+  if (accepted) assertTestInventory(source.files, acceptedChecks);
   const present = source.files.filter(file => existsSync(join(state.workspace, file.path))).map(file => file.path);
   if (present.length) git(state.workspace, ['add', '-N', '--', ...present]);
   const patch = git(state.workspace, ['diff', '--binary', state.baselineTree, '--']);
   writeFileSync(join(state.runDirectory, 'checkpoint.patch.tmp'), patch);
   const acceptanceReceipt = state.reviewReceipts?.filter(receipt => receipt.purpose === 'acceptance-coverage' && receipt.approved).at(-1);
-  const paths = ['acceptance-review.json', ...state.redChecks.flatMap(check => [relative(state.runDirectory, check.logPath), relative(state.runDirectory, check.logPath).replace(/\.log$/, '.jsonl')])];
+  const paths = ['accepted-checks.json', 'acceptance-review.json', ...state.redChecks.flatMap(check => [relative(state.runDirectory, check.logPath), relative(state.runDirectory, check.logPath).replace(/\.log$/, '.jsonl')])];
   if (acceptanceReceipt) paths.push(acceptanceReceipt.evidencePath);
   for (const regression of state.regressions ?? []) paths.push(regression.receipt.evidencePath, ...regression.redChecks.flatMap(check => [relative(state.runDirectory, check.logPath), relative(state.runDirectory, check.reportPath!)]));
   if (state.pendingRegression) paths.push(state.pendingRegression.receipt.evidencePath);
   const proofs = accepted ? paths.map(path => ({ path, hash: digest(readFileSync(join(state.runDirectory, path))) })) : [];
-  const checkpoint: Checkpoint = { schemaVersion: 1, runId: state.runId, taskHash: taskIdentity(task), environment, baselineTree: state.baselineTree, baseCommit: state.baseCommit, sourceHash: source.hash, patchHash: digest(patch), accepted, regressions: state.regressions, pendingRegression: state.pendingRegression, plan: state.plan, acceptanceReceipt, acceptedChecks: source.files.filter(file => /^(tests|acceptance)\//.test(file.path)), redChecks: state.redChecks, proofs };
+  const checkpoint: Checkpoint = { schemaVersion: 1, runId: state.runId, taskHash: taskIdentity(task), environment, baselineTree: state.baselineTree, baseCommit: state.baseCommit, sourceHash: source.hash, patchHash: digest(patch), accepted, regressions: state.regressions, pendingRegression: state.pendingRegression, plan: state.plan, acceptanceReceipt, acceptedChecks, redChecks: state.redChecks, proofs };
   renameSync(join(state.runDirectory, 'checkpoint.patch.tmp'), join(state.runDirectory, 'checkpoint.patch'));
   writeJson(join(state.runDirectory, 'checkpoint.json'), checkpoint);
 }
@@ -49,9 +58,11 @@ export function loadCheckpoint(directory: string, root: string, task: Task, envi
   value.plan = parsePlan(value.plan, task);
   if (!value.proofs.length || value.redChecks.length !== value.plan.slices.flatMap(slice => slice.checks).length) throw new Error('Checkpoint behavior proofs are incomplete.');
   for (const proof of value.proofs) {
-    if (relative(directory, resolve(directory, proof.path)) !== proof.path || proof.path.startsWith('..') || !/^(acceptance-review\.json|(?:red-\d+(?:-\d+)?|regression-red-\d+-\d+)\.(log|jsonl|json)|review-receipt-[a-z0-9-]+\.json)$/.test(proof.path)) throw new Error('Invalid checkpoint proof path.');
+    if (relative(directory, resolve(directory, proof.path)) !== proof.path || proof.path.startsWith('..') || !/^(accepted-checks\.json|acceptance-review\.json|(?:red-\d+(?:-\d+)?|regression-red-\d+-\d+)\.(log|jsonl|json)|review-receipt-[a-z0-9-]+\.json)$/.test(proof.path)) throw new Error('Invalid checkpoint proof path.');
     if (digest(readFileSync(join(directory, proof.path))) !== proof.hash) throw new Error('Checkpoint proof hash mismatch.');
   }
+  if (!value.proofs.some(proof => proof.path === 'accepted-checks.json')) throw new Error('Checkpoint has no approved test inventory proof.');
+  assertTestInventory(value.acceptedChecks, readJson(join(directory, 'accepted-checks.json')) as { path: string; hash: string }[]);
   const regressionReceipts = new Set((value.regressions ?? []).map(regression => regression.receipt.evidencePath));
   const regressionProofs = new Set((value.regressions ?? []).flatMap(regression => regression.redChecks.flatMap(check => [check.logPath.split('/').at(-1)!, check.reportPath?.split('/').at(-1)])));
   for (const proof of value.proofs) {
@@ -101,8 +112,7 @@ export function restoreCheckpoint(checkpoint: Checkpoint, directory: string, wor
   if (readFileSync(patch).length) git(workspace, ['apply', patch]);
   const source = snapshot(workspace);
   if (source.hash !== checkpoint.sourceHash) throw new Error('Restored checkpoint source hash mismatch.');
-  const hashes = new Map(source.files.map(file => [file.path, file.hash]));
-  for (const file of checkpoint.acceptedChecks) if (hashes.get(file.path) !== file.hash) throw new Error('Restored accepted checks changed.');
+  assertTestInventory(source.files, checkpoint.acceptedChecks);
 }
 
 export function captureInterruptedDraft(directory: string): void {
