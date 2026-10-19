@@ -8,7 +8,7 @@ import { parseVerificationContract, readJson, snapshot, writeJson } from './evid
 import { runProcess } from './process.ts';
 import { allocatePorts, git, prepareWorkspace, processEnvironment, protectedPath } from './workspace.ts';
 import { controllerDelivery } from './delivery.ts';
-import { digest, environmentIdentity, loadCheckpoint, restoreCheckpoint, saveCheckpoint } from './checkpoint.ts';
+import { digest, environmentIdentity, loadCheckpoint, restoreCheckpoint, saveCheckpoint, assertTestInventory } from './checkpoint.ts';
 import { assertRunQuiescent, processIdentity } from './ownership.ts';
 import { executionBudget } from './budget.ts';
 import type { Delivery } from '../src/workflow.ts';
@@ -132,6 +132,7 @@ export async function runController(options: { repository: string; task: unknown
         if (content.length > original.length && content.subarray(0, original.length).equals(original)) appended.add(path);
       }
       for (const [path, hash] of protectedFiles) if (currentFiles.get(path) !== hash && !appended.has(path)) throw new Error(`Protected contract file changed: ${path}`);
+      if (checksFrozen && !regressionDraft) assertTestInventory(current.files, [...protectedFiles].map(([path, hash]) => ({ path, hash })));
       const original = new Map(baseline.files.map(file => [file.path, file.hash]));
       for (const path of new Set([...original.keys(), ...currentFiles.keys()])) {
         if (original.get(path) === currentFiles.get(path)) continue;
