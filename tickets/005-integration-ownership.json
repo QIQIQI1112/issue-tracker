@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "recordType": "owner-maintenance",
+  "id": "integration-ownership",
+  "issueId": 10,
+  "requirementId": null,
+  "relatedRequirementId": 2,
+  "changeKind": "harness",
+  "dependsOn": [8],
+  "goal": "Retain both owned worktrees when final reviewer settlement is unknown, as required by whole-goal review.",
+  "acceptance": [
+    "Both integration cleanup paths check live settlement and owned process groups before removing a workspace.",
+    "The queue retains candidate and integration worktrees with ownership evidence while unsafe.",
+    "Settled successful and rejected reviews still clean up and no unverified target advances."
+  ],
+  "execution": "Separate corrective maintenance delivery; original requirement membership and criteria remain frozen."
+}

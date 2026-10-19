@@ -1,0 +1,61 @@
+# Change ownership, review, and recovery
+
+## Plan changes by responsibility
+
+Keep new behavior checks in their feature issue. The tests worker adds the checks; an independent acceptance reviewer evaluates their coverage before implementation. A new test is not automatically a new issue.
+
+Create a separate `acceptance_contract` issue when changing an existing required assertion, required case, verification gate, or acceptance criterion. Create a separate `harness` issue when changing the controller, verifier, review policy, recovery, budgets, or protected workbench controls. Declare dependencies explicitly. Version-two conversation plans accept `changeKind`; version-one plans retain their original canonical identity. A classification never expands a worker's write permissions.
+
+The ordinary queue leaves maintenance jobs awaiting owner verification. Maintenance is implemented in an isolated owner worktree with its own failing checks, full verification, independent review, and verified local integration. The owner recorder requires actual machine reports for the exact committed source and independent approval covering the exact issue goal and acceptance contract. A generic approval or an old passing build cannot complete unrelated work. Owner maintenance is a cooperative local protocol, not a sandbox for hostile maintainers.
+
+## Review the right evidence at each stage
+
+Ordinary integrated feature execution follows this order:
+
+1. Plan acceptance coverage and named behavior checks.
+2. Add or repair only unapproved scoped checks.
+3. Run controller-owned named red proofs, distinguishing missing behavior from environment/import failures and already-satisfied behavior.
+4. Independently review coverage, assertions, boundary cases, and the actual red proofs. Repeat steps 2–4 within the acceptance budget when rejected.
+5. Freeze accepted checks, implement, and run the complete verifier.
+6. Apply the patch to the latest enrolled target and run the complete verifier again.
+7. Independently review that integrated code and its evidence. Repair a rejected candidate within the implementation budget, then repeat verification and final review.
+8. Advance the local target only to the exact verified and reviewed tree.
+9. Verify and independently review the original whole requirement after all child merges.
+
+There is one authoritative code review for each integrated candidate. Candidate verification, integrated verification, and whole-requirement verification remain mandatory. A delivery without a merge target retains its independent candidate code review. Maintenance retains its separate owner review and admission requirements.
+
+Owner receipts bind review purpose, source hash, canonical plan identity, acceptance identity, verification contract, and evidence path. Rejected reviews and earlier test generations retain separate evidence. Workers cannot approve themselves by writing a hash or claiming completion.
+
+## Retry without losing accepted work
+
+Checkpoints live in the run evidence directory, outside disposable worktrees. They include a reconstructable binary patch, added and deleted source, baseline identities, plan, accepted test hashes, review, and named red-proof hashes. A retry receives a new run ID and preserves its predecessor. Ownership checks follow the full predecessor lineage and all earlier issue runs; repeated retry cannot hide an older live process.
+
+The controller can reuse accepted planning/test evidence only when the goal, criteria, scope, budget, controls, original tests, dependency lock, runtime, active harness, and proof hashes match. It records every invalidation reason. Unapproved drafts remain evidence and cannot authorize implementation. Every restored draft gets fresh full verification and code review. Verified merge recovery runs before replay so a crash after integration cannot apply the change twice.
+
+Acceptance attempts, implementation attempts, and active execution time are cumulative per issue. Waiting between completed runs is not charged. A hard crash conservatively spends its active phase reservation. Retry cannot silently increase budgets or alter criteria. Exhaustion requires a separate owner decision.
+
+Owned subprocess receipts include all discovered process groups and their cleanup state. Recovery refuses unsettled groups and retains unsafe workspaces for owner inspection. Stale execution lease reclamation is serialized. A crash while holding the short admission guard requires explicit inspection of that guard; automatic concurrent guard reclamation is deliberately unavailable. Inspect exact recorded PIDs and identities before cleanup, never process names.
+
+## Read a delivery
+
+The issue report presents the goal, result, changed files, decisions, named behavior checks, verification counts, review outcome, merge commit, execution timeline, cumulative budget, predecessor, and reuse decision. Legacy reports remain readable without the new optional fields.
+
+For workflow improvement, retain `state.json`, `task.json`, `plan.json`, review receipts, checkpoint manifests/patches, machine reports, and phase logs. The evidence manifest provides file sizes and hashes. Successful browser tests do not retain full traces; failed tests keep their debugging artifacts. Read the compact delivery first and open detailed evidence only for a concrete question.
+
+A final reviewer that ignores cancellation must keep its exact integration worktree through both cleanup paths. The owner records the retained workspace and safety reason, and queue cleanup also preserves the candidate worktree. This rule is covered by real controller and queue interruption regressions; settled successful and rejected reviewers still clean up normally. Requirement-level review can block an otherwise passing delivery and create a separately reviewed corrective issue without changing the frozen original requirement membership or acceptance criteria.
+
+Process-group inspection treats only `ESRCH` as confirmed absence. `EPERM` and other probe errors remain unsafe and are retried within the existing cleanup window. A persistent error returns a structured failure with `settled: false`; it cannot escape from an exit callback or prevent the ownership receipt from being finalized. The result and receipt use the same final observation. Receipts retain bounded diagnostic probe errors even when a later probe confirms absence. On Darwin, a zombie-only group can produce `EPERM` ([Apple XNU signal implementation](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/kern/kern_sig.c#L1612-L1621)); this possibility does not authorize treating `EPERM` as dead or weakening the positive-PID cancellation assertions.
+
+## Close a confirmed coverage gap
+
+A final independent code reviewer sets `needsRegression: true` only when a blocking, reproducible product defect lacks deterministic coverage. The finding states the trigger and expected behavior. Existing failing checks use ordinary repair. Speculative improvements and new business goals do not enter this branch.
+
+The controller sends that finding to the existing tests role as `regression-tests`. It may create new scoped Node test files or browser spec files only. Every existing file, including accepted tests and the defective implementation, remains unchanged. The response lists exact new file names and test titles. No defect registry, additional issue hierarchy, or new service is required.
+
+The controller runs each named new check against the reviewed defective candidate. A passing check, missing case, import failure, setup failure, skip, or timeout cannot establish a regression red proof. Browser proofs use an owned disposable server/database and machine JSON reports; Node proofs use the trusted reporter. An independent acceptance reviewer reads the finding, checks, and actual red proofs. Rejected drafts can be revised within the existing cumulative acceptance budget. Only approved checks are frozen and added to the effective verification contract. The repair worker then fixes the product while all accepted checks remain immutable.
+
+Candidate verification, integrated verification, final independent code review, verified local merge, and whole-requirement acceptance keep their existing responsibilities. An integrated review of a newer target cannot authorize red proofs against a different worker snapshot: the controller blocks for owner rebase when the reviewed source differs. Scope and criteria never expand through a regression request.
+
+Before regression generation, a checkpoint retains the rejected reviewed candidate and pending request. Unapproved test drafts remain evidence and are never promoted by interruption recovery. Retry regenerates those drafts and repeats red proofs and independent acceptance review. After approval, checkpoints retain the new check hashes, red logs and machine reports, and source-bound coverage receipt; retry restores these checks frozen and runs fresh complete verification and code review. Orphan regression proof files or review receipts reject reuse, so missing pending or accepted regression metadata cannot silently authorize repair. Acceptance attempts, implementation attempts, elapsed execution time, and ownership lineage remain cumulative. Exhaustion still requires an explicit owner decision.
+
+Delivery reports include the added behavior checks, coverage receipt, phase timing, and proof paths. New test files are discovered by the ordinary test commands after integration, so later tasks run the regression automatically. `acceptance/refresh-focus.spec.ts` is the permanent regression for issue opener retention and focus restoration during a job-triggered background refresh, covering success/failure and title/identifier entry controls.

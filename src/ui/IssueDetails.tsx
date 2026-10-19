@@ -1,41 +1,137 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Issue } from '../domain.ts';
-import type { Delivery, Workbench, WorkRun } from '../workflow.ts';
+import type { Delivery, Job, Workbench, WorkRun } from '../workflow.ts';
 import { apiRequest, errorMessage } from './client.ts';
-import { DeliveryView } from './DeliveryView.tsx';
+import { SelectedReport } from './SelectedReport.tsx';
+import { statusLabels } from './IssueRow.tsx';
+import { activeJob, mergedIssue, requirementProgress, waitingDependencies } from './workbench-state.ts';
 
-export function IssueDetails({ id, workbench, onStarted }: { id: number; workbench: Workbench; onStarted: () => void }) {
+function CurrentLimitations({ runId }: { runId: string }) {
+  const [delivery, setDelivery] = useState<Delivery | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    const controller = new AbortController();
+    let fetching = false;
+    const refresh = async () => {
+      if (fetching) return;
+      fetching = true;
+      try {
+        const result = await apiRequest<{ delivery: Delivery | null }>('/api/runs/' + encodeURIComponent(runId), { signal: controller.signal });
+        if (!controller.signal.aborted) { setDelivery(result.delivery); setError(''); }
+      } catch (error) { if (!controller.signal.aborted) setError(errorMessage(error)); }
+      finally { fetching = false; }
+    };
+    void refresh();
+    const timer = setInterval(() => { void refresh(); }, 2000);
+    return () => { controller.abort(); clearInterval(timer); };
+  }, [runId]);
+  return <>{delivery?.limitations.map((text, index) => <p className="execution-warning" key={index}>{text}</p>)}{error && <p>Current delivery limitations unavailable: {error}. Retrying automatically.</p>}</>;
+}
+
+export function IssueDetails({ id, workbench, issues = [], metadataError = '', onStarted }: { id: number; workbench: Workbench; issues?: Issue[]; metadataError?: string; onStarted: () => void }) {
   const [issue, setIssue] = useState<Issue | null>(null);
   const [runs, setRuns] = useState<WorkRun[]>([]);
   const [selected, setSelected] = useState('');
-  const [delivery, setDelivery] = useState<Delivery | null>(null);
   const [error, setError] = useState('');
+  const [startError, setStartError] = useState('');
+  const [retry, setRetry] = useState(0);
   const [pending, setPending] = useState(false);
+  const [admittedJobId, setAdmittedJobId] = useState<number | null>(null);
+  const lock = useRef(false);
   useEffect(() => {
     const controller = new AbortController();
-    const refresh = () => { void apiRequest<{ issue: Issue; runs: WorkRun[] }>(`/api/issues/${id}`, { signal: controller.signal }).then(result => { setIssue(result.issue); setRuns(result.runs); }).catch(error => { if (!controller.signal.aborted) setError(errorMessage(error)); }); };
-    refresh(); const timer = setInterval(refresh, 2000);
+    let fetching = false;
+    const refresh = async () => {
+      if (fetching) return;
+      fetching = true;
+      try {
+        const result = await apiRequest<{ issue: Issue; runs: WorkRun[] }>('/api/issues/' + id, { signal: controller.signal });
+        if (!controller.signal.aborted) { setIssue(result.issue); setRuns(result.runs); setError(''); }
+      } catch (error) { if (!controller.signal.aborted) setError(errorMessage(error)); }
+      finally { fetching = false; }
+    };
+    void refresh();
+    const timer = setInterval(() => { void refresh(); }, 2000);
     return () => { controller.abort(); clearInterval(timer); };
-  }, [id]);
-  const runId = selected || runs[0]?.id;
-  useEffect(() => {
-    if (!runId) return;
-    const controller = new AbortController();
-    const refresh = () => { void apiRequest<{ delivery: Delivery | null }>(`/api/runs/${runId}`, { signal: controller.signal }).then(result => setDelivery(result.delivery)).catch(error => { if (!controller.signal.aborted) setError(errorMessage(error)); }); };
-    refresh(); const timer = setInterval(refresh, 2000);
-    return () => { controller.abort(); clearInterval(timer); };
-  }, [runId]);
+  }, [id, retry]);
+
+  const owned = (item: { repoId: number; requirementId: number | null }) => item.repoId === issue?.work?.repoId && item.requirementId === issue?.work?.requirementId;
+  const jobs = workbench.jobs.filter(job => owned(job) && job.issueId === id).sort((a, b) => b.id - a.id);
+  const issueRuns = runs.filter(run => owned(run) && run.issueId === id).sort((a, b) => b.jobId - a.jobId || b.startedAt.localeCompare(a.startedAt));
+  const requirement = workbench.requirements.find(item => item.id === issue?.work?.requirementId && item.repoId === issue?.work?.repoId);
+  const requirementRuns = requirement ? workbench.runs.filter(run => owned(run) && run.issueId === null && workbench.jobs.some(job => job.id === run.jobId && job.runId === run.id && owned(job) && job.issueId === null && ['decompose', 'plan_review', 'requirement_verify'].includes(job.kind))).sort((a, b) => b.jobId - a.jobId) : [];
+  const allRuns = [...issueRuns, ...requirementRuns];
+  const runId = allRuns.some(run => run.id === selected) ? selected : issueRuns[0]?.id ?? requirementRuns[0]?.id;
+  const latestJob = jobs[0];
+  const latestRun = issueRuns[0];
+  const currentRun = latestJob ? issueRuns.find(run => run.jobId === latestJob.id && run.id === latestJob.runId) : latestRun;
+  const active = jobs.some(activeJob) || currentRun?.status === 'running';
+  const admitted = admittedJobId !== null && !jobs.some(job => job.id === admittedJobId && !activeJob(job));
+  const merged = !!issue && mergedIssue({ ...workbench, runs: issueRuns }, issue);
+  const waiting = latestJob && issue ? waitingDependencies(workbench, [...issues.filter(item => item.id !== id), issue], latestJob) : [];
+  const progress = requirement ? requirementProgress(workbench, [...issues.filter(item => item.id !== id), ...(issue ? [issue] : [])], requirement) : null;
+  const currentReason = latestJob?.reason || currentRun?.reason;
   async function start() {
-    setPending(true); setError('');
-    try { await apiRequest(`/api/issues/${id}/start`, { method: 'POST', body: '{}' }); onStarted(); }
-    catch (error) { setError(errorMessage(error)); }
-    finally { setPending(false); }
+    if (lock.current || active || merged || admitted) return;
+    lock.current = true; setPending(true); setStartError('');
+    try {
+      const result = await apiRequest<{ job: Job }>('/api/issues/' + id + '/start', { method: 'POST', body: '{}' });
+      setAdmittedJobId(result.job.id); onStarted();
+    } catch (error) { setStartError(errorMessage(error)); }
+    finally { lock.current = false; setPending(false); }
   }
-  const active = workbench.jobs.some(job => job.issueId === id && ['queued', 'running'].includes(job.status));
-  const merged = runs.some(run => run.status === 'merged');
+  const stage = (run: WorkRun) => {
+    const kind = workbench.jobs.find(job => job.id === run.jobId && job.runId === run.id && owned(job))?.kind;
+    return kind === 'decompose' ? 'Decomposition' : kind === 'plan_review' ? 'Plan review' : kind === 'requirement_verify' ? 'Whole-goal verification' : 'Issue execution';
+  };
+  const option = (run: WorkRun) => <option key={run.id} value={run.id}>{stage(run)} · {run.id} · {run.startedAt} · {run.status}{run.completedAt ? ' · completed ' + run.completedAt : ''}</option>;
   return <div className="detail-body">
-    {error && <p role="alert" className="form-error">{error}</p>}
-    {issue ? <><h3>{issue.title}</h3><p>{issue.description}</p><dl><dt>Repository</dt><dd>{workbench.repos.find(repo => repo.id === issue.work?.repoId)?.name ?? 'Unassigned'}</dd><dt>Requirement</dt><dd>{workbench.requirements.find(item => item.id === issue.work?.requirementId)?.title ?? 'Standalone issue'}</dd><dt>Dependencies</dt><dd>{issue.work?.dependsOn.map(id => `#${id}`).join(', ') || 'None'}</dd></dl>{issue.work && <><h4>Acceptance conditions</h4><ul>{issue.work.acceptance.map((text, index) => <li key={index}>{text}</li>)}</ul><button className="button primary" type="button" disabled={pending || active || merged} onClick={() => { void start(); }}>{merged ? 'Automatically merged' : active ? 'Queued or running' : 'Start issue'}</button></>}{!issue.work && <p>Edit this issue to assign a repository before execution.</p>}</> : <p role="status">Loading issue…</p>}
-    <h3>Execution history</h3>{runs.length ? <><label>Run<select aria-label="Select execution run" value={runId} onChange={event => { setSelected(event.target.value); setDelivery(null); }}>{runs.map(run => <option key={run.id} value={run.id}>{run.startedAt} · {run.status}</option>)}</select></label>{delivery && runId ? <DeliveryView delivery={delivery} runId={runId} /> : <p>Execution is in progress. The delivery report will appear here.</p>}</> : <p>No executions yet.</p>}
+    {metadataError && <p className="form-error">Execution metadata unavailable: {metadataError}. Retrying automatically.</p>}
+    {error && <><p role="alert" className="form-error">{error}</p><button className="button" type="button" onClick={() => { setError(''); setRetry(value => value + 1); }}>Retry details</button></>}
+    {issue ? <>
+      <h3>{issue.title}</h3><p>{issue.description || 'No description recorded.'}</p>
+      <dl className="issue-metadata">
+        <dt>Identity</dt><dd>Issue #{issue.id} · LOC-{String(issue.id).padStart(3, '0')}</dd>
+        <dt>Status</dt><dd>{statusLabels[issue.status]}</dd>
+        <dt>Priority</dt><dd>{({ low: 'Low', medium: 'Medium', high: 'High' })[issue.priority]}</dd>
+        <dt>Labels</dt><dd>{issue.labels.join(', ') || 'None'}</dd>
+        <dt>Created</dt><dd><time dateTime={issue.createdAt}>{issue.createdAt}</time></dd>
+        <dt>Updated</dt><dd><time dateTime={issue.updatedAt}>{issue.updatedAt}</time></dd>
+        <dt>Repository</dt><dd>{workbench.repos.find(repo => repo.id === issue.work?.repoId)?.name ?? (issue.work ? 'Repository #' + issue.work.repoId + ' unavailable' : 'Unassigned')}</dd>
+        <dt>Requirement</dt><dd>{requirement?.title ?? (issue.work?.requirementId ? 'Requirement #' + issue.work.requirementId + ' unavailable' : 'Standalone issue')}</dd>
+        <dt>Dependencies</dt><dd>{issue.work?.dependsOn.map(id => '#' + id).join(', ') || 'None'}</dd>
+      </dl>
+      <h4>Acceptance conditions</h4>{issue.work?.acceptance.length ? <ul>{issue.work.acceptance.map((text, index) => <li key={index}>{text}</li>)}</ul> : <p>No acceptance conditions recorded.</p>}
+      {requirement && <section aria-label="Requirement context" className="diagnostic-section">
+        <h3>Original requirement goal</h3><p>{requirement.goal}</p>
+        {requirement.submission ? <><h4>Conversation plan provenance</h4><dl>
+          <dt>Submission</dt><dd>{requirement.submission.id}</dd><dt>Plan hash</dt><dd><code>{requirement.submission.planHash}</code></dd>
+          <dt>Source kind</dt><dd>{requirement.submission.source.kind}</dd><dt>Source reference</dt><dd>{requirement.submission.source.reference}</dd><dt>Source summary</dt><dd>{requirement.submission.source.summary}</dd>
+        </dl></> : <p>Submission provenance unavailable: no conversation submission recorded.</p>}
+        <p>{progress?.outcome}</p><p>{progress?.merged}/{progress?.children.length} child issues have recorded merges. Issue status alone does not establish delivery.</p>
+        {workbench.jobs.filter(job => owned(job) && job.issueId === null && job.kind === 'requirement_verify').sort((a, b) => b.id - a.id).slice(0, 1).map(job => <p key={job.id}>Latest whole-goal job #{job.id} · {job.status}{job.reason ? ' · ' + job.reason : ''}</p>)}
+      </section>}
+      <section aria-label="Current execution" className="diagnostic-section current-execution">
+        <h3>Current execution</h3>
+        <p>{latestJob ? 'Job #' + latestJob.id + ' · ' + latestJob.status : currentRun ? 'Latest execution · ' + currentRun.status : 'No execution admitted.'}</p>
+        {currentRun && <p>Run <code>{currentRun.id}</code> · {currentRun.status}</p>}
+        {currentReason && <p className="execution-warning">{currentReason}</p>}
+        {waiting.length > 0 && <p>Waiting for dependencies with recorded merges: {waiting.map(id => '#' + id).join(', ')}.</p>}
+        {active && <p>{latestJob?.status === 'queued' ? latestJob.kind === 'maintenance' ? 'Awaiting owner maintenance verification.' : 'Queued for execution.' : 'Execution is in progress.'}</p>}
+        {currentRun && <CurrentLimitations key={currentRun.id} runId={currentRun.id} />}
+        {startError && <p role="alert" className="form-error">{startError}</p>}
+        {issue.work ? <button className="button primary" type="button" disabled={pending || active || admitted || merged || !!metadataError} onClick={() => { void start(); }}>{merged ? 'Automatically merged' : active || admitted ? 'Queued or running' : pending ? 'Starting…' : latestJob?.status === 'blocked' ? 'Retry issue' : 'Start issue'}</button> : <p>Execution requires a repository assignment through the API.</p>}
+      </section>
+      <h3>Execution history</h3>{!issueRuns.length && <p>No executions yet.</p>}
+      {allRuns.length > 0 && <><label className="diagnostic-selector">Run<select aria-label="Select execution run" value={runId} onChange={event => setSelected(event.target.value)} onKeyDown={event => {
+        if (event.key !== 'Home' && event.key !== 'End') return;
+        const options = event.currentTarget.options;
+        const option = options.item(event.key === 'Home' ? 0 : options.length - 1);
+        if (option) { event.preventDefault(); setSelected(option.value); }
+      }}>
+        {issueRuns.length > 0 && <optgroup label="Issue executions">{issueRuns.map(option)}</optgroup>}
+        {requirementRuns.length > 0 && <optgroup label="Requirement audits">{requirementRuns.map(option)}</optgroup>}
+      </select></label>{runId && <SelectedReport key={runId} runId={runId} />}</>}
+    </> : !error && <p role="status">Loading issue…</p>}
   </div>;
 }

@@ -14,6 +14,8 @@ npm run dev
 
 Open http://127.0.0.1:5173. The API runs at http://127.0.0.1:4310. Both bind to loopback only. Development starts a separate queue worker. Open Development to register repositories and start requirements; use issue IDs to inspect deliveries. Reset is for disposable data only. Read [the workbench workflow](docs/workbench.md) before executing tasks.
 
+You can describe a business requirement directly in Codex. The repo's `$issue-tracker-submit` skill prepares and submits a complete plan with issues, acceptance, defaults, and dependencies. Independent coverage review then releases those issues to the existing queue. Follow [conversation intake](docs/conversation-intake.md); the website shows the submitted goal, source, executions, and reports.
+
 ## Commands
 
 | Command | Purpose |
@@ -29,6 +31,9 @@ Open http://127.0.0.1:5173. The API runs at http://127.0.0.1:4310. Both bind to 
 | `npm run factory -- tickets/001-labels.json` | Run a bounded Codex task in an owned worktree; requires an authenticated Codex CLI. |
 | `npm run factory -- tickets/001-labels.json --merge main` | Independently verify/review and automatically integrate into a clean local target. |
 | `npm run worker -- --once` | Process at most one runnable queued job without starting the app. |
+| `npm run submit-plan -- --list` | Discover the owned API and actual enrolled repository IDs. |
+| `npm run submit-plan -- <plan.json>` | Atomically submit a conversation plan and queue independent coverage review. |
+| `npm run submit-plan -- --status <submission-id>` | Read current execution state and report URLs. |
 | `npm run build && npm start` | Serve the built UI and API together at http://127.0.0.1:4310. |
 
 Verification writes `.runs/verify-*/summary.json`, Node and browser reports, logs, and traces for failed tests only. `.runs/latest.json` points to the latest summary. Success requires complete reports, all required browser cases, no skips, and unchanged source and contract snapshots. The summary records file hashes as well as the Git commit and dirty flag. Read [verification](docs/verification.md) for budgets and evidence rules.

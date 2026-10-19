@@ -25,7 +25,7 @@ The baseline may already satisfy the task. Named checks then record `already_pas
 
 1. **Prepare:** create a detached worktree, snapshot source and its baseline Git tree, allocate distinct loopback ports, and assign a disposable database.
 2. **Plan:** a read-only session records ordinary defaults and maps every acceptance ID to named Node checks and required browser cases.
-3. **Checks:** a worker adds missing scoped tests without changing implementation or any original test bytes. A fresh read-only session reviews their coverage. The controller freezes their file hashes.
+3. **Checks:** a worker adds missing scoped tests without changing implementation or any original test bytes. A fresh read-only session reviews their coverage. Rejected new checks receive the findings and may be repaired up to the task's `maxAttempts`, within the same total deadline. Each revision requires fresh review; exhaustion blocks implementation. The controller freezes file hashes only after approval. Numbered `test-report-*.json` and `acceptance-review-*.json` retain every decision alongside the latest report.
 4. **Red proof:** execute each named Node check. Require an assertion failure for missing behavior, or an actual named pass when already satisfied. Imports, environment failures, skipped tests, and absent names do not qualify.
 5. **Implement and verify:** a worker implements scoped slices. The owner runs a copied trusted verifier against the candidate, reads machine reports, and checks protected files and source identity.
 6. **Review or repair:** a fresh read-only session reviews the candidate and verification receipt. Failures feed a repair session within the attempt/time budget. Protected-file edits or invalid orchestration responses block the task immediately.
@@ -33,6 +33,22 @@ The baseline may already satisfy the task. Named checks then record `already_pas
 8. **Deliver:** write `ready` for a delivery-only candidate, `merged` for a proven local integration, or `blocked` with the actual reason. Generate `delivery.json` and `delivery.md` from owner records in every case. A worker's completion statement cannot establish readiness.
 
 `AGENTS.md` supplies persistent agent conventions; `agent.ts` supplies phase-specific English prompts; runtime contracts and controller checks enforce the executable parts. A prose instruction alone cannot guarantee that a required check ran.
+
+Conversation-origin plans use the shared `src/submission.ts` runtime contract and `scripts/submit-plan.ts` client. Intake atomically preserves the submitted original goal, source, issue graph, and plan hash. Its `plan_review` job obtains independent coverage approval against exact target source before releasing existing child IDs. It does not invoke decomposition again. `startIssue` cannot bypass unapproved plan admission; HTTP retries only return existing work. See [conversation intake](../docs/conversation-intake.md).
+
+## Maintenance ownership
+
+Feature code and additive checks share one issue, with checks independently reviewed and frozen before implementation. Acceptance-contract and harness changes use separate issues and dependencies. Version-two plans declare `changeKind` as `feature`, `acceptance_contract`, or `harness`; version-one plans retain their exact canonical representation.
+
+Declarations are descriptive. The ordinary queue cannot claim `maintenance` jobs. Protected control-plane source includes workflow admission, submission validation, evidence access, instance ownership, and target identity. Labels and submitted metadata never expand feature scope. Maintenance uses the owner inspect, red-proof, implement, full-verification, independent-review, and verified local integration workflow. The maintenance tickets are audit records, not inputs granting feature-executor scope. Pin the run's verifier identity and explicitly review contract revisions; activate revised controls only for later runs.
+
+After the independently reviewed commit is on the enrolled target, record its delivery with actual machine reports and a review receipt containing `approved`, an empty `findings` array, and matching `sourceHash` or `reviewedSourceHash`:
+
+```sh
+node --import tsx scripts/record-maintenance.ts --database <platform.sqlite> --issue <id> --commit <exact-sha> --verification <summary.json> --review <review.json>
+```
+
+The recorder validates committed hashes, required cases, gate results, executed counts, review identity, dependencies, and target ancestry before claiming work. It retains evidence and generates a standard indexed delivery. There is no HTTP attestation endpoint. This is a cooperative local ownership protocol, not hostile-worker isolation.
 
 ## Ownership and evidence
 
@@ -63,3 +79,21 @@ The completed [live integration pilot](../docs/controller-pilot.md) records real
 This is an ownership protocol for cooperative local workers, not a security boundary against hostile code. Dependencies are shared through a symlink; the Git object store and host account are shared. File hashes detect changes at checkpoints but cannot prevent changing and restoring a file between them. A process that detaches and reparents before ownership inspection can still escape cleanup. Strong isolation needs separate dependencies and credentials, containers/OS boundaries, and an independently protected execution service.
 
 The local application is the authoritative requirement and issue source. `queue.ts` owns serial dispatch, dependency order, final requirement verification, and outcome indexing. `planner.ts` supplies read-only decomposition/review sessions with bounded structured-response repair. `integration.ts` owns serialized verified local merges, `delivery.ts` generates reports, and `recovery.ts` reconciles proven merges after interruption. There is no GitHub polling, remote publishing, credential broker, hostile-worker isolation, parallel queue, or statistical evidence across many model runs. `tickets/` remains a portable CLI snapshot format.
+
+Owner review receipts must include `coveredIssues: [{ issueId, contractHash }]`, using `maintenanceIdentity(issue)` for the exact title, goal, work assignment, and acceptance contract. A generic source approval cannot complete unrelated work.
+
+## Durable retry checkpoints
+
+The controller owns `checkpoint.json` and `checkpoint.patch` outside disposable worktrees. The binary patch includes added files. Accepted checkpoints bind the goal, criteria, scope, budget, original controls/checks, runtime and active harness, accepted test bytes, plan, review receipt, and named red-proof files. Partial work is saved only after scope enforcement. Queue recovery can capture a quiescent interrupted draft before deleting its worktree. A damaged patch or proof, changed contract/control/runtime, or changed goal invalidates reuse and records the reason. Unapproved test drafts remain evidence; they cannot authorize implementation. Every resumed candidate receives fresh full verification and code review.
+
+Runs remain immutable history. A retry gets a new run ID and records its predecessor; the owner selects the safe restart stage from validated evidence, never from a worker-supplied phase string. Automatic merge recovery is checked before any replay. Integration verification or review rejection feeds a bounded repair attempt; source mutation, scope violations, and unsafe ownership remain blockers.
+
+The serial queue uses a durable per-repository/issue budget ledger and an exclusive lease. Acceptance and implementation attempt counts and active execution time survive retry. Idle time between finished runs is not charged. A crashed phase conservatively spends its remaining reserved time; it does not reset the budget. Existing live leases block concurrent work. Lease admission is serialized by an atomic guard before stale-owner inspection and acquisition. A stale execution lease can be removed automatically only when its recorded PID no longer exists. A crash during the short admission critical section leaves a guard for explicit owner inspection; never reclaim a guard concurrently. Criteria/budget changes require an owner decision and a distinct authorized task; ordinary HTTP retry cannot reset them.
+
+Subprocess receipts record the exact spawned PID, all discovered owned process groups, process identity, command, and cleanup outcome. Recovery and workspace deletion refuse to proceed while an unsettled owned group or controller is present. The agent must settle after cancellation before draft capture. If it does not cooperate, retain the workspace and record the cleanup blocker for owner inspection. Never kill by process name or infer ownership from a reused PID.
+
+## Purpose-specific review
+
+See `docs/harness-reliability.md` for the current ordered protocol. Owner red proofs precede acceptance review. Ordinary integrated tasks receive one authoritative final code review against the latest verified target; delivery-only tasks retain candidate review. Candidate, integrated, and whole-goal full verification remain required. Source-bound receipts, phase timings, predecessor lineage, cumulative budgets, and invalidation reasons are included in JSON/Markdown deliveries and the issue report UI.
+
+Integration cleanup checks both the current controller settlement state and all recorded owned groups before removing its worktree. Both nested cleanup paths fail closed, retain `integration-workspace`, and write `integration-cleanup.json` when safety is unknown. Queue cleanup applies the same quiescence rule to both candidate and integration worktrees. An active controller uses the subprocess-only check; previous-run recovery additionally checks controller ownership and the full predecessor lineage.

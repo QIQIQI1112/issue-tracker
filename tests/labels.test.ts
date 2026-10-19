@@ -4,7 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { once } from 'node:events';
 import { join } from 'node:path';
 import { parseCreateIssue, parsePatchIssue } from '../src/domain.ts';
-import { IssueStore } from '../src/storage.ts';
+import { DATABASE_SCHEMA_VERSION, IssueStore } from '../src/storage.ts';
 import { createApp } from '../src/api.ts';
 import { evidenceDirectory } from './helpers/subprocess.ts';
 
@@ -54,7 +54,7 @@ test('version-one databases upgrade without losing existing records', () => {
     assert.deepEqual(store.update(7, { labels: ['migrated'] })?.labels, ['migrated']);
   } finally { store.close(); }
   const reopened = new DatabaseSync(path);
-  assert.equal((reopened.prepare('PRAGMA user_version').get() as { user_version: number }).user_version, 3);
+  assert.equal((reopened.prepare('PRAGMA user_version').get() as { user_version: number }).user_version, DATABASE_SCHEMA_VERSION);
   reopened.close();
 });
 

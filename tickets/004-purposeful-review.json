@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "recordType": "owner-maintenance",
+  "id": "purposeful-review",
+  "issueId": 8,
+  "requirementId": 2,
+  "changeKind": "harness",
+  "goal": "Review acceptance after owner red proofs and review final integrated code once while retaining complete verification and inspectable evidence.",
+  "acceptance": [
+    "Every new check generation receives named owner red proofs before independent acceptance review and freezing.",
+    "Ordinary integrated candidates have one authoritative final code review; rejection never advances an unreviewed target.",
+    "Candidate, integrated, and whole-requirement machine verification remain mandatory.",
+    "Reports bind review purpose/source/criteria/contract and expose phase durations, cumulative budget, recovery lineage, and invalidation reasons with legacy compatibility."
+  ],
+  "execution": "Separate owner maintenance; this audit record does not grant feature-executor scope."
+}

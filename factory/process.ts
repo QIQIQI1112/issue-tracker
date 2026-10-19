@@ -1,14 +1,11 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, appendFileSync } from 'node:fs';
+import { processIdentity } from './ownership.ts';
+import { writeJson } from './evidence.ts';
 import { dirname } from 'node:path';
 
 export type ProcessResult = { status: 'passed' | 'failed' | 'timeout' | 'cancelled' | 'output_limit'; pid: number | null; exitCode: number | null; signal: NodeJS.Signals | null; durationMs: number; output: string; error?: string };
 export type ProcessOptions = { command: string; args: string[]; cwd: string; env?: NodeJS.ProcessEnv; logPath: string; timeoutMs: number; graceMs?: number; input?: string; signal?: AbortSignal; onOutput?: (text: string) => void };
-
-function alive(pid: number): boolean {
-  try { process.kill(-pid, 0); return true; }
-  catch (error) { if ((error as NodeJS.ErrnoException).code === 'ESRCH') return false; throw error; }
-}
 
 export async function runProcess(options: ProcessOptions): Promise<ProcessResult> {
   const started = Date.now();
@@ -18,6 +15,8 @@ export async function runProcess(options: ProcessOptions): Promise<ProcessResult
   mkdirSync(dirname(options.logPath), { recursive: true });
   writeFileSync(options.logPath, '');
   const child = spawn(options.command, options.args, { cwd: options.cwd, env: { ...(options.env ?? process.env), ISSUE_TRACKER_PARENT_GRACE_MS: String(Math.max(1, Math.floor(ownerGrace / 2))) }, detached: true, stdio: [options.input === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'] });
+  const owner = { pid: child.pid ?? null, identity: child.pid ? processIdentity(child.pid) : '', cwd: options.cwd, command: options.command, args: options.args, groups: child.pid ? [child.pid] : [], settled: false, probeErrors: [] as string[] };
+  writeJson(`${options.logPath}.owner.json`, owner);
   let status: ProcessResult['status'] | undefined;
   let errorMessage: string | undefined;
   let output = '';
@@ -34,8 +33,24 @@ export async function runProcess(options: ProcessOptions): Promise<ProcessResult
     const pending = [child.pid];
     for (let index = 0; index < pending.length; index += 1) for (const [pid, parent] of rows) if (parent === pending[index] && !descendants.has(pid)) { descendants.add(pid); pending.push(pid); }
     for (const [pid, , group] of rows) if (descendants.has(pid) && descendants.has(group)) ownedGroups.add(group);
+    owner.groups = [...ownedGroups];
+    writeJson(`${options.logPath}.owner.json`, owner);
   };
-  const anyAlive = () => [...ownedGroups].some(alive);
+  const probeGroups = () => {
+    let present = false;
+    let inspectionError: string | undefined;
+    for (const pid of ownedGroups) {
+      try { process.kill(-pid, 0); present = true; }
+      catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code === 'ESRCH') continue;
+        present = true;
+        inspectionError = `Cannot inspect owned process group ${pid}: ${code ?? 'unknown'}: ${String(error)}`;
+        if (!owner.probeErrors.includes(inspectionError) && owner.probeErrors.length < 16) owner.probeErrors.push(inspectionError);
+      }
+    }
+    return { present, inspectionError };
+  };
   const signalGroup = (signal: NodeJS.Signals) => {
     for (const pid of ownedGroups) {
       try { process.kill(-pid, signal); }
@@ -66,21 +81,25 @@ export async function runProcess(options: ProcessOptions): Promise<ProcessResult
   child.stdout?.on('data', capture);
   child.stderr?.on('data', capture);
   child.once('error', error => { errorMessage = error.message; status ??= 'failed'; });
-  child.once('exit', () => { if (anyAlive()) stop(); });
+  child.once('exit', () => { if (probeGroups().present) stop(); });
   child.stdin?.on('error', () => {});
   if (options.input !== undefined) child.stdin?.end(options.input);
   return await new Promise(resolve => {
     child.once('close', async (exitCode, signal) => {
-      try {
-        const deadline = Date.now() + grace + 1000;
-        while (anyAlive() && Date.now() < deadline) await new Promise(done => setTimeout(done, 20));
-        if (anyAlive()) { status = 'failed'; errorMessage = 'Owned process group survived cleanup.'; }
-      } catch (error) { status = 'failed'; errorMessage = String(error); }
+      const deadline = Date.now() + grace + 1000;
+      let remaining = probeGroups();
+      while (remaining.present && Date.now() < deadline) {
+        await new Promise(done => setTimeout(done, 20));
+        remaining = probeGroups();
+      }
+      if (remaining.present) { status = 'failed'; errorMessage = remaining.inspectionError ?? 'Owned process group survived cleanup.'; }
       clearTimeout(timer);
       if (escalating) clearTimeout(escalating);
       if (forcing) clearTimeout(forcing);
       options.signal?.removeEventListener('abort', abort);
       process.removeListener('SIGTERM', ownerStopped); process.removeListener('SIGINT', ownerStopped);
+      owner.settled = !remaining.present;
+      writeJson(`${options.logPath}.owner.json`, owner);
       resolve({ status: status ?? (exitCode === 0 ? 'passed' : 'failed'), pid: child.pid ?? null, exitCode, signal, durationMs: Date.now() - started, output, ...(errorMessage ? { error: errorMessage } : {}) });
     });
   });

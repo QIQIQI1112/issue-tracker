@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import { IssueStore } from '../src/storage.ts';
-import { acquireDatabaseLock } from '../src/instance.ts';
+import { acquireExecutionLease } from './lease.ts';
 import { SerialQueue } from './queue.ts';
 
 const path = resolve(process.env.DB_PATH ?? '.data/issues.sqlite');
-const release = acquireDatabaseLock(`${path}.queue`, randomUUID());
+const release = acquireExecutionLease(`${path}.queue`, randomUUID());
 let store: IssueStore | undefined;
 const cancelled = new AbortController();
 let stopping = false;

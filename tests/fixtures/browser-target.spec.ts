@@ -17,9 +17,9 @@ test('browser mutation refuses an API replaced after loading', async ({ page, wo
   const row = page.getByTestId('issue-1');
   await expect(row).toBeVisible();
   if (method === 'POST') await page.getByRole('button', { name: 'New issue', exact: true }).click();
-  else await row.getByRole('button', { name: method === 'PATCH' ? /^Edit / : /^Delete / }).click();
+  else if (method === 'DELETE') await row.getByRole('button', { name: /^Delete / }).click();
   const dialog = page.getByRole('dialog');
-  if (method !== 'DELETE') await dialog.getByLabel('Title', { exact: true }).fill(`${workspace.prefix} Wrong-target draft`);
+  if (method === 'POST') await dialog.getByLabel('Title', { exact: true }).fill(`${workspace.prefix} Wrong-target draft`);
   let sentIdentity: string | undefined;
   await page.route('**/api/issues{,/**}', async route => {
     if (route.request().method() === method) {
@@ -30,11 +30,16 @@ test('browser mutation refuses an API replaced after loading', async ({ page, wo
     await route.continue();
   });
   const responsePromise = page.waitForResponse(response => response.request().method() === method && response.url().includes('/api/issues'));
-  await dialog.getByRole('button', { name: method === 'POST' ? 'Create issue' : method === 'PATCH' ? 'Save changes' : 'Delete issue', exact: true }).click();
+  const patch = method === 'PATCH' ? page.evaluate(async title => {
+    const response = await fetch('/api/issues/1', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }) });
+    return { status: response.status, body: await response.json() };
+  }, `${workspace.prefix} Wrong-target draft`) : null;
+  if (method !== 'PATCH') await dialog.getByRole('button', { name: method === 'POST' ? 'Create issue' : 'Delete issue', exact: true }).click();
   const response = await responsePromise;
   writeFileSync(observed, JSON.stringify({ status: response.status(), sentIdentity, body: response.status() === 204 ? '' : await response.text() }));
   await waitFor(restored);
   expect(response.status()).toBe(409);
   expect(sentIdentity).toBe(encodeURIComponent(JSON.stringify([info.project.metadata.instanceId, info.project.metadata.databasePath])));
-  await expect(dialog.getByRole('alert')).toHaveText('Owned API target identity mismatch. Refusing mutation.');
+  if (patch) expect(await patch).toEqual({ status: 409, body: { error: 'Owned API target identity mismatch. Refusing mutation.' } });
+  else await expect(dialog.getByRole('alert')).toHaveText('Owned API target identity mismatch. Refusing mutation.');
 });

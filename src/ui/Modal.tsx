@@ -2,7 +2,7 @@ import { useEffect, useId, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { Icon } from './Icon.tsx';
 
-export function Modal({ title, children, onDismiss, pending = false }: { title: string; children: ReactNode; onDismiss: () => void; pending?: boolean }) {
+export function Modal({ title, children, onDismiss, pending = false, wide = false }: { title: string; children: ReactNode; onDismiss: () => void; pending?: boolean; wide?: boolean }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   useEffect(() => {
@@ -18,9 +18,9 @@ export function Modal({ title, children, onDismiss, pending = false }: { title: 
     };
   }, []);
 
-  return <dialog ref={ref} className="modal" aria-labelledby={titleId} aria-busy={pending} tabIndex={-1} onKeyDown={(event) => {
+  return <dialog ref={ref} className={wide ? 'modal diagnostics-modal' : 'modal'} aria-labelledby={titleId} aria-busy={pending} tabIndex={-1} onKeyDown={(event) => {
     if (event.key !== 'Tab') return;
-    const controls = [...event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), a[href], [tabindex="0"]')];
+    const controls = [...event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), a[href], summary, [tabindex="0"]')].filter(control => control.getClientRects().length > 0);
     const first = controls[0];
     const last = controls.at(-1);
     if (!first || !last) { event.preventDefault(); event.currentTarget.focus(); return; }

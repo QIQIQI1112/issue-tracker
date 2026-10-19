@@ -14,6 +14,8 @@ An issue has a numeric stable ID, title, description, status, priority, labels, 
 
 Schema version 3 adds repositories with local Git roots and target branches, business requirements, optional issue assignments, dependency IDs, acceptance conditions, persistent jobs, and run indexes. `src/workflow.ts` owns their pure types and validation. `src/workflow-store.ts` owns transactional admission, claims, dependencies, and outcome indexing. An execution's machine evidence remains owned by the separate factory process. See [the workbench](workbench.md).
 
+Version 4 adds immutable conversation plan submissions with canonical hashes, source summaries, and issue-key mappings. `src/submission.ts` owns the pure shared graph/plan contract. Codex submits through `scripts/submit-plan.ts`; the controller independently reviews the plan before issue execution. See [conversation intake](conversation-intake.md).
+
 The server validates every write. SQL statements use placeholders for values. Database constraints repeat critical domain invariants. The UI handles filtering, text search, and sorting on the small list returned by the API.
 
 ## HTTP contract
@@ -30,6 +32,8 @@ The server validates every write. SQL statements use placeholders for values. Da
 | `GET /api/repos`, `POST /api/repos` | List and register local repositories. |
 | `GET /api/requirements`, `POST /api/requirements` | List and create business requirements. |
 | `POST /api/requirements/:id/start` | Queue decomposition or retry unfinished issues. |
+| `POST /api/plan-submissions` | Atomically create a submitted plan and independent-review job; replay returns the existing IDs. |
+| `GET /api/plan-submissions/:id` | Immutable original plan, current Requirement/issues/jobs/runs. |
 | `POST /api/issues/:id/start` | Queue a frozen issue snapshot. |
 | `GET /api/runs/:id` | Run metadata and standard delivery report. |
 | `GET /api/runs/:id/evidence?file=<manifest-path>` | Download unchanged, manifest-listed evidence. |
@@ -40,7 +44,7 @@ Automated callers may condition API mutations with `X-Issue-Tracker-Target: enco
 
 ## Persistence and ownership
 
-`IssueStore` applies ordered migrations inside an initialization transaction using `PRAGMA user_version`. Version 2 adds labels; version 3 adds workbench tables without deleting issues. Unknown newer versions are rejected without resetting them. SQLite is a file under `.data/` by default. API and queue have distinct exclusive lock files, and reset checks both. WAL and atomic claims support their concurrent connections. The test suite checks reopening, upgrade preservation, and real process restarts.
+`IssueStore` applies ordered migrations inside an initialization transaction using `PRAGMA user_version`. Version 2 adds labels; version 3 adds workbench tables; version 4 adds submissions without rewriting existing history. Unknown newer versions are rejected without resetting them. SQLite is a file under `.data/` by default. API and queue have distinct exclusive lock files, and reset checks both. WAL and atomic claims support their concurrent connections. The test suite checks reopening, upgrade preservation, and real process restarts.
 
 ## Engineering control plane
 
@@ -49,3 +53,7 @@ Automated callers may condition API mutations with `X-Issue-Tracker-Target: enco
 ## Explicit omissions
 
 No GitHub synchronization, remote publishing, authentication, cloud deployment, parallel scheduling, or automatic stale-lock removal. Enrolled local targets can merge automatically after machine verification and independent agent review. Candidate source, application metadata, and execution evidence have separate owners.
+
+## Issue inspection
+
+The issue title and LOC identifier open one read-only diagnostics dialog. The browser retains creation, deletion and list controls; repository/requirement administration uses the existing APIs and conversation CLI. There is no Workbench page or issue editing dialog. Diagnostics combine persisted issue metadata with owned jobs, issue runs and requirement audit runs from the existing APIs. Current execution reasons and limitations remain separate from selected historical reports. Manifest text evidence previews use the existing verified evidence endpoint, render escaped plain text, enforce a 1 MiB received-byte bound and abort obsolete loads. Every manifest artifact retains its download link. Missing report/review data cannot establish verified delivery.

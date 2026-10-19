@@ -4,24 +4,21 @@ import { fixtureAgent, fixtureRepository } from '../tests/helpers/factory-fixtur
 import { SerialQueue } from '../factory/queue.ts';
 import { IssueStore } from '../src/storage.ts';
 import { git } from '../factory/workspace.ts';
+import { runProcess } from '../factory/process.ts';
+import { writeFileSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { randomUUID } from 'node:crypto';
 
-test('a requirement becomes automatically merged issues with inspectable delivery evidence', async ({ page }, info) => {
+test('a requirement becomes automatically merged issues with inspectable delivery evidence', async ({ page, request }, info) => {
   test.setTimeout(60000);
   const repository = fixtureRepository(info.outputPath('owned-repository'));
-  await page.goto(appUrl(info));
-  await page.getByRole('button', { name: 'Development', exact: true }).click();
-  await page.getByText('Register a repository', { exact: true }).click();
-  await page.getByLabel('Repository name', { exact: true }).fill('Acceptance repository');
-  await page.getByLabel('Local repository path', { exact: true }).fill(repository);
-  await page.getByRole('button', { name: 'Register repository', exact: true }).click();
-  await expect(page.getByRole('status')).toContainText('Repository registered.');
-  await page.getByLabel('Requirement repository', { exact: true }).selectOption({ label: 'Acceptance repository' });
-  await page.getByLabel('Requirement title', { exact: true }).fill('Observable readiness');
-  await page.getByLabel('Business goal', { exact: true }).fill('Return ready and prove the integrated behavior.');
-  await page.getByRole('button', { name: 'Create requirement', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Observable readiness', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Start requirement Observable readiness', exact: true }).click();
-  await expect(page.getByRole('status')).toContainText('Requirement queued.');
+  const registered = await request.post(`${appUrl(info)}/api/repos`, { data: { name: 'Acceptance repository', path: repository, targetBranch: 'main' } });
+  expect(registered.status()).toBe(201);
+  const { repo } = await registered.json();
+  const created = await request.post(`${appUrl(info)}/api/requirements`, { data: { repoId: repo.id, title: 'Observable readiness', goal: 'Return ready and prove the integrated behavior.' } });
+  expect(created.status()).toBe(201);
+  const { requirement } = await created.json();
+  expect((await request.post(`${appUrl(info)}/api/requirements/${requirement.id}/start`, { data: {} })).status()).toBe(202);
   const store = new IssueStore(info.project.metadata.databasePath as string);
   try {
     const queue = new SerialQueue(store, { agent: fixtureAgent(), planner: { decompose: async () => ({ assumptions: [{ decision: 'One focused issue', reason: 'The goal has one behavior.' }], issues: [{ key: 'ready', title: 'Return ready', description: 'Return ready and preserve the behavior.', acceptance: ['The value is ready.'], dependsOn: [] }] }), review: async () => ({ approved: true, summary: 'The original goal is satisfied.', findings: [] }) } });
@@ -30,7 +27,7 @@ test('a requirement becomes automatically merged issues with inspectable deliver
     expect(await queue.processNext()).toBe(true);
     const issue = store.list().find(issue => issue.title === 'Return ready')!;
     const run = store.work.runs().find(run => run.issueId === issue.id)!;
-    await page.reload();
+    await page.goto(appUrl(info));
     await page.getByLabel('Filter by repository', { exact: true }).selectOption(String(issue.work!.repoId));
     await page.getByRole('button', { name: 'View issue Return ready', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: `Issue #${issue.id}`, exact: true });
@@ -49,6 +46,43 @@ test('a requirement becomes automatically merged issues with inspectable deliver
     await page.setViewportSize({ width: 390, height: 844 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: info.outputPath('delivery-report.png'), fullPage: true });
+  } finally { store.close(); }
+});
+
+test('a Codex conversation plan submitted through the CLI appears with provenance and completes in the existing queue', async ({ page, request }, info) => {
+  test.setTimeout(60000);
+  const repository = fixtureRepository(info.outputPath('conversation-repository'));
+  const registered = await request.post(`${appUrl(info)}/api/repos`, { data: { name: 'Conversation repository', path: repository, targetBranch: 'main' } });
+  expect(registered.status()).toBe(201);
+  const { repo } = await registered.json();
+  const submissionId = randomUUID();
+  const file = info.outputPath('conversation-plan.json');
+  const receiptPath = info.outputPath('conversation-receipt.json');
+  writeFileSync(file, JSON.stringify({ schemaVersion: 1, submissionId, repoId: repo.id, requirement: { title: 'Conversation readiness', goal: 'The exported value is ready and the existing integration checks pass.' }, source: { kind: 'codex', reference: 'acceptance-conversation', summary: 'The user requested readiness through their own agent.' }, assumptions: [{ decision: 'One focused repair', reason: 'The original goal has one observable behavior.' }], issues: [{ key: 'ready', title: 'Conversation ready value', description: 'Return ready and preserve existing behavior checks.', acceptance: ['The exported value is ready.', 'Existing Node and browser behavior checks pass.'], dependsOn: [] }] }));
+  const result = await runProcess({ command: process.execPath, args: ['--import', 'tsx', resolve('scripts/submit-plan.ts'), file, '--url', appUrl(info), '--database', info.project.metadata.databasePath as string, '--receipt', receiptPath], cwd: process.cwd(), env: process.env, timeoutMs: 10000, logPath: info.outputPath('submission-cli.log') });
+  expect(result.status).toBe('passed');
+  const receipt = JSON.parse(readFileSync(receiptPath, 'utf8'));
+  expect(receipt.jobs[0].kind).toBe('plan_review');
+  const imported = await (await request.get(`${appUrl(info)}/api/plan-submissions/${submissionId}`)).json();
+  expect(imported.requirement.status).toBe('queued');
+  expect(imported.submission.plan.source).toMatchObject({ kind: 'codex', reference: 'acceptance-conversation' });
+  expect(imported.submission.id).toBe(submissionId);
+  expect((await request.patch(`${appUrl(info)}/api/issues/${receipt.issues[0].issue.id}`, { data: { title: 'Cannot rewrite the submitted plan' } })).status()).toBe(409);
+  const store = new IssueStore(info.project.metadata.databasePath as string);
+  try {
+    const queue = new SerialQueue(store, { agent: fixtureAgent(), planner: { decompose: async () => { throw new Error('A submitted plan must keep its original issues.'); }, review: async () => ({ approved: true, summary: 'The submitted goal and behavior are covered.', findings: [] }) } });
+    expect(await queue.processNext()).toBe(true);
+    expect(await queue.processNext()).toBe(true);
+    expect(await queue.processNext()).toBe(true);
+    expect(store.work.requirement(receipt.requirement.id)?.status).toBe('done');
+    const completed = await (await request.get(`${appUrl(info)}/api/plan-submissions/${submissionId}`)).json();
+    expect(completed.requirement.status).toBe('done');
+    expect(completed.runs.some((run: { issueId: number | null; status: string }) => run.issueId === null && run.status === 'passed')).toBe(true);
+    await page.goto(appUrl(info));
+    await page.getByRole('button', { name: 'View issue Conversation ready value', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: `Issue #${receipt.issues[0].issue.id}`, exact: true });
+    await expect(dialog.getByText('Automatically merged', { exact: true })).toBeVisible();
+    await expect(dialog.getByText('1 Node cases · 1 browser cases · 1 implementation attempts', { exact: true })).toBeVisible();
   } finally { store.close(); }
 });
 

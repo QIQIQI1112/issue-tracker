@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { availablePort, launch, stop } from './owned-server.ts';
 import { targetHeader, targetIdentity } from '../src/target-safety.ts';
 
-test('a UI rename survives a full server process restart', async ({ page, request }, testInfo) => {
+test('an API update remains inspectable after a full server process restart', async ({ page, request }, testInfo) => {
   test.setTimeout(45000);
   const directory = testInfo.outputPath('owned-instance');
   mkdirSync(directory, { recursive: true });
@@ -17,12 +17,14 @@ test('a UI rename survives a full server process restart', async ({ page, reques
     const created = await request.post(`${running.url}/api/issues`, { headers, data: { title: 'Before restart', description: 'Restart acceptance fixture' } });
     expect(created.status()).toBe(201);
     await page.goto(running.url);
-    await page.getByRole('button', { name: 'Edit Before restart', exact: true }).click();
-    const dialog = page.getByRole('dialog', { name: 'Edit issue' });
-    await dialog.getByLabel('Title', { exact: true }).fill('Persisted after restart');
-    await dialog.getByRole('button', { name: 'Save changes', exact: true }).click();
-    await expect(dialog).not.toBeVisible();
-    await expect(page.getByText('Persisted after restart', { exact: true })).toBeVisible();
+    const updated = await request.patch(`${running.url}/api/issues/1`, { headers, data: { title: 'Persisted after restart' } });
+    expect(updated.status()).toBe(200);
+    await page.reload();
+    await page.getByRole('button', { name: 'View issue Persisted after restart', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Issue #1', exact: true });
+    await expect(dialog.getByRole('heading', { name: 'Persisted after restart', exact: true })).toBeVisible();
+    await expect(dialog.getByText('Restart acceptance fixture', { exact: true })).toBeVisible();
+    await page.keyboard.press('Escape');
     await stop(running.child);
     expect(existsSync(databasePath + '.lock')).toBe(false);
     running = await launch(port, databasePath, 'after-restart');

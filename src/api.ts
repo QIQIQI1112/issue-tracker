@@ -49,6 +49,15 @@ export function createApp(store: IssueStore, metadata: { instanceId: string; ver
   app.get('/api/repos', (_request, response) => response.json({ repos: store.work.repos() }));
   app.post('/api/repos', (request, response) => response.status(201).json({ repo: store.work.addRepo(parseRepository(request.body)) }));
   app.get('/api/requirements', (_request, response) => response.json({ requirements: store.work.requirements() }));
+  app.post('/api/plan-submissions', (request, response) => {
+    const receipt = store.work.submitPlan(request.body);
+    response.status(receipt.replayed ? 200 : 201).json(receipt);
+  });
+  app.get('/api/plan-submissions/:id', (request, response) => {
+    const receipt = store.work.submissionReceipt(request.params.id);
+    if (!receipt) { response.status(404).json({ error: 'Submission not found.' }); return; }
+    response.json(receipt);
+  });
   app.post('/api/requirements', (request, response) => {
     const value = record(request.body);
     response.status(201).json({ requirement: store.work.addRequirement({ repoId: positiveId(value.repoId), title: boundedText(value.title, 'Title', 120), goal: boundedText(value.goal, 'Business goal') }) });

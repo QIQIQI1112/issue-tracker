@@ -3,10 +3,11 @@ import { join } from 'node:path';
 import { runProcess } from './process.ts';
 import { writeJson } from './evidence.ts';
 import { parseReview, reviewSchema } from './contracts.ts';
-import { boundedText, criteria, record } from '../src/workflow.ts';
-import type { Requirement } from '../src/workflow.ts';
+import { parseDecomposition } from '../src/submission.ts';
+import type { Decomposition, Requirement } from '../src/workflow.ts';
 
-export type Decomposition = { assumptions: { decision: string; reason: string }[]; issues: { key: string; title: string; description: string; acceptance: string[]; dependsOn: string[] }[] };
+export { parseDecomposition } from '../src/submission.ts';
+export type { Decomposition } from '../src/workflow.ts';
 export type PlannerInput = { cwd: string; directory: string; requirement: Requirement; evidence: string; env: NodeJS.ProcessEnv; signal?: AbortSignal };
 export type Planner = { decompose(input: PlannerInput): Promise<Decomposition>; review(input: PlannerInput): Promise<{ approved: boolean; summary: string; findings: string[] }> };
 
@@ -14,28 +15,6 @@ const string = { type: 'string' };
 const strings = { type: 'array', items: string };
 const objectSchema = (properties: Record<string, unknown>) => ({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false });
 const decompositionSchema = objectSchema({ assumptions: { type: 'array', items: objectSchema({ decision: string, reason: string }) }, issues: { type: 'array', items: objectSchema({ key: string, title: string, description: string, acceptance: strings, dependsOn: strings }) } });
-
-export function parseDecomposition(input: unknown): Decomposition {
-  const value = record(input);
-  if (!Array.isArray(value.issues) || !value.issues.length || value.issues.length > 20 || !Array.isArray(value.assumptions) || value.assumptions.length > 30) throw new Error('Decomposition needs 1–20 issues and bounded assumptions.');
-  const issues = value.issues.map(input => {
-    const item = record(input);
-    const key = boundedText(item.key, 'Issue key', 64);
-    if (!/^[a-z0-9-]+$/.test(key) || !Array.isArray(item.dependsOn) || item.dependsOn.length > 20) throw new Error('Invalid issue key or dependencies.');
-    return { key, title: boundedText(item.title, 'Title', 120), description: boundedText(item.description, 'Description', 2000), acceptance: criteria(item.acceptance), dependsOn: item.dependsOn.map(value => boundedText(value, 'Dependency', 64)) };
-  });
-  const indexed = new Map(issues.map(issue => [issue.key, issue]));
-  if (indexed.size !== issues.length) throw new Error('Duplicate issue keys.');
-  const visit = (key: string, stack: Set<string>) => {
-    if (stack.has(key)) throw new Error('Cyclic issue dependencies.');
-    const issue = indexed.get(key);
-    if (!issue) throw new Error('Unknown dependency key.');
-    if (new Set(issue.dependsOn).size !== issue.dependsOn.length) throw new Error('Duplicate dependencies.');
-    for (const dependency of issue.dependsOn) visit(dependency, new Set([...stack, key]));
-  };
-  for (const issue of issues) visit(issue.key, new Set());
-  return { issues, assumptions: value.assumptions.map(input => { const item = record(input); return { decision: boundedText(item.decision, 'Decision'), reason: boundedText(item.reason, 'Reason') }; }) };
-}
 
 export function codexPlanner(binary = 'codex'): Planner {
   const execute = async (input: PlannerInput, mode: 'decompose' | 'review'): Promise<unknown> => {

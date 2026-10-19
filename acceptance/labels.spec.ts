@@ -5,7 +5,7 @@ import { mkdirSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { targetHeader, targetIdentity } from '../src/target-safety.ts';
 
-test('labels can be created, edited, filtered, and cleared through the UI', async ({ page, request, workspace }, info) => {
+test('created labels and API label updates remain filterable and clearable', async ({ page, request, workspace }, info) => {
   test.setTimeout(15000);
   const title = `${workspace.prefix} Labelled issue`;
   const other = await workspace.create({ title: 'Other label', labels: ['backend'], status: 'open' });
@@ -24,13 +24,8 @@ test('labels can be created, edited, filtered, and cleared through the UI', asyn
   await expect(row).toBeVisible();
   await expect(page.getByTestId(`issue-${other.id}`)).not.toBeVisible();
   await page.getByLabel('Filter by label', { exact: true }).selectOption('');
-  await row.getByRole('button', { name: `Edit ${title}`, exact: true }).click();
-  const edit = page.getByRole('dialog', { name: 'Edit issue' });
-  await expect(edit.getByLabel('Labels', { exact: true })).toHaveValue('bug, frontend');
-  await edit.getByLabel('Labels', { exact: true }).fill('UI, bug');
-  await edit.getByLabel('Status', { exact: true }).selectOption('done');
-  await edit.getByRole('button', { name: 'Save changes', exact: true }).click();
-  await expect(edit).not.toBeVisible();
+  expect((await request.patch(`${appUrl(info)}/api/issues/${issue.id}`, { data: { labels: ['UI', 'bug'], status: 'done' } })).status()).toBe(200);
+  await page.reload();
   await page.getByLabel('Filter by label', { exact: true }).selectOption('ui');
   await page.getByLabel('Search issues', { exact: true }).fill(workspace.prefix);
   await page.getByLabel('Filter by status', { exact: true }).selectOption('done');
@@ -40,10 +35,9 @@ test('labels can be created, edited, filtered, and cleared through the UI', asyn
   await expect(page.getByRole('heading', { name: 'No matching issues' })).toBeVisible();
   await page.getByRole('button', { name: 'Reset filters', exact: true }).click();
   await expect(page.getByLabel('Filter by label', { exact: true })).toHaveValue('');
-  await row.getByRole('button', { name: `Edit ${title}`, exact: true }).click();
-  await edit.getByLabel('Labels', { exact: true }).fill('');
-  await edit.getByRole('button', { name: 'Save changes', exact: true }).click();
-  await expect(edit).not.toBeVisible();
+  expect((await request.patch(`${appUrl(info)}/api/issues/${issue.id}`, { data: { labels: [] } })).status()).toBe(200);
+  await page.reload();
+  await expect(row.getByText('ui', { exact: true })).toHaveCount(0);
   const issues = await (await request.get(`${appUrl(info)}/api/issues`)).json();
   expect(issues.issues.find((item: { id: number }) => item.id === issue.id).labels).toEqual([]);
   await page.setViewportSize({ width: 390, height: 844 });
