@@ -4,6 +4,8 @@
 
 Run `npm run verify` from the repository root. It runs lint, type checks, Node behavior tests, the production build, and Chromium acceptance in sequence. A failed or timed-out gate stops the run with a nonzero exit. Read `.runs/latest.json` and its referenced `summary.json`; terminal prose is insufficient evidence.
 
+GitHub uses `npm run verify:ci`, a separately reviewed [critical profile](ci-critical.md), with `.runs/ci-latest.json` and `ci-summary.json`. It retains lint, type checks and build, but selects critical Node/browser cases. It is additional remote evidence; complete local, integrated and whole-requirement verification still use the full command above.
+
 Schema version 2 records a unique run ID, optional task/attempt IDs, gate status and duration, the Git commit and dirty flag, and a SHA-256 inventory of tracked and nonignored source files. Generated output, dependencies, `.runs`, `.data`, and `.env` are excluded. Success requires the source inventory and verification contract to remain unchanged for the entire run.
 
 Node tests are discovered recursively under `tests/` and emit `node-results.jsonl` through the owner-selected reporter. Their final machine summary must contain at least one test, every test must pass, and failed, cancelled, skipped, and todo counts must be zero. In a controller run, each planned Node case must also appear as a passing event with its exact file and title. The browser report must contain executed cases, no report errors, no skips, failures, or flaky cases, and passing results for every case named in `factory/verification-contract.json`. Case counts must agree with the report. Missing, empty, malformed, or incomplete reports fail verification even when a command exits zero.
