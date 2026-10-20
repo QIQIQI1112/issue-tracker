@@ -32,7 +32,7 @@ test('a requirement becomes automatically merged issues with inspectable deliver
     await page.getByRole('button', { name: 'View issue Return ready', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: `Issue #${issue.id}`, exact: true });
     await expect(dialog.getByRole('heading', { name: 'Delivery report', exact: true })).toBeVisible();
-    await expect(dialog.getByText('Automatically merged', { exact: true })).toBeVisible();
+    await expect(dialog.getByRole('article', { name: 'Delivery report' }).getByText('merged', { exact: true })).toBeVisible();
     await expect(dialog.getByText('1 Node cases · 1 browser cases · 1 implementation attempts', { exact: true })).toBeVisible();
     await expect(dialog.getByText(git(repository, ['rev-parse', 'HEAD']).trim(), { exact: true })).toBeVisible();
     await dialog.getByText(/^Evidence \(/).click();
@@ -81,27 +81,20 @@ test('a Codex conversation plan submitted through the CLI appears with provenanc
     await page.goto(appUrl(info));
     await page.getByRole('button', { name: 'View issue Conversation ready value', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: `Issue #${receipt.issues[0].issue.id}`, exact: true });
-    await expect(dialog.getByText('Automatically merged', { exact: true })).toBeVisible();
+    await expect(dialog.getByRole('article', { name: 'Delivery report' }).getByText('merged', { exact: true })).toBeVisible();
     await expect(dialog.getByText('1 Node cases · 1 browser cases · 1 implementation attempts', { exact: true })).toBeVisible();
   } finally { store.close(); }
 });
 
-test('issue ownership and dependency edits persist and cyclic dependencies are rejected', async ({ page, request }, info) => {
+test('API issue ownership and dependency edits persist and cyclic dependencies are rejected', async ({ page, request }, info) => {
   const repos = await (await request.get(`${appUrl(info)}/api/repos`)).json();
   const repoId = repos.repos[0].id;
   const first = await request.post(`${appUrl(info)}/api/issues`, { data: { title: 'Dependency prerequisite', work: { repoId, requirementId: null, dependsOn: [], acceptance: ['An observable prerequisite.'] } } });
   const { issue: prerequisite } = await first.json();
+  const created = await request.post(`${appUrl(info)}/api/issues`, { data: { title: 'Dependent acceptance issue', work: { repoId, requirementId: null, dependsOn: [prerequisite.id], acceptance: ['The dependent behavior is observable.'] } } });
+  expect(created.status()).toBe(201);
+  const { issue } = await created.json();
   await page.goto(appUrl(info));
-  await page.getByRole('button', { name: 'New issue', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: 'Create issue', exact: true });
-  await dialog.getByLabel('Title', { exact: true }).fill('Dependent acceptance issue');
-  await dialog.getByLabel('Issue repository', { exact: true }).selectOption(String(repoId));
-  await dialog.getByText('Execution criteria and dependencies', { exact: true }).click();
-  await dialog.getByLabel('Acceptance conditions', { exact: true }).fill('The dependent behavior is observable.');
-  await dialog.getByLabel('Dependency issue IDs', { exact: true }).fill(String(prerequisite.id));
-  const created = page.waitForResponse(response => response.url().endsWith('/api/issues') && response.request().method() === 'POST');
-  await dialog.getByRole('button', { name: 'Create issue', exact: true }).click();
-  const { issue } = await (await created).json();
   expect(issue.work.dependsOn).toEqual([prerequisite.id]);
   const cyclic = await request.patch(`${appUrl(info)}/api/issues/${prerequisite.id}`, { data: { work: { ...prerequisite.work, dependsOn: [issue.id] } } });
   expect(cyclic.status()).toBe(400);

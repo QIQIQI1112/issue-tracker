@@ -125,5 +125,5 @@ test('initial issue controls expose accessible names and live loading semantics'
   for (const name of ['Search issues', 'Filter by repository', 'Filter by status', 'Filter by label', 'Sort issues', 'Issue list']) assert.ok(html.includes(`aria-label="${name}"`), name);
   assert.match(html, /role="status"/);
   assert.match(html, /aria-busy="true"/);
-  assert.match(html, /New issue/);
+  assert.match(html, /<h1>Issues<\/h1>/);
 });

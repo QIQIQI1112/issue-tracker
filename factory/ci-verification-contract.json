@@ -20,7 +20,8 @@
     "tests/process.test.ts",
     "tests/github-publication.test.ts",
     "tests/ci-critical-contract.test.ts",
-    "tests/ci-critical-runner.test.ts"
+    "tests/ci-critical-runner.test.ts",
+    "tests/read-only-contract.test.ts"
   ],
   "requiredNodeTests": [
     {
@@ -310,16 +311,20 @@
     {
       "file": "tests/ci-critical-runner.test.ts",
       "title": "critical CI runner enforces contract-drift evidence"
+    },
+    {
+      "file": "tests/read-only-contract.test.ts",
+      "title": "agent-owned operation contract retains full and critical inspection evidence"
     }
   ],
   "requiredBrowserTests": [
     {
       "file": "ui.spec.ts",
-      "title": "create, reload, inspect API updates and confirmed deletion persist"
+      "title": "API-created issues, API updates and deletions remain visible across reloads"
     },
     {
       "file": "ui.spec.ts",
-      "title": "whitespace-only titles are rejected accessibly without a mutation"
+      "title": "invalid API titles are rejected without changing the inspected collection"
     },
     {
       "file": "persistence.spec.ts",

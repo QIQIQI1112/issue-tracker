@@ -11,11 +11,11 @@
     },
     {
       "file": "ui.spec.ts",
-      "title": "create, reload, inspect API updates and confirmed deletion persist"
+      "title": "API-created issues, API updates and deletions remain visible across reloads"
     },
     {
       "file": "ui.spec.ts",
-      "title": "whitespace-only titles are rejected accessibly without a mutation"
+      "title": "invalid API titles are rejected without changing the inspected collection"
     },
     {
       "file": "ui.spec.ts",
@@ -23,7 +23,7 @@
     },
     {
       "file": "ui.spec.ts",
-      "title": "an empty isolated workspace offers a working first-issue action"
+      "title": "an empty isolated workspace remains inspectable and receives agent-created issues"
     },
     {
       "file": "ui.spec.ts",
@@ -35,11 +35,11 @@
     },
     {
       "file": "ui.spec.ts",
-      "title": "a real server validation error preserves draft values and allows retry"
+      "title": "a failed detail request allows read retry without losing the issue"
     },
     {
       "file": "ui.spec.ts",
-      "title": "pending creation blocks duplicate submission and dialog dismissal"
+      "title": "pending details can be dismissed without leaking stale content"
     },
     {
       "file": "ui.spec.ts",
@@ -51,11 +51,11 @@
     },
     {
       "file": "labels.spec.ts",
-      "title": "invalid label drafts are rejected accessibly without a write"
+      "title": "invalid API labels leave the inspected issue unchanged"
     },
     {
       "file": "labels.spec.ts",
-      "title": "UI-assigned labels survive a full server restart"
+      "title": "API-assigned labels survive a full server restart"
     },
     {
       "file": "workbench.spec.ts",
@@ -63,7 +63,7 @@
     },
     {
       "file": "workbench.spec.ts",
-      "title": "issue ownership and dependency edits persist and cyclic dependencies are rejected"
+      "title": "API issue ownership and dependency edits persist and cyclic dependencies are rejected"
     },
     {
       "file": "workbench.spec.ts",
