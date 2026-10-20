@@ -38,7 +38,16 @@ test('Codex adapter terminates a hung owned worker and retains its receipt', asy
   writeFileSync(binary, `#!/usr/bin/env node\nimport {writeFileSync} from 'node:fs';\nwriteFileSync(${JSON.stringify(pidPath)},String(process.pid));\nprocess.on('SIGTERM',()=>{});\nsetInterval(()=>{},1000);\n`);
   chmodSync(binary, 0o700);
   await assert.rejects(codexAgent(binary).run(context), /timeout/);
-  const pid = Number(readFileSync(pidPath, 'utf8'));
+  const receipt = JSON.parse(readFileSync(join(context.directory, 'process.json'), 'utf8')) as { pid: number };
+  const owner = JSON.parse(readFileSync(join(context.directory, 'events.log.owner.json'), 'utf8')) as { pid: number; identity: string; cwd: string; command: string; groups: number[]; settled: boolean };
+  const pid = receipt.pid;
+  assert.ok(Number.isSafeInteger(pid) && pid > 0);
+  assert.equal(owner.pid, pid);
+  assert.equal(owner.command, binary);
+  assert.equal(owner.cwd, context.cwd);
+  assert.ok(owner.identity.includes(binary));
+  assert.ok(owner.groups.includes(pid));
+  assert.equal(owner.settled, true);
   assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' });
   assert.equal(JSON.parse(readFileSync(join(context.directory, 'process.json'), 'utf8')).status, 'timeout');
 });

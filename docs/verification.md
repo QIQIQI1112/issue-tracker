@@ -41,6 +41,8 @@ Required cases cover create/edit/status changes, validation, search/filter/sort,
 
 ## Evidence and diagnosis
 
+The adapter timeout case includes CLI/interpreter startup in its unchanged 1500 ms deadline. It obtains the actual spawned PID from `process.json` and matches the controller's `events.log.owner.json`: positive integer PID, command, working directory, process identity, group membership and settled cleanup. Timeout rejection, recorded timeout status and a real `ESRCH` liveness check remain required. A child-written `worker.pid` is optional diagnostic output and may never exist when startup exceeds the deadline; it is not ownership authority. A deterministic subprocess regression makes that marker unavailable while running the actual named adapter check, so correctness does not depend on CPU load or lucky reruns. Original case names, full and critical selections, production process behavior and budgets remain unchanged.
+
 - `summary.json`: admission result, gate receipts, source hashes, and task/attempt identity.
 - `node-results.jsonl` and `browser-results.json`: machine-readable execution reports.
 - `*.log`: retained gate output.
