@@ -1,15 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Issue, IssueStatus, NewIssue } from '../domain.ts';
+import type { Issue, IssueStatus } from '../domain.ts';
 import { apiRequest, errorMessage } from './client.ts';
 import { Icon } from './Icon.tsx';
-import { IssueForm } from './IssueForm.tsx';
 import { IssueRow, statusLabels } from './IssueRow.tsx';
 import { Modal } from './Modal.tsx';
 import { IssueDetails } from './IssueDetails.tsx';
 import type { Workbench as WorkbenchData } from '../workflow.ts';
 
 type Filter = 'all' | IssueStatus;
-type Editor = { mode: 'create' } | { mode: 'delete'; issue: Issue };
 
 export function App() {
   const [workbench, setWorkbench] = useState<WorkbenchData>({ repos: [], requirements: [], jobs: [], runs: [] });
@@ -25,11 +23,6 @@ export function App() {
   const [labelFilter, setLabelFilter] = useState('');
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('newest');
-  const [editor, setEditor] = useState<Editor | null>(null);
-  const [pending, setPending] = useState(false);
-  const [mutationError, setMutationError] = useState<string | null>(null);
-  const [notice, setNotice] = useState('');
-  const mutationLock = useRef(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -58,51 +51,6 @@ export function App() {
     return () => { controller.abort(); clearInterval(timer); };
   }, [reloadVersion]);
 
-  function openEditor(next: Editor) {
-    setMutationError(null);
-    setEditor(next);
-  }
-  function dismissEditor() {
-    if (mutationLock.current) return;
-    setEditor(null);
-    setMutationError(null);
-  }
-  async function saveIssue(values: NewIssue) {
-    if (!editor || editor.mode === 'delete' || mutationLock.current) return;
-    mutationLock.current = true;
-    setPending(true);
-    setMutationError(null);
-    try {
-      const result = await apiRequest<{ issue: Issue }>('/api/issues', { method: 'POST', body: JSON.stringify(values) });
-      setIssues((current) => [result.issue, ...current]);
-      setFilter('all'); setLabelFilter(''); setSearch('');
-      setNotice('Issue created.');
-      setEditor(null);
-      if (loadError) setReloadVersion((value) => value + 1);
-    } catch (error) {
-      setMutationError(errorMessage(error));
-    } finally {
-      mutationLock.current = false;
-      setPending(false);
-    }
-  }
-  async function deleteIssue() {
-    if (editor?.mode !== 'delete' || mutationLock.current) return;
-    mutationLock.current = true;
-    setPending(true);
-    setMutationError(null);
-    try {
-      await apiRequest<void>(`/api/issues/${editor.issue.id}`, { method: 'DELETE' });
-      setIssues((current) => current.filter((issue) => issue.id !== editor.issue.id));
-      setNotice('Issue deleted.');
-      setEditor(null);
-    } catch (error) {
-      setMutationError(errorMessage(error));
-    } finally {
-      mutationLock.current = false;
-      setPending(false);
-    }
-  }
   const query = search.trim().toLocaleLowerCase();
   const hasFilters = query.length > 0 || filter !== 'all' || labelFilter !== '' || repoFilter !== '';
   const labelOptions = [...new Set([...issues.flatMap(issue => issue.labels), ...(labelFilter ? [labelFilter] : [])])].sort((left, right) => left.localeCompare(right));
@@ -124,18 +72,16 @@ export function App() {
     </aside>
     <main id="main-content" className="main" tabIndex={-1}>
       <div className="breadcrumb"><span className="breadcrumb-workspace">Local workspace</span><Icon name="chevron" /><span>Issues</span><span className="local-badge">LOCAL</span></div>
-      <><section className="page-header"><div><div className="title-line"><h1>Issues</h1>{!loading && !loadError && <span className="issue-count" aria-label={`${issues.length} total issues`}>{issues.length}</span>}</div><p>A little structure for what comes next.</p></div><button id="new-issue" className="button primary" type="button" disabled={loading || pending} onClick={() => openEditor({ mode: 'create' })}><Icon name="plus" />New issue</button></section>
+      <><section className="page-header"><div><div className="title-line"><h1>Issues</h1>{!loading && !loadError && <span className="issue-count" aria-label={`${issues.length} total issues`}>{issues.length}</span>}</div><p>A little structure for what comes next.</p></div></section>
       <div className="toolbar"><div className="search-field"><Icon name="search" /><input type="search" aria-label="Search issues" placeholder="Search issues…" value={search} onChange={(event) => setSearch(event.target.value)} /></div><div className="toolbar-selects"><label className="select-field"><span>Repo</span><select aria-label="Filter by repository" value={repoFilter} onChange={event => setRepoFilter(event.target.value)}><option value="">All repositories</option>{workbench.repos.map(repo => <option key={repo.id} value={repo.id}>{repo.name}</option>)}</select></label><label className="select-field"><span>Status</span><select aria-label="Filter by status" value={filter} onChange={(event) => setFilter(event.target.value as Filter)}><option value="all">All statuses</option><option value="open">Open</option><option value="in_progress">In progress</option><option value="done">Done</option></select></label><label className="select-field"><span>Label</span><select aria-label="Filter by label" value={labelFilter} onChange={event => setLabelFilter(event.target.value)}><option value="">All labels</option>{labelOptions.map(label => <option key={label} value={label}>{label}</option>)}</select></label><label className="select-field"><span>Sort</span><select aria-label="Sort issues" value={sort} onChange={(event) => setSort(event.target.value)}><option value="newest">Newest first</option><option value="priority">Priority</option><option value="title">Title A–Z</option></select></label></div></div>
-      <p className={`live-notice ${notice ? '' : 'sr-only'}`} role="status" aria-live="polite">{notice}</p>
       <section className="issue-panel" aria-label="Issue list" aria-busy={loading}>
         {loading && issues.length === 0 ? <div className="state-panel" role="status"><span className="spinner" aria-hidden="true" /><h2>Loading issues…</h2><p>Opening your local workspace.</p></div> : loadError && issues.length === 0 ? <div className="state-panel"><Icon name="database" /><h2>Couldn’t load issues</h2><p role="alert">{loadError}</p><button className="button" type="button" onClick={() => setReloadVersion((value) => value + 1)}>Retry</button></div> : <>
           {loading && <p role="status">Refreshing issues…</p>}
           {loadError && <div className="state-panel"><h2>Couldn’t refresh issues</h2><p role="alert">{loadError}</p><p>Showing previously loaded issues.</p><button className="button" type="button" onClick={() => setReloadVersion(value => value + 1)}>Retry</button></div>}
-          <div className="list-heading"><strong>{filter === 'all' ? 'All issues' : statusLabels[filter]}</strong><span>{visibleIssues.length} {visibleIssues.length === 1 ? 'issue' : 'issues'}</span></div>{visibleIssues.length ? <ul className="issue-list">{visibleIssues.map((issue) => <IssueRow key={issue.id} issue={issue} onDetails={item => setDetailId(item.id)} onDelete={(item) => openEditor({ mode: 'delete', issue: item })} />)}</ul> : <div className="state-panel"><Icon name="issues" /><h2>{hasFilters ? 'No matching issues' : 'No issues yet'}</h2><p>{hasFilters ? 'Try another search or reset your filters to see all issues.' : 'Capture your first task, bug, or idea. Everything stays in your local workspace.'}</p>{hasFilters ? <button className="button" type="button" onClick={resetFilters}>Reset filters</button> : <button className="button primary" type="button" onClick={() => openEditor({ mode: 'create' })}><Icon name="plus" />Create your first issue</button>}</div>}</>}
+          <div className="list-heading"><strong>{filter === 'all' ? 'All issues' : statusLabels[filter]}</strong><span>{visibleIssues.length} {visibleIssues.length === 1 ? 'issue' : 'issues'}</span></div>{visibleIssues.length ? <ul className="issue-list">{visibleIssues.map((issue) => <IssueRow key={issue.id} issue={issue} onDetails={item => setDetailId(item.id)} />)}</ul> : <div className="state-panel"><Icon name="issues" /><h2>{hasFilters ? 'No matching issues' : 'No issues yet'}</h2><p>{hasFilters ? 'Try another search or reset your filters to see all issues.' : 'Ask your agent to create and manage issues. Inspect issues and execution evidence here.'}</p>{hasFilters && <button className="button" type="button" onClick={resetFilters}>Reset filters</button>}</div>}</>}
       </section>
       <footer className="page-footer"><span>Private by default. Local by design.</span><span>Loop / Local workspace</span></footer></>
     </main>
-    {detailId !== null && <Modal wide title={`Issue #${detailId}`} onDismiss={() => setDetailId(null)}><IssueDetails key={detailId} id={detailId} issues={issues} metadataError={workbenchError} workbench={workbench} onStarted={() => setReloadVersion(value => value + 1)} /></Modal>}
-    {editor && <Modal title={editor.mode === 'create' ? 'Create issue' : 'Delete issue'} pending={pending} onDismiss={dismissEditor}>{editor.mode === 'delete' ? <div className="delete-body"><p>Delete <strong>{editor.issue.title}</strong>?</p><p>This permanently removes the issue from your local workspace. This action cannot be undone.</p>{mutationError && <p className="form-error" role="alert">{mutationError}</p>}<div className="form-footer"><button className="button" type="button" data-autofocus disabled={pending} onClick={dismissEditor}>Cancel</button><button className="button danger" type="button" disabled={pending} aria-label="Delete issue" onClick={() => { void deleteIssue(); }}>{pending ? 'Deleting…' : 'Delete issue'}</button></div></div> : <IssueForm workbench={workbench} pending={pending} serverError={mutationError} onSave={saveIssue} onCancel={dismissEditor} />}</Modal>}
+    {detailId !== null && <Modal wide title={`Issue #${detailId}`} onDismiss={() => setDetailId(null)}><IssueDetails key={detailId} id={detailId} issues={issues} metadataError={workbenchError} workbench={workbench} /></Modal>}
   </div>;
 }
