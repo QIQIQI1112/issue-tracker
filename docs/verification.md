@@ -16,6 +16,8 @@ The dashboard UI revision has a separate owner-reviewed interaction compatibilit
 
 ## Budgets
 
+The [repository navigation acceptance revision](repository-navigation-acceptance.md) maps retired status-sidebar and repository-toolbar assumptions to equivalent retained filtering checks. It preserves all 17 full required browser cases, with one explicitly renamed status-filtering identity, and leaves critical CI and all verification gates unchanged.
+
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `VERIFY_STEP_TIMEOUT_MS` | `180000` | Maximum time for an individual gate. |

@@ -5,6 +5,7 @@ import type { Issue } from '../src/domain.ts';
 import { appUrl, test } from './workspace.ts';
 import { availablePort, launch, stop } from './owned-server.ts';
 import { targetHeader, targetIdentity } from '../src/target-safety.ts';
+import { expectRepositoryControl, expectStatusSelection, selectStatus } from './navigation.ts';
 
 test('workspace exposes labelled controls and the real local persistence hint', async ({ page, workspace }, info) => {
   const issue = await workspace.create({ title: 'Inspect keyboard navigation' });
@@ -12,7 +13,8 @@ test('workspace exposes labelled controls and the real local persistence hint', 
   await expect(page).toHaveTitle('Loop — Local issue tracker');
   await expect(page.getByRole('heading', { name: 'Issues', exact: true })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Workspace views' })).toBeVisible();
-  for (const label of ['Search issues', 'Filter by repository', 'Filter by status', 'Filter by label', 'Sort issues']) await expect(page.getByLabel(label, { exact: true })).toBeVisible();
+  for (const label of ['Search issues', 'Filter by status', 'Filter by label', 'Sort issues']) await expect(page.getByLabel(label, { exact: true })).toBeVisible();
+  await expectRepositoryControl(page);
   await expect(page.getByText('SQLite persistence', { exact: true })).toBeVisible();
   const opener = page.getByRole('button', { name: `View issue ${issue.title}`, exact: true });
   await opener.click();
@@ -86,7 +88,7 @@ test('invalid API titles are rejected without changing the inspected collection'
   await expect(page.getByRole('button', { name: `Inspect issue ${issue.title}`, exact: true })).toBeVisible();
 });
 
-test('title and description search, both status controls, and all sort orders operate on real issues', async ({ page, workspace }, info) => {
+test('title and description search, status filtering, and all sort orders operate on real issues', async ({ page, workspace }, info) => {
   const zulu = await workspace.create({ title: 'Zulu routing', description: `DescriptionOnly-${workspace.prefix}`, status: 'open', priority: 'high' });
   const alpha = await workspace.create({ title: 'Alpha keyboard', description: 'Polish focus restoration.', status: 'done', priority: 'low' });
   const beta = await workspace.create({ title: 'Beta layout', description: 'Fit the phone viewport.', status: 'in_progress', priority: 'medium' });
@@ -112,15 +114,14 @@ test('title and description search, both status controls, and all sort orders op
   await expect(page.getByTestId(`issue-${alpha.id}`)).toBeVisible();
   await expect(page.getByTestId(`issue-${zulu.id}`)).not.toBeVisible();
   await expect(page.getByTestId(`issue-${beta.id}`)).not.toBeVisible();
-  const views = page.getByRole('navigation', { name: 'Workspace views' });
-  await expect(views.getByRole('button', { name: 'Done', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await views.getByRole('button', { name: 'In progress', exact: true }).click();
+  await expectStatusSelection(page, 'done');
+  await selectStatus(page, 'in_progress');
   await expect(filter).toHaveValue('in_progress');
   await expect(titles).toHaveText([`${workspace.prefix} Beta layout`]);
-  await views.getByRole('button', { name: 'Open', exact: true }).click();
+  await selectStatus(page, 'open');
   await expect(filter).toHaveValue('open');
   await expect(titles).toHaveText([`${workspace.prefix} Zulu routing`]);
-  await views.getByRole('button', { name: 'All issues', exact: true }).click();
+  await selectStatus(page, 'all');
   await expect(filter).toHaveValue('all');
   await expect(titles).toHaveCount(3);
   await search.fill(`${workspace.prefix} no-such-issue`);
@@ -259,7 +260,7 @@ test('phone layout keeps issue actions and dialogs in the viewport with no horiz
   const title = `${workspace.prefix} Mobile layout verified`;
   expect((await request.patch(`${appUrl(info)}/api/issues/${issue.id}`, { data: { title, status: 'done' } })).status()).toBe(200);
   await page.reload();
-  await page.getByRole('navigation', { name: 'Workspace views' }).getByRole('button', { name: 'Done', exact: true }).click();
+  await selectStatus(page, 'done');
   await expect(row.getByText('Done', { exact: true })).toBeVisible();
   await page.screenshot({ path: info.outputPath('phone-workspace.png'), fullPage: true });
   expect((await request.delete(`${appUrl(info)}/api/issues/${issue.id}`)).status()).toBe(204);
