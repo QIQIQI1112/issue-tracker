@@ -18,7 +18,7 @@ export function environmentIdentity(repository: string, engine: string): string 
   return digest(JSON.stringify({ controls, runtime }));
 }
 
-type Checkpoint = { schemaVersion: 1; runId: string; taskHash: string; environment: string; baselineTree: string; baseCommit: string; sourceHash: string; patchHash: string; accepted: boolean; regressions?: AcceptedRegression[]; pendingRegression?: PendingRegression; plan?: Plan; acceptanceReceipt?: NonNullable<ControllerState['reviewReceipts']>[number]; acceptedChecks: { path: string; hash: string }[]; redChecks: ControllerState['redChecks']; proofs: { path: string; hash: string }[] };
+type Checkpoint = { schemaVersion: 1; runId: string; taskHash: string; environment: string; baselineTree: string; baseCommit: string; sourceHash: string; patchHash: string; accepted: boolean; regressions?: AcceptedRegression[]; pendingRegression?: PendingRegression; plan?: Plan; acceptanceReceipt?: NonNullable<ControllerState['reviewReceipts']>[number]; acceptedChecks: { path: string; hash: string }[]; redChecks: ControllerState['redChecks']; browserRedChecks?: ControllerState['browserRedChecks']; proofs: { path: string; hash: string }[] };
 
 export function assertTestInventory(files: { path: string; hash: string }[], approved: { path: string; hash: string }[]): void {
   const current = new Map(files.filter(file => /^(tests|acceptance)\//.test(file.path)).map(file => [file.path, file.hash]));
@@ -38,11 +38,12 @@ export function saveCheckpoint(state: ControllerState, task: Task, environment: 
   writeFileSync(join(state.runDirectory, 'checkpoint.patch.tmp'), patch);
   const acceptanceReceipt = state.reviewReceipts?.filter(receipt => receipt.purpose === 'acceptance-coverage' && receipt.approved).at(-1);
   const paths = ['accepted-checks.json', 'acceptance-review.json', ...state.redChecks.flatMap(check => [relative(state.runDirectory, check.logPath), relative(state.runDirectory, check.logPath).replace(/\.log$/, '.jsonl')])];
+  for (const check of state.browserRedChecks ?? []) paths.push(relative(state.runDirectory, check.logPath), relative(state.runDirectory, check.reportPath!));
   if (acceptanceReceipt) paths.push(acceptanceReceipt.evidencePath);
   for (const regression of state.regressions ?? []) paths.push(regression.receipt.evidencePath, ...regression.redChecks.flatMap(check => [relative(state.runDirectory, check.logPath), relative(state.runDirectory, check.reportPath!)]));
   if (state.pendingRegression) paths.push(state.pendingRegression.receipt.evidencePath);
   const proofs = accepted ? paths.map(path => ({ path, hash: digest(readFileSync(join(state.runDirectory, path))) })) : [];
-  const checkpoint: Checkpoint = { schemaVersion: 1, runId: state.runId, taskHash: taskIdentity(task), environment, baselineTree: state.baselineTree, baseCommit: state.baseCommit, sourceHash: source.hash, patchHash: digest(patch), accepted, regressions: state.regressions, pendingRegression: state.pendingRegression, plan: state.plan, acceptanceReceipt, acceptedChecks, redChecks: state.redChecks, proofs };
+  const checkpoint: Checkpoint = { schemaVersion: 1, runId: state.runId, taskHash: taskIdentity(task), environment, baselineTree: state.baselineTree, baseCommit: state.baseCommit, sourceHash: source.hash, patchHash: digest(patch), accepted, regressions: state.regressions, pendingRegression: state.pendingRegression, plan: state.plan, acceptanceReceipt, acceptedChecks, redChecks: state.redChecks, browserRedChecks: state.browserRedChecks ?? [], proofs };
   renameSync(join(state.runDirectory, 'checkpoint.patch.tmp'), join(state.runDirectory, 'checkpoint.patch'));
   writeJson(join(state.runDirectory, 'checkpoint.json'), checkpoint);
 }
@@ -57,15 +58,18 @@ export function loadCheckpoint(directory: string, root: string, task: Task, envi
   if (digest(readFileSync(join(directory, 'checkpoint.patch'))) !== value.patchHash) throw new Error('Checkpoint patch hash mismatch.');
   value.plan = parsePlan(value.plan, task);
   if (!value.proofs.length || value.redChecks.length !== value.plan.slices.flatMap(slice => slice.checks).length) throw new Error('Checkpoint behavior proofs are incomplete.');
+  if (!Array.isArray(value.browserRedChecks)) throw new Error('Checkpoint browser proof metadata is missing.');
   for (const proof of value.proofs) {
-    if (relative(directory, resolve(directory, proof.path)) !== proof.path || proof.path.startsWith('..') || !/^(accepted-checks\.json|acceptance-review\.json|(?:red-\d+(?:-\d+)?|regression-red-\d+-\d+)\.(log|jsonl|json)|review-receipt-[a-z0-9-]+\.json)$/.test(proof.path)) throw new Error('Invalid checkpoint proof path.');
+    if (relative(directory, resolve(directory, proof.path)) !== proof.path || proof.path.startsWith('..') || !/^(accepted-checks\.json|acceptance-review\.json|(?:red-\d+(?:-\d+)?|regression-red-\d+-\d+|browser-red-\d+-\d+)\.(log|jsonl|json)|review-receipt-[a-z0-9-]+\.json)$/.test(proof.path)) throw new Error('Invalid checkpoint proof path.');
     if (digest(readFileSync(join(directory, proof.path))) !== proof.hash) throw new Error('Checkpoint proof hash mismatch.');
   }
   if (!value.proofs.some(proof => proof.path === 'accepted-checks.json')) throw new Error('Checkpoint has no approved test inventory proof.');
   assertTestInventory(value.acceptedChecks, readJson(join(directory, 'accepted-checks.json')) as { path: string; hash: string }[]);
   const regressionReceipts = new Set((value.regressions ?? []).map(regression => regression.receipt.evidencePath));
   const regressionProofs = new Set((value.regressions ?? []).flatMap(regression => regression.redChecks.flatMap(check => [check.logPath.split('/').at(-1)!, check.reportPath?.split('/').at(-1)])));
+  const browserProofs = new Set(value.browserRedChecks.flatMap(check => [check.logPath.split('/').at(-1), check.reportPath?.split('/').at(-1)]));
   for (const proof of value.proofs) {
+    if (proof.path.startsWith('browser-red-') && !browserProofs.has(proof.path)) throw new Error('Orphan browser red proof in checkpoint.');
     if (proof.path.startsWith('regression-red-') && !regressionProofs.has(proof.path)) throw new Error('Orphan regression red proof in checkpoint.');
     if (!proof.path.startsWith('review-receipt-')) continue;
     const bound = readJson(join(directory, proof.path)) as { purpose: string; response: unknown };
@@ -81,6 +85,16 @@ export function loadCheckpoint(directory: string, root: string, task: Task, envi
   const fields = ['purpose', 'planHash', 'sourceHash', 'criteriaHash', 'contractHash', 'approved', 'summary', 'evidencePath'] as const;
   if (receipt.purpose !== 'acceptance-coverage' || fields.some(field => receipt[field] !== bound[field]) || JSON.stringify(parseReview(bound.response, task)) !== JSON.stringify(review)) throw new Error('Checkpoint acceptance receipt metadata does not match its hashed proof.');
   if (!review.approved) throw new Error('Checkpoint acceptance review was not approved.');
+  const browserFeedback = (bound as typeof bound & { feedback: { browserRedChecks?: ControllerState['redChecks']; acceptedChecks?: { path: string; hash: string }[] } }).feedback;
+  const normalizeBrowser = (checks: ControllerState['redChecks']) => checks.map(check => ({ ...check, logPath: check.logPath.split('/').at(-1), reportPath: check.reportPath?.split('/').at(-1) }));
+  if (!Array.isArray(browserFeedback?.browserRedChecks) || JSON.stringify(normalizeBrowser(browserFeedback.browserRedChecks)) !== JSON.stringify(normalizeBrowser(value.browserRedChecks))) throw new Error('Checkpoint browser proof metadata does not match approval.');
+  const approvedBrowserFiles = new Map(browserFeedback.acceptedChecks?.map(file => [file.path, file.hash]));
+  for (const check of value.browserRedChecks) {
+    if (!value.plan.browserChecks.some(planned => planned.file === check.file && planned.title === check.title) || !['expected_failure', 'already_passed'].includes(check.status) || !check.reportPath) throw new Error('Checkpoint browser proof is invalid.');
+    for (const path of [check.logPath, check.reportPath]) if (!value.proofs.some(proof => proof.path === path.split('/').at(-1))) throw new Error('Checkpoint browser proof is incomplete.');
+    const path = `acceptance/${check.file}`;
+    if (!approvedBrowserFiles.has(path) || approvedBrowserFiles.get(path) !== value.acceptedChecks.find(file => file.path === path)?.hash) throw new Error('Checkpoint browser test hash does not match approval.');
+  }
   const requireProof = (path: string) => { if (!value.proofs.some(proof => proof.path === path)) throw new Error('Checkpoint regression proof is incomplete.'); };
   for (const regression of value.regressions ?? []) {
     const report = parseRegressionReport({ schemaVersion: 1, taskId: task.id, summary: 'Checkpoint regression checks.', blockers: [], checks: regression.checks, browserChecks: regression.browserChecks }, task);
