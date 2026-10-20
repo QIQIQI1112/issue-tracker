@@ -65,6 +65,7 @@ export function IssueDetails({ id, workbench, issues = [], metadataError = '' }:
   const waiting = latestJob && issue ? waitingDependencies(workbench, [...issues.filter(item => item.id !== id), issue], latestJob) : [];
   const progress = requirement ? requirementProgress(workbench, [...issues.filter(item => item.id !== id), ...(issue ? [issue] : [])], requirement) : null;
   const currentReason = latestJob?.reason || currentRun?.reason;
+  const replacement = issues.find(item => item.id === issue?.closure?.supersededBy);
   const stage = (run: WorkRun) => {
     const kind = workbench.jobs.find(job => job.id === run.jobId && job.runId === run.id && owned(job))?.kind;
     return kind === 'decompose' ? 'Decomposition' : kind === 'plan_review' ? 'Plan review' : kind === 'requirement_publish' ? 'GitHub publication' : kind === 'requirement_verify' ? 'Whole-goal verification' : 'Issue execution';
@@ -86,6 +87,14 @@ export function IssueDetails({ id, workbench, issues = [], metadataError = '' }:
         <dt>Requirement</dt><dd>{requirement?.title ?? (issue.work?.requirementId ? 'Requirement #' + issue.work.requirementId + ' unavailable' : 'Standalone issue')}</dd>
         <dt>Dependencies</dt><dd>{issue.work?.dependsOn.map(id => '#' + id).join(', ') || 'None'}</dd>
       </dl>
+      {issue.closure && <section aria-label="Closure context" className="diagnostic-section">
+        <h3>Issue closure</h3><p>Closure does not establish successful delivery.</p>
+        <dl>
+          <dt>Closure reason</dt><dd>{issue.closure.reason}</dd>
+          <dt>Closed at</dt><dd><time dateTime={issue.closure.closedAt}>{issue.closure.closedAt}</time></dd>
+          <dt>Replacement issue</dt><dd>{issue.closure.supersededBy === undefined ? 'No replacement issue recorded.' : <>Issue #{issue.closure.supersededBy} · {replacement?.title ?? 'Replacement title unavailable.'}</>}</dd>
+        </dl>
+      </section>}
       <h4>Acceptance conditions</h4>{issue.work?.acceptance.length ? <ul>{issue.work.acceptance.map((text, index) => <li key={index}>{text}</li>)}</ul> : <p>No acceptance conditions recorded.</p>}
       {requirement && <section aria-label="Requirement context" className="diagnostic-section">
         <h3>Original requirement goal</h3><p>{requirement.goal}</p>
@@ -102,7 +111,7 @@ export function IssueDetails({ id, workbench, issues = [], metadataError = '' }:
           <dt>Submission</dt><dd>{requirement.submission.id}</dd><dt>Plan hash</dt><dd><code>{requirement.submission.planHash}</code></dd>
           <dt>Source kind</dt><dd>{requirement.submission.source.kind}</dd><dt>Source reference</dt><dd>{requirement.submission.source.reference}</dd><dt>Source summary</dt><dd>{requirement.submission.source.summary}</dd>
         </dl></> : <p>Submission provenance unavailable: no conversation submission recorded.</p>}
-        <p>{progress?.outcome}</p><p>{progress?.merged}/{progress?.children.length} child issues have recorded merges. Issue status alone does not establish delivery.</p>
+        <p>{progress?.outcome}</p><p>{progress?.merged}/{progress?.children.length} child issues have recorded merges. Delivery requires recorded execution evidence, regardless of issue status.</p>
         {workbench.jobs.filter(job => owned(job) && job.issueId === null && job.kind === 'requirement_verify').sort((a, b) => b.id - a.id).slice(0, 1).map(job => <p key={job.id}>Latest whole-goal job #{job.id} · {job.status}{job.reason ? ' · ' + job.reason : ''}</p>)}
       </section>}
       <h3>Execution history</h3>

@@ -41,6 +41,8 @@ Verification writes `.runs/verify-*/summary.json`, Node and browser reports, log
 
 Issues support normalized labels, combined label/status/search filters, and migration of existing databases. The defaults and acceptance checks are documented in [labels](docs/labels.md).
 
+Issue lifecycle distinguishes Open, In progress, Blocked, Closed and Done. Failed work remains Blocked until retried or explicitly closed by the agent. Closed records retain their reason, time, optional replacement and original execution evidence; they cannot satisfy merge dependencies. See [lifecycle operations](docs/workbench.md#issue-lifecycle) and the [staged acceptance revision](docs/issue-lifecycle-contract.md).
+
 ## Stack
 
 - **TypeScript** for shared issue types and static checks across browser, server, and tests.

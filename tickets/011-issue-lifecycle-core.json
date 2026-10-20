@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "recordType": "owner-maintenance",
+  "id": "issue-lifecycle-core",
+  "issueId": 36,
+  "requirementId": 9,
+  "dependsOn": [
+    35
+  ],
+  "changeKind": "harness",
+  "goal": "Owner harness maintenance. Activate the exact pre-approved one-line queue status assertion from the independently delivered inactive acceptance revision atomically with this implementation; do not relax it or any other existing assertion. Extend issue status to blocked and closed; add optional persisted closure metadata {reason,closedAt,supersededBy?}. Add POST /api/issues/:id/close with strict input validation and existing loopback/origin/target identity protections; use IssueStore.closeIssue(id,input). Failed runs and failed dependency cascades set Blocked, retry claim sets In progress, and only actual merged execution sets Done. Reject closed issue starts/edits/deletion and requirement retries containing closed children without changing dependency/verification/merge rules. Preserve all immutable plan bytes, existing runs/jobs/reports and cumulative budgets. Migrate old SQLite safely, preserving foreign keys, IDs, sequence and metadata; backfill only latest-blocked inactive unmerged issues. Add minimum status labels needed to compile; detailed UI is the dependent feature. Add scoped tests before repair and update authoritative English docs.",
+  "acceptance": [
+    "Blocked outcomes, interrupted recovery and blocked dependency cascades visibly persist Blocked; normal Open defaults, retry admission/claim and successful merged Done semantics remain intact.",
+    "Close records a nonempty reason up to 2000 characters, owner timestamp and optional existing positive same-repository replacement. Reject self/missing/cross-repository replacements, invalid fields and payloads without partial writes. Identical repeated closure is idempotent; conflicting reclosure fails.",
+    "Closing works for blocked immutable submitted-plan issues without modifying their original content; queued/running or actual merged issues cannot close. Closed issues cannot start, mutate, delete or satisfy dependencies; requirement retries cannot bypass them or fabricate whole-goal completion.",
+    "SQLite upgrade preserves issue IDs, labels, repos, assignments, dependencies, submissions, jobs, runs, publication metadata, foreign-key integrity and the AUTOINCREMENT high-water mark. Latest-blocked inactive unmerged legacy issues backfill to Blocked; active, merged, open and terminal history remain intact.",
+    "The close endpoint preserves target-identity and origin protections, returns appropriate missing/invalid/conflict responses, and persists across reopen. Original failure reports remain addressable and unchanged.",
+    "Owner red proofs and independent acceptance approval freeze new scoped regressions before implementation; complete verification and final source-bound independent review precede integration and owner attestation. Existing roles, budgets, manifests and verification gates remain intact.",
+    "Activate only the exact one-line interrupted-recovery status assertion approved by the prerequisite. All other existing test bytes and full/critical manifests remain unchanged; new implementation regressions are independently approved and frozen before repair."
+  ],
+  "acceptanceRevision": "tickets/010-issue-lifecycle-acceptance.json",
+  "regressionFiles": [
+    "tests/issue-lifecycle.test.ts",
+    "tests/issue-lifecycle-migration.test.ts"
+  ],
+  "execution": "Separate owner maintenance with accepted red proofs, frozen tests, exact staged assertion activation, complete verification, independent source-bound review, verified integration and owner attestation. Activate revised controls only after those gates; ordinary feature executors receive no protected scope."
+}

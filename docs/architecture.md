@@ -10,13 +10,15 @@ React UI → same-origin /api → Express HTTP boundary
 
 ## Data model
 
-An issue has a numeric stable ID, title, description, status, priority, labels, created timestamp, and updated timestamp. Status is `open | in_progress | done`; priority is `low | medium | high`. Trimmed titles contain 1–120 characters; descriptions contain at most 2,000 characters. IDs and timestamps are not client-editable. Labels are trimmed, lowercased, and deduplicated; see [labels](labels.md) for limits and PATCH semantics.
+An issue has a numeric stable ID, title, description, status, priority, labels, created timestamp, and updated timestamp. Status is `open | in_progress | blocked | closed | done`; priority is `low | medium | high`. Closed issues additionally expose `closure: { reason, closedAt, supersededBy? }`. Trimmed titles contain 1–120 characters; descriptions contain at most 2,000 characters. IDs, closure metadata and timestamps are not client-editable. Labels are trimmed, lowercased, and deduplicated; see [labels](labels.md) for limits and PATCH semantics.
 
 Schema version 3 adds repositories with local Git roots and target branches, business requirements, optional issue assignments, dependency IDs, acceptance conditions, persistent jobs, and run indexes. `src/workflow.ts` owns their pure types and validation. `src/workflow-store.ts` owns transactional admission, claims, dependencies, and outcome indexing. An execution's machine evidence remains owned by the separate factory process. See [the workbench](workbench.md).
 
 Version 4 adds immutable conversation plan submissions with canonical hashes, source summaries, and issue-key mappings. `src/submission.ts` owns the pure shared graph/plan contract. Codex submits through `scripts/submit-plan.ts`; the controller independently reviews the plan before issue execution. See [conversation intake](conversation-intake.md).
 
 Version 5 adds maintenance change classifications. Version 6 adds optional GitHub enrollment, immutable requirement publication identities and deferred publication scheduling. `DATABASE_SCHEMA_VERSION` in `src/storage.ts` declares the current supported version; migrations preserve existing history.
+
+Version 7 extends the issue status constraint and adds closure reason, timestamp and a replacement foreign key. It follows SQLite's [generalized table migration procedure](https://www.sqlite.org/lang_altertable.html#making_other_kinds_of_table_schema_changes): foreign keys are disabled before the transaction, the replacement table receives existing rows, then the old table is replaced without renaming its references. Existing indexes/triggers and AUTOINCREMENT high-water state are retained; foreign-key integrity is checked before commit and enforcement is restored afterward. Only inactive, unmerged legacy issues whose latest job is blocked are backfilled; active ownership and original jobs/runs/plans/evidence are preserved.
 
 The server validates every write. SQL statements use placeholders for values. Database constraints repeat critical domain invariants. The UI handles filtering, text search, and sorting on the small list returned by the API.
 
@@ -38,6 +40,7 @@ The server validates every write. SQL statements use placeholders for values. Da
 | `POST /api/plan-submissions` | Atomically create a submitted plan and independent-review job; replay returns the existing IDs. |
 | `GET /api/plan-submissions/:id` | Immutable original plan, current Requirement/issues/jobs/runs. |
 | `POST /api/issues/:id/start` | Queue a frozen issue snapshot. |
+| `POST /api/issues/:id/close` | `200 { issue: Issue }`; explicit closure with reason and optional replacement. |
 | `GET /api/runs/:id` | Run metadata and standard delivery report. |
 | `GET /api/runs/:id/evidence?file=<manifest-path>` | Download unchanged, manifest-listed evidence. |
 

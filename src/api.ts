@@ -78,6 +78,11 @@ export function createApp(store: IssueStore, metadata: { instanceId: string; ver
     response.json({ issue, runs: store.work.runs().filter(run => run.issueId === issue.id) });
   });
   app.post('/api/issues/:id/start', (request, response) => response.status(202).json({ job: store.work.startIssue(issueId(request.params.id)) }));
+  app.post('/api/issues/:id/close', (request, response) => {
+    const issue = store.closeIssue(issueId(request.params.id), request.body);
+    if (!issue) { response.status(404).json({ error: 'Issue not found.' }); return; }
+    response.json({ issue });
+  });
   app.get('/api/runs/:id', (request, response) => {
     const run = store.work.run(request.params.id);
     if (!run) { response.status(404).json({ error: 'Run not found.' }); return; }

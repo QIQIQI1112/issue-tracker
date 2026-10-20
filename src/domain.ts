@@ -1,7 +1,9 @@
-export const ISSUE_STATUSES = ['open', 'in_progress', 'done'] as const;
+export const ISSUE_STATUSES = ['open', 'in_progress', 'blocked', 'closed', 'done'] as const;
 export const ISSUE_PRIORITIES = ['low', 'medium', 'high'] as const;
 export type IssueStatus = (typeof ISSUE_STATUSES)[number];
 export type IssuePriority = (typeof ISSUE_PRIORITIES)[number];
+export type IssueClosure = { reason: string; closedAt: string; supersededBy?: number };
+export type CloseIssueInput = Omit<IssueClosure, 'closedAt'>;
 export interface Issue {
   id: number;
   title: string;
@@ -11,9 +13,10 @@ export interface Issue {
   labels: string[];
   createdAt: string;
   updatedAt: string;
+  closure?: IssueClosure;
   work?: Assignment;
 }
-export type NewIssue = Omit<Issue, 'id' | 'createdAt' | 'updatedAt'>;
+export type NewIssue = Omit<Issue, 'id' | 'createdAt' | 'updatedAt' | 'closure'>;
 export type IssuePatch = Partial<NewIssue>;
 
 export class ValidationError extends Error { }
@@ -46,8 +49,9 @@ function description(input: unknown): string {
 }
 
 function status(input: unknown): IssueStatus {
+  if (input === 'closed') throw new ValidationError('Use the explicit close lifecycle operation to close an issue.');
   if (!ISSUE_STATUSES.includes(input as IssueStatus)) {
-    throw new ValidationError('Status must be open, in_progress, or done.');
+    throw new ValidationError('Status must be open, in_progress, blocked, or done.');
   }
   return input as IssueStatus;
 }
@@ -94,6 +98,15 @@ export function parsePatchIssue(input: unknown): IssuePatch {
   if ('labels' in value) patch.labels = parseLabels(value.labels);
   if ('work' in value) patch.work = assignment(value.work);
   return patch;
+}
+
+export function parseCloseIssue(input: unknown): CloseIssueInput {
+  if (input === null || typeof input !== 'object' || Array.isArray(input)) throw new ValidationError('Issue closure must be an object.');
+  const value = input as Record<string, unknown>;
+  if (Object.keys(value).some(key => !['reason', 'supersededBy'].includes(key))) throw new ValidationError('Unknown issue closure field.');
+  if (typeof value.reason !== 'string' || !value.reason.trim() || value.reason.trim().length > 2000) throw new ValidationError('Closure reason must contain 1–2000 characters.');
+  if ('supersededBy' in value && (typeof value.supersededBy !== 'number' || !Number.isSafeInteger(value.supersededBy) || value.supersededBy < 1)) throw new ValidationError('Replacement issue ID must be a positive safe integer.');
+  return { reason: value.reason.trim(), ...('supersededBy' in value ? { supersededBy: value.supersededBy as number } : {}) };
 }
 import { assignment } from './workflow.ts';
 import type { Assignment } from './workflow.ts';

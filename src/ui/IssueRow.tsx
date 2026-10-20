@@ -1,6 +1,6 @@
 import type { Issue } from '../domain.ts';
 
-export const statusLabels = { open: 'Open', in_progress: 'In progress', done: 'Done' } as const;
+export const statusLabels = { open: 'Open', in_progress: 'In progress', blocked: 'Blocked', closed: 'Closed', done: 'Done' } as const;
 const priorityLabels = { low: 'Low', medium: 'Medium', high: 'High' } as const;
 const dateFormatter = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
 const fullDateFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });

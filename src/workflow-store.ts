@@ -150,6 +150,7 @@ export class WorkflowStore {
       if (work.requirementId !== null && this.requirement(work.requirementId)?.status !== 'draft' && !this.decomposing) throw new ConflictError('Requirement membership is frozen after execution starts.');
     }
     if (issueId !== null && this.issues.list().some(issue => issue.work?.dependsOn.includes(issueId) && issue.work.repoId !== work.repoId)) throw new ValidationError('Cannot move an issue away from its dependents repository.');
+    if (issueId !== null && this.issues.list().some(issue => issue.closure?.supersededBy === issueId && issue.work?.repoId !== work.repoId)) throw new ValidationError('Cannot move a replacement issue away from its closed issue repository.');
     const visit = (id: number, seen = new Set<number>()) => {
       if (id === issueId) throw new ValidationError('Issue dependencies must not contain a cycle.');
       if (seen.has(id)) return;
@@ -169,6 +170,7 @@ export class WorkflowStore {
     });
   }
   assertEditable(issueId: number): void {
+    if (this.issues.get(issueId)?.status === 'closed') throw new ConflictError('Closed issues are immutable. Create a follow-up issue.');
     const requirementId = this.context(issueId)?.requirementId;
     if (requirementId && this.submissionForRequirement(requirementId)) throw new ConflictError('Submitted plan issues are immutable. Submit a new plan for revised work.');
     if (this.jobs().some(job => job.issueId === issueId && ['queued', 'running'].includes(job.status))) throw new ConflictError('Queued or running issues cannot be edited or deleted.');
@@ -176,13 +178,14 @@ export class WorkflowStore {
   }
   assertDeletable(issueId: number): void {
     this.assertEditable(issueId);
+    if (this.issues.list().some(issue => issue.closure?.supersededBy === issueId)) throw new ConflictError('Replacement issues referenced by closed issues must be retained.');
     const requirementId = this.context(issueId)?.requirementId;
     if (requirementId && this.requirement(requirementId)?.status !== 'draft') throw new ConflictError('Requirement membership is frozen after execution starts.');
     if (this.issues.list().some(issue => issue.work?.dependsOn.includes(issueId)) || this.runs().some(run => run.issueId === issueId)) throw new ConflictError('Issues with dependents or execution history must be retained.');
   }
   jobs(): Job[] { return this.database.prepare(`SELECT ${jobColumns} FROM jobs ORDER BY id`).all() as Job[]; }
-  runs(): WorkRun[] { return this.database.prepare(`SELECT ${runColumns} FROM work_runs ORDER BY started_at DESC`).all() as WorkRun[]; }
-  run(id: string): WorkRun | undefined { return this.database.prepare(`SELECT ${runColumns} FROM work_runs WHERE id = ?`).get(id) as WorkRun | undefined; }
+  runs(): WorkRun[] { return this.database.prepare(`SELECT ${runColumns} FROM work_runs ORDER BY started_at DESC`).all().map(row => ({ ...row }) as WorkRun); }
+  run(id: string): WorkRun | undefined { const row = this.database.prepare(`SELECT ${runColumns} FROM work_runs WHERE id = ?`).get(id); return row ? { ...row } as WorkRun : undefined; }
   private enqueue(kind: Job['kind'], repoId: number, requirementId: number | null, issueId: number | null, payload: unknown): Job {
     if (this.jobs().some(job => job.kind === kind && job.issueId === issueId && job.requirementId === requirementId && ['queued', 'running'].includes(job.status))) throw new ConflictError('This task is already queued or running.');
     const now = new Date().toISOString();
@@ -192,6 +195,7 @@ export class WorkflowStore {
   startIssue(id: number): Job {
     return this.transaction(() => {
       const issue = this.issues.get(id);
+      if (issue?.status === 'closed') throw new ConflictError('Closed issues cannot restart. Create a follow-up issue.');
       if (!issue?.work) throw new ValidationError('Assign a repository and acceptance conditions before starting the issue.');
       if (issue.work.requirementId && this.submissionForRequirement(issue.work.requirementId) && !this.approvedSubmission(issue.work.requirementId)) throw new ConflictError('Submitted issues require independent plan approval before execution.');
       if (this.runs().some(run => run.issueId === id && run.status === 'merged')) throw new ConflictError('This issue has already been merged. Create a follow-up issue.');
@@ -204,6 +208,7 @@ export class WorkflowStore {
       if (!requirement) throw new ValidationError('Requirement not found.');
       if (requirement.status === 'done' || this.jobs().some(job => job.requirementId === id && ['queued', 'running'].includes(job.status))) throw new ConflictError('Requirement is completed or already active.');
       const issues = this.issues.list().filter(issue => issue.work?.requirementId === id);
+      if (issues.some(issue => issue.status === 'closed')) throw new ConflictError('Requirements with closed issues cannot restart or bypass their original delivery contract.');
       const needsReview = this.submissionForRequirement(id) && !this.approvedSubmission(id);
       const jobs = needsReview ? [this.enqueue('plan_review', requirement.repoId, id, null, requirement)] : issues.length ? issues.filter(issue => !this.runs().some(run => run.issueId === issue.id && run.status === 'merged')).map(issue => this.startIssue(issue.id)) : [this.enqueue('decompose', requirement.repoId, id, null, requirement)];
       if (issues.length && !jobs.length) {
@@ -283,7 +288,7 @@ export class WorkflowStore {
         if (publication && status === 'passed' && (job.kind === 'requirement_verify' || job.kind === 'requirement_publish' && publication.state !== 'merged')) this.enqueue('requirement_publish', job.repoId, job.requirementId, null, this.requirement(job.requirementId));
       }
       if (job.kind === 'plan_review' && status === 'passed') for (const issue of this.issues.list().filter(issue => issue.work?.requirementId === job.requirementId)) this.startIssue(issue.id);
-      if (job.issueId !== null) this.database.prepare('UPDATE issues SET status=?, updated_at=? WHERE id=?').run(status === 'merged' ? 'done' : 'open', now, job.issueId);
+      if (job.issueId !== null) this.database.prepare('UPDATE issues SET status=?, updated_at=? WHERE id=?').run(status === 'merged' ? 'done' : status === 'blocked' ? 'blocked' : 'open', now, job.issueId);
       if (status === 'blocked') {
         let changed = true;
         const blocked = new Set(this.jobs().filter(item => item.status === 'blocked' && item.issueId !== null).map(item => item.issueId!));
@@ -291,6 +296,7 @@ export class WorkflowStore {
           changed = false;
           for (const waiting of this.jobs().filter(item => item.status === 'queued' && item.issueId !== null)) if (this.context(waiting.issueId!)!.dependsOn.some(dependency => blocked.has(dependency) && !this.runs().some(item => item.issueId === dependency && item.status === 'merged'))) {
             this.database.prepare("UPDATE jobs SET status='blocked', reason='A dependency failed.', updated_at=? WHERE id=?").run(now, waiting.id);
+            this.database.prepare("UPDATE issues SET status='blocked', updated_at=? WHERE id=?").run(now, waiting.issueId!);
             blocked.add(waiting.issueId!); changed = true;
           }
         }

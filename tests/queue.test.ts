@@ -69,7 +69,7 @@ test('dependency admission, editing guards, failed cascades, and interrupted rec
     assert.equal(store.work.run(claimed.run.id)?.status, 'blocked');
     assert.equal(store.work.jobs().find(job => job.issueId === second.id)?.status, 'blocked');
     assert.equal(store.work.requirement(requirement.id)?.status, 'blocked');
-    assert.equal(store.get(first.id)?.status, 'open');
+    assert.equal(store.get(first.id)?.status, 'blocked');
   } finally { store.close(); }
 });
 
