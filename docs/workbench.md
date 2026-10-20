@@ -56,6 +56,34 @@ Open represents unstarted work. In progress follows an execution claim. Blocked 
 
 Agents close inactive work through `POST /api/issues/:id/close` with `{ "reason": "Replaced by the verified follow-up.", "supersededBy": 22 }`. The reason is trimmed and must contain 1–2000 characters; `supersededBy` is optional and must identify another existing issue in the same repository without creating a replacement cycle. Unknown fields and client-supplied closure times are rejected. Use the existing pinned `X-Issue-Tracker-Target` identity and loopback/origin safeguards. Success returns the issue with server-owned `closure: { reason, closedAt, supersededBy? }`; missing issues return 404, invalid input 400, and conflicting lifecycle operations 409. Identical repeated close requests return the same record and timestamp.
 
+The status selector defaults to All statuses and offers Open, In progress, Blocked, Closed and Done independently. It combines with repository, title/description search and label filters. Closed diagnostics show the reason as escaped text, the recorded closure time and the replacement issue ID/title from the complete issue collection, even when filters exclude that replacement. Missing replacements say “No replacement issue recorded.” An unavailable title retains the replacement ID and an explicit explanation. Closure context is separate from execution outcomes: original failed runs, selected reports, evidence, current failure reasons and current limitations remain inspectable. The website sends only inspection reads and has no lifecycle or execution controls.
+
+### Pinned agent close procedure
+
+Use the owner launch receipt to obtain the expected instance ID, resolved regular database path and assigned loopback API URL. Do not adopt an identity discovered from an unexpected server. Read `/api/health` and compare its `instanceId` and `databasePath` with that receipt before each mutation. Encode the expected pair as `encodeURIComponent(JSON.stringify([instanceId, databasePath]))` for `X-Issue-Tracker-Target`. A stale, malformed or mismatched supplied pin returns 409 before any write; an untrusted host or origin returns 403. Keep the pin on the close request even after a successful health check so a replaced server cannot receive the operation.
+
+Read `/api/issues/:id`, the replacement's detail when present, and `/api/workbench` before closing. Confirm the intended repository and immutable requirement, inactive original work and the authorized replacement. Send only the reason and optional numeric `supersededBy`; never send a timestamp or change the ordinary status field to Closed. For example, after validating the owner identity and setting `PINNED_API_URL` and `PINNED_TARGET` from that receipt:
+
+```sh
+curl --fail-with-body --silent --show-error \
+  -X POST "$PINNED_API_URL/api/issues/20/close" \
+  -H "X-Issue-Tracker-Target: $PINNED_TARGET" \
+  -H 'Content-Type: application/json' \
+  --data-binary @close-request.json
+```
+
+The reviewed `close-request.json` must contain the durable owner reason and `"supersededBy": 22` for the authorized issue20 operation. Store the exact request and HTTP response/status with the evidence. A successful response is 200 with `{ "issue": ... }`. Repeating the same trimmed reason and replacement returns the original closure and timestamp; changing either after closure conflicts with 409. After a lost response, inspect the pinned target and original issue before replaying the identical request. Do not retry by starting execution, replaying a submission or editing the immutable plan. Read the issue and workbench again after success and inspect its retained diagnostics.
+
+### Post-publication issue20 owner acceptance
+
+This operation belongs to the conversation owner after confirmed requirement9 GitHub PR merge, exact-head CI and safe activation of the verified checkout. Child integration and isolated fixture tests do not authorize the implementation worker to operate on issue20 and cannot prove this acceptance. Retain the owner receipt under `.data/evidence/issue-lifecycle-20261020/` with:
+
+1. The publication/CI identities, activated source commit, settled prior queue ownership and expected API instance/database identity. Keep the queue idle while capturing and comparing evidence so unrelated work cannot change the snapshots.
+2. Before snapshots of issue20, issue22, requirement4, the original immutable submission/plan and hash, all original jobs/runs and lineage, consumed attempts and elapsed budgets. Preserve the original report/log/evidence files and their byte hashes, including delivery budget fields and report bytes rather than regenerated renderings.
+3. The reviewed durable reason, exact pinned request, response/status and any identical replay. The request closes issue20 with `supersededBy: 22`; it does not start or retry any work.
+4. After readback proving issue20 is Closed with that reason, server timestamp and replacement22; issue22 remains Done; requirement4 remains Blocked. Compare every retained plan/job/run/report/log/evidence/budget snapshot and require equality. Only issue20's lifecycle status, closure metadata and update timestamp should change.
+5. Browser inspection of issue20's closure context and its original failed history, reports and logs, with the original requirement still unverified. Record exact evidence paths and any mismatch; do not claim owner acceptance until the comparisons pass.
+
 Closing a submitted issue is a dedicated lifecycle operation, not a plan edit. Original goals, descriptions, acceptance, dependencies, submission hashes, failed jobs/runs/reports and budgets remain intact. Queued/running or merged work cannot close. Closed issues cannot restart, edit, move or delete; their referenced replacements cannot be removed or moved to another repository. A closed predecessor cannot satisfy dependencies through its replacement, and a requirement containing a closed child cannot restart or become Done through that closure. Follow-up work uses its own immutable plan. The browser remains an inspection surface with no closure button.
 
 The version-seven migration preserves existing identities, assignments, foreign keys, history, publication metadata and the issue ID high-water mark. A legacy inactive issue with a latest blocked job and no running or merged run becomes Blocked without rewriting its original evidence. Existing manual Open/In progress/Done states and active work remain unchanged. The approved one-assertion activation is recorded in [the lifecycle contract](issue-lifecycle-contract.md).
