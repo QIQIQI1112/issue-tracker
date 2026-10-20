@@ -30,6 +30,22 @@ Owner receipts bind review purpose, source hash, canonical plan identity, accept
 
 Initial acceptance runs controller-owned Playwright proofs for every planned browser case in a new or changed spec file, including appended specs. Unchanged baseline browser files retain their existing coverage and still run in full verification. A named assertion failure establishes missing behavior; an exact single-case passing report records already-satisfied behavior for independent review. Import errors, setup errors, missing cases, skips, retries and timeouts cannot authorize freezing. Assertion detection reads the diagnostic before the source excerpt, including custom assertion explanations, rather than matching an `expect` call in an unrelated setup error's code frame. Invalid browser evidence returns to the tests role within the existing cumulative acceptance budget; process ownership errors and cancellation still block. Missing browser behavior prevents skipping implementation even when all Node proofs pass.
 
+### Improve drafts inside the existing tests phase
+
+The `tests` and `regression-tests` prompts include a short self-check based on observed acceptance rework. It adds no role, phase, gate or budget. Apply only relevant checks to the planned behavior:
+
+| Risk in a draft | Stronger behavior proof |
+| --- | --- |
+| Clicking a missing control ends in an action timeout. | Assert its presence with a bounded named `expect` before acting. |
+| Only matching data is present, or state is dismissed before testing cleanup. | Include confounding and excluded records; change scope while active details and pending state still exist, then assert cleanup. |
+| Raw fixture words can satisfy an assertion about a generated explanation. | Assert the application-generated observation separately from displayed source text. |
+| A rejection diagnostic alone appears to prove a boundary. | Assert that the rejected payload is not admitted and that the exact valid limit is accepted. |
+| Programmatic focus appears to prove keyboard access. | Traverse with normal Tab and Shift+Tab and assert the reachable control. |
+
+Baseline and accepted bytes remain protected. Before approval, the initial tests role may revise only its current unapproved appended regions or new scoped files; the regression-tests role may revise only its own new scoped files. Keep planned and reported check identities aligned rather than accumulating unmapped replacement scenarios after feedback. Record a known sandbox startup `EPERM` once, stop repeated server/browser launches, and leave owner red proofs to the controller.
+
+Adapter regressions verify that both roles actually receive this guidance with their existing response schemas and permissions. They prove prompt delivery, not guaranteed model output quality. Controller-owned red proofs, independent acceptance review, frozen checks, complete verification and final source review remain authoritative. Observe future draft rejection and repair evidence before claiming reduced rework.
+
 Acceptance and final code reviews may correct a malformed structured response once within the same phase. The correction shares the original phase deadline, attempt number, source, plan and evidence. Both responses count toward active execution time; no planning or tests generation restarts and no budget resets. The controller retains the original response and validation error in `phase-*/contract-error.json`. A valid rejection follows the existing repair path. Failed or timed-out processes are not format errors. Read-only source checks run after every response or invocation failure, before format correction or approval. An approved review requires an empty blocking-findings array; the controller never deletes findings to manufacture approval.
 
 ## Retry without losing accepted work
