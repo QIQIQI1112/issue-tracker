@@ -14,12 +14,7 @@ test('browser mutation refuses an API replaced after loading', async ({ page, wo
   const { OWNED_SWAP_READY: ready, OWNED_SWAP_DONE: replaced, OWNED_SWAP_OBSERVED: observed, OWNED_SWAP_RESTORED: restored, OWNED_MUTATION: method } = process.env;
   if (!ready || !replaced || !observed || !restored || !method) throw new Error('Missing owned browser-swap coordination.');
   await page.goto(appUrl(info));
-  const row = page.getByTestId('issue-1');
-  await expect(row).toBeVisible();
-  if (method === 'POST') await page.getByRole('button', { name: 'New issue', exact: true }).click();
-  else if (method === 'DELETE') await row.getByRole('button', { name: /^Delete / }).click();
-  const dialog = page.getByRole('dialog');
-  if (method === 'POST') await dialog.getByLabel('Title', { exact: true }).fill(`${workspace.prefix} Wrong-target draft`);
+  await expect(page.getByTestId('issue-1')).toBeVisible();
   let sentIdentity: string | undefined;
   await page.route('**/api/issues{,/**}', async route => {
     if (route.request().method() === method) {
@@ -30,16 +25,18 @@ test('browser mutation refuses an API replaced after loading', async ({ page, wo
     await route.continue();
   });
   const responsePromise = page.waitForResponse(response => response.request().method() === method && response.url().includes('/api/issues'));
-  const patch = method === 'PATCH' ? page.evaluate(async title => {
-    const response = await fetch('/api/issues/1', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }) });
-    return { status: response.status, body: await response.json() };
-  }, `${workspace.prefix} Wrong-target draft`) : null;
-  if (method !== 'PATCH') await dialog.getByRole('button', { name: method === 'POST' ? 'Create issue' : 'Delete issue', exact: true }).click();
+  const mutation = page.evaluate(async ({ method, title }) => {
+    const path = '/src/ui/client.ts';
+    const { apiRequest } = await import(path);
+    try {
+      await apiRequest(method === 'POST' ? '/api/issues' : '/api/issues/1', { method, ...(method === 'DELETE' ? {} : { body: JSON.stringify({ title }) }) });
+      return { error: null };
+    } catch (error) { return { error: error instanceof Error ? error.message : String(error) }; }
+  }, { method, title: `${workspace.prefix} Wrong-target draft` });
   const response = await responsePromise;
   writeFileSync(observed, JSON.stringify({ status: response.status(), sentIdentity, body: response.status() === 204 ? '' : await response.text() }));
   await waitFor(restored);
   expect(response.status()).toBe(409);
   expect(sentIdentity).toBe(encodeURIComponent(JSON.stringify([info.project.metadata.instanceId, info.project.metadata.databasePath])));
-  if (patch) expect(await patch).toEqual({ status: 409, body: { error: 'Owned API target identity mismatch. Refusing mutation.' } });
-  else await expect(dialog.getByRole('alert')).toHaveText('Owned API target identity mismatch. Refusing mutation.');
+  expect(await mutation).toEqual({ error: 'Owned API target identity mismatch. Refusing mutation.' });
 });

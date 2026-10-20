@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Issue } from '../domain.ts';
-import type { Delivery, Job, Workbench, WorkRun } from '../workflow.ts';
+import type { Delivery, Workbench, WorkRun } from '../workflow.ts';
 import { apiRequest, errorMessage } from './client.ts';
 import { SelectedReport } from './SelectedReport.tsx';
 import { statusLabels } from './IssueRow.tsx';
-import { activeJob, mergedIssue, requirementProgress, waitingDependencies } from './workbench-state.ts';
+import { activeJob, requirementProgress, waitingDependencies } from './workbench-state.ts';
 
 function CurrentLimitations({ runId }: { runId: string }) {
   const [delivery, setDelivery] = useState<Delivery | null>(null);
@@ -28,16 +28,12 @@ function CurrentLimitations({ runId }: { runId: string }) {
   return <>{delivery?.limitations.map((text, index) => <p className="execution-warning" key={index}>{text}</p>)}{error && <p>Current delivery limitations unavailable: {error}. Retrying automatically.</p>}</>;
 }
 
-export function IssueDetails({ id, workbench, issues = [], metadataError = '', onStarted }: { id: number; workbench: Workbench; issues?: Issue[]; metadataError?: string; onStarted: () => void }) {
+export function IssueDetails({ id, workbench, issues = [], metadataError = '' }: { id: number; workbench: Workbench; issues?: Issue[]; metadataError?: string }) {
   const [issue, setIssue] = useState<Issue | null>(null);
   const [runs, setRuns] = useState<WorkRun[]>([]);
   const [selected, setSelected] = useState('');
   const [error, setError] = useState('');
-  const [startError, setStartError] = useState('');
   const [retry, setRetry] = useState(0);
-  const [pending, setPending] = useState(false);
-  const [admittedJobId, setAdmittedJobId] = useState<number | null>(null);
-  const lock = useRef(false);
   useEffect(() => {
     const controller = new AbortController();
     let fetching = false;
@@ -66,20 +62,9 @@ export function IssueDetails({ id, workbench, issues = [], metadataError = '', o
   const latestRun = issueRuns[0];
   const currentRun = latestJob ? issueRuns.find(run => run.jobId === latestJob.id && run.id === latestJob.runId) : latestRun;
   const active = jobs.some(activeJob) || currentRun?.status === 'running';
-  const admitted = admittedJobId !== null && !jobs.some(job => job.id === admittedJobId && !activeJob(job));
-  const merged = !!issue && mergedIssue({ ...workbench, runs: issueRuns }, issue);
   const waiting = latestJob && issue ? waitingDependencies(workbench, [...issues.filter(item => item.id !== id), issue], latestJob) : [];
   const progress = requirement ? requirementProgress(workbench, [...issues.filter(item => item.id !== id), ...(issue ? [issue] : [])], requirement) : null;
   const currentReason = latestJob?.reason || currentRun?.reason;
-  async function start() {
-    if (lock.current || active || merged || admitted) return;
-    lock.current = true; setPending(true); setStartError('');
-    try {
-      const result = await apiRequest<{ job: Job }>('/api/issues/' + id + '/start', { method: 'POST', body: '{}' });
-      setAdmittedJobId(result.job.id); onStarted();
-    } catch (error) { setStartError(errorMessage(error)); }
-    finally { lock.current = false; setPending(false); }
-  }
   const stage = (run: WorkRun) => {
     const kind = workbench.jobs.find(job => job.id === run.jobId && job.runId === run.id && owned(job))?.kind;
     return kind === 'decompose' ? 'Decomposition' : kind === 'plan_review' ? 'Plan review' : kind === 'requirement_publish' ? 'GitHub publication' : kind === 'requirement_verify' ? 'Whole-goal verification' : 'Issue execution';
@@ -120,18 +105,14 @@ export function IssueDetails({ id, workbench, issues = [], metadataError = '', o
         <p>{progress?.outcome}</p><p>{progress?.merged}/{progress?.children.length} child issues have recorded merges. Issue status alone does not establish delivery.</p>
         {workbench.jobs.filter(job => owned(job) && job.issueId === null && job.kind === 'requirement_verify').sort((a, b) => b.id - a.id).slice(0, 1).map(job => <p key={job.id}>Latest whole-goal job #{job.id} · {job.status}{job.reason ? ' · ' + job.reason : ''}</p>)}
       </section>}
-      <section aria-label="Current execution" className="diagnostic-section current-execution">
-        <h3>Current execution</h3>
-        <p>{latestJob ? 'Job #' + latestJob.id + ' · ' + latestJob.status : currentRun ? 'Latest execution · ' + currentRun.status : 'No execution admitted.'}</p>
-        {currentRun && <p>Run <code>{currentRun.id}</code> · {currentRun.status}</p>}
-        {currentReason && <p className="execution-warning">{currentReason}</p>}
-        {waiting.length > 0 && <p>Waiting for dependencies with recorded merges: {waiting.map(id => '#' + id).join(', ')}.</p>}
-        {active && <p>{latestJob?.status === 'queued' ? latestJob.kind === 'maintenance' ? 'Awaiting owner maintenance verification.' : 'Queued for execution.' : 'Execution is in progress.'}</p>}
-        {currentRun && <CurrentLimitations key={currentRun.id} runId={currentRun.id} />}
-        {startError && <p role="alert" className="form-error">{startError}</p>}
-        {issue.work ? <button className="button primary" type="button" disabled={pending || active || admitted || merged || !!metadataError} onClick={() => { void start(); }}>{merged ? 'Automatically merged' : active || admitted ? 'Queued or running' : pending ? 'Starting…' : latestJob?.status === 'blocked' ? 'Retry issue' : 'Start issue'}</button> : <p>Execution requires a repository assignment through the API.</p>}
-      </section>
-      <h3>Execution history</h3>{!issueRuns.length && <p>No executions yet.</p>}
+      <h3>Execution history</h3>
+      <p>{latestJob ? 'Job #' + latestJob.id + ' · ' + latestJob.status : currentRun ? 'Latest execution · ' + currentRun.status : 'No execution admitted.'}</p>
+      {currentRun && <p>Run <code>{currentRun.id}</code> · {currentRun.status}</p>}
+      {currentReason && <p className="execution-warning">{currentReason}</p>}
+      {waiting.length > 0 && <p>Waiting for dependencies with recorded merges: {waiting.map(id => '#' + id).join(', ')}.</p>}
+      {active && <p>{latestJob?.status === 'queued' ? latestJob.kind === 'maintenance' ? 'Awaiting owner maintenance verification.' : 'Queued for execution.' : 'Execution is in progress.'}</p>}
+      {currentRun && <CurrentLimitations key={currentRun.id} runId={currentRun.id} />}
+      {!issueRuns.length && <p>No executions yet.</p>}
       {allRuns.length > 0 && <><label className="diagnostic-selector">Run<select aria-label="Select execution run" value={runId} onChange={event => setSelected(event.target.value)} onKeyDown={event => {
         if (event.key !== 'Home' && event.key !== 'End') return;
         const options = event.currentTarget.options;

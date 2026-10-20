@@ -12,8 +12,8 @@ test('critical CI policy validates its fixed selection without replacing full ac
     assert.ok(contract.nodeFiles.includes(`tests/${file}.test.ts`), `Missing critical coverage: ${file}`);
   }
   const browser = [
-    { file: 'ui.spec.ts', title: 'create, reload, inspect API updates and confirmed deletion persist' },
-    { file: 'ui.spec.ts', title: 'whitespace-only titles are rejected accessibly without a mutation' },
+    { file: 'ui.spec.ts', title: 'API-created issues, API updates and deletions remain visible across reloads' },
+    { file: 'ui.spec.ts', title: 'invalid API titles are rejected without changing the inspected collection' },
     { file: 'persistence.spec.ts', title: 'an API update remains inspectable after a full server process restart' },
     { file: 'workbench.spec.ts', title: 'a Codex conversation plan submitted through the CLI appears with provenance and completes in the existing queue' },
     { file: 'github-publication.spec.ts', title: 'issue diagnostics expose GitHub PR CI and final merge without treating local acceptance as delivery' },

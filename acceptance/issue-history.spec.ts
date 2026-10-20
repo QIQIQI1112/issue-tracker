@@ -333,7 +333,7 @@ test('issue workspace removes Workbench administration and retains combined repo
     await page.getByRole('searchbox', { name: 'Search issues' }).fill('absent-query');
     await page.getByRole('button', { name: 'Reset filters', exact: true }).click();
     await expect(page.getByTestId(`issue-${excluded.id}`)).toBeVisible();
-    await expect(page.getByRole('button', { name: 'New issue', exact: true })).toBeEnabled();
+    await expect(page.getByLabel('Search issues', { exact: true })).toBeEnabled();
   } finally { other.close(); f.close(); }
 });
 
@@ -414,13 +414,13 @@ test('diagnostics surface current failures without reports and distinguish recov
     const successful = f.record('issue', 'completed', recovered.id, null, true);
     enrichDiagnosticRun(successful, {}, { limitations: ['Delivery retained an external validation limitation.'] });
     let dialog = await openDiagnostics(page, info, blocked);
-    await expect(dialog.getByRole('region', { name: 'Current execution', exact: true }), 'Current run reasons do not require delivery.json.').toContainText('Current controller admission failure.');
+    await expect(dialog.locator('.execution-warning:not(.selected-report .execution-warning)'), 'Current run reasons do not require delivery.json.').toContainText('Current controller admission failure.');
     await expect(dialog.getByLabel('Selected report')).toContainText('Delivery report unavailable');
     await expect(dialog).not.toContainText(/independent.*approved|whole goal verified/i);
     await expect(dialog.getByLabel('Select execution run').locator('option')).toContainText(failed.id);
     await page.keyboard.press('Escape');
     dialog = await openDiagnostics(page, info, recovered);
-    const current = dialog.getByRole('region', { name: 'Current execution', exact: true });
+    const current = dialog.locator('.execution-warning:not(.selected-report .execution-warning)');
     await expect(current).not.toContainText('Historical rejected source.');
     await expect(current, 'Current delivery limitations remain prominent.').toContainText('Delivery retained an external validation limitation.');
     const selector = dialog.getByLabel('Select execution run', { exact: true });
@@ -447,7 +447,7 @@ test('diagnostic request retry and issue changes clear stale content and errors'
     const dialog = page.getByRole('dialog', { name: `Issue #${first.id}`, exact: true });
     await expect(dialog.getByRole('alert')).toContainText('Issue diagnostic request temporarily failed.');
     await page.unroute(`**/api/issues/${first.id}`);
-    await dialog.getByRole('button', { name: /Retry issue|Retry details/i }).click();
+    await dialog.getByRole('button', { name: 'Retry details', exact: true }).click();
     await expect(dialog).toContainText(first.description);
     await expect(dialog.getByRole('alert')).toHaveCount(0);
     await page.route(`**/api/runs/${run.id}`, route => route.fulfill({ status: 503, json: { error: 'Selected report failed once.' } }));
@@ -467,7 +467,7 @@ test('diagnostic request retry and issue changes clear stale content and errors'
   } finally { f.close(); }
 });
 
-test('diagnostic execution actions preserve admission and prevent duplicate starts', async ({ page, request }, info) => {
+test('diagnostic inspection reflects API admission and duplicate starts remain rejected', async ({ page, request }, info) => {
   const f = fixture(info, 'Contextual execution');
   try {
     const idle = f.child('Inactive contextual subject');
@@ -480,25 +480,17 @@ test('diagnostic execution actions preserve admission and prevent duplicate star
     f.record('issue', 'running', running.id);
     const merged = f.child('Merged contextual subject', [], 'done');
     f.record('issue', 'completed', merged.id, null, true);
-    let dialog = await openDiagnostics(page, info, retry);
-    const retryAction = dialog.getByRole('button', { name: /^(Start issue|Retry issue)$/i });
-    await expect(retryAction, 'Inactive blocked work retains guarded retry.').toBeEnabled();
-    await retryAction.click();
-    await expect(dialog.getByRole('button', { name: /Queued or running/i })).toBeDisabled();
-    await page.keyboard.press('Escape');
-    dialog = await openDiagnostics(page, info, idle);
-    const start = dialog.getByRole('button', { name: 'Start issue', exact: true });
-    await expect(start).toBeEnabled();
-    await start.click();
-    await expect(dialog.getByRole('button', { name: /Queued or running/i })).toBeDisabled();
+    for (const issue of [retry, idle]) expect((await request.post(`${appUrl(info)}/api/issues/${issue.id}/start`, { data: {} })).status()).toBe(202);
+    let dialog = await openDiagnostics(page, info, idle);
+    await expect(dialog.getByText('No executions yet.', { exact: true })).toBeVisible();
     const work = await (await request.get(`${appUrl(info)}/api/workbench`)).json();
     expect(work.jobs.filter((job: Job) => job.issueId === idle.id && ['queued', 'running'].includes(job.status))).toHaveLength(1);
     for (const issue of [idle, retry, waiting, running, merged]) {
       await page.keyboard.press('Escape');
       dialog = await openDiagnostics(page, info, issue);
-      await expect(dialog.getByRole('button', { name: /Queued or running|Automatically merged/i })).toBeDisabled();
+      await expect(dialog.getByRole('heading', { name: issue.title, exact: true })).toBeVisible();
       expect((await request.post(`${appUrl(info)}/api/issues/${issue.id}/start`, { data: {} })).status()).toBe(409);
-      if (issue.id === waiting.id) await expect(dialog.getByRole('region', { name: 'Current execution' })).toContainText(new RegExp(`(waiting|dependenc).*#${prerequisite.id}`, 'i'));
+      if (issue.id === waiting.id) await expect(dialog).toContainText(new RegExp(`(waiting|dependenc).*#${prerequisite.id}`, 'i'));
       if (issue.id === running.id) await expect(dialog).toContainText('Execution is in progress.');
     }
   } finally { f.close(); }

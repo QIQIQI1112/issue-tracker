@@ -28,7 +28,7 @@ test('issue workspace omits Workbench navigation and manual administration', () 
   const html = renderToStaticMarkup(createElement(App));
   assert.doesNotMatch(html, /Workbench|Register repository|Create requirement/, 'Issue inspection replaces the Workbench administration view.');
   for (const name of ['Search issues', 'Filter by repository', 'Filter by status', 'Filter by label', 'Sort issues']) assert.ok(html.includes(`aria-label="${name}"`), `Retain ${name}.`);
-  assert.match(html, /New issue/, 'Issue creation remains available.');
+  assert.match(html, /<h1>Issues<\/h1>/, 'The inspection workspace retains its main heading.');
 });
 
 test('delivery audits distinguish approved rejected and missing independent review', () => {
