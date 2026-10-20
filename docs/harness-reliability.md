@@ -1,5 +1,7 @@
 # Change ownership, review, and recovery
 
+Requirement planning and review retain each invocation's complete evidence string as `evidence.txt`, including response repair attempts. Prompts identify its absolute path, UTF-8 byte count and SHA-256. Evidence up to 64 KiB also remains inline for small-context compatibility; larger manifests are read from the retained file to keep CLI input bounded. Reviewers inspect complete retained evidence, actual source and underlying machine reports rather than approve from summaries. No evidence is truncated, and review schemas, sandbox, deadlines, retry counts and approval gates remain unchanged. Failed invocations retain their evidence for diagnosis.
+
 ## Plan changes by responsibility
 
 Keep new behavior checks in their feature issue. The tests worker adds the checks; an independent acceptance reviewer evaluates their coverage before implementation. A new test is not automatically a new issue.
