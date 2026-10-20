@@ -4,6 +4,7 @@ import { parseSubmission } from '../src/submission.ts';
 import { targetHeader, targetIdentity } from '../src/target-safety.ts';
 import type { SubmissionReceipt } from '../src/workflow.ts';
 import { writeJson } from '../factory/evidence.ts';
+import { resolveDatabasePath } from '../src/instance.ts';
 
 async function main() {
   const args = process.argv.slice(2);
@@ -31,7 +32,7 @@ async function main() {
   const url = new URL(values.get('--url') ?? `http://127.0.0.1:${process.env.API_PORT ?? 4310}`);
   if (url.protocol !== 'http:' || !['127.0.0.1', 'localhost'].includes(url.hostname) || url.username || url.password || url.pathname !== '/' || url.search || url.hash) throw new Error('Use a loopback HTTP origin without credentials, path, query, or fragment.');
   const database = values.get('--database') ?? process.env.DB_PATH ?? '.data/issues.sqlite';
-  const expectedDatabase = database === ':memory:' ? database : resolve(database);
+  const expectedDatabase = database === ':memory:' ? database : resolveDatabasePath(database);
   const request = async (path: string, options: RequestInit = {}) => {
     const response = await fetch(url.origin + path, { ...options, signal: AbortSignal.timeout(10000) });
     const body = await response.json();

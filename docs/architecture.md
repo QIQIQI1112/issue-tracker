@@ -16,6 +16,8 @@ Schema version 3 adds repositories with local Git roots and target branches, bus
 
 Version 4 adds immutable conversation plan submissions with canonical hashes, source summaries, and issue-key mappings. `src/submission.ts` owns the pure shared graph/plan contract. Codex submits through `scripts/submit-plan.ts`; the controller independently reviews the plan before issue execution. See [conversation intake](conversation-intake.md).
 
+Version 5 adds maintenance change classifications. Version 6 adds optional GitHub enrollment, immutable requirement publication identities and deferred publication scheduling. `DATABASE_SCHEMA_VERSION` in `src/storage.ts` declares the current supported version; migrations preserve existing history.
+
 The server validates every write. SQL statements use placeholders for values. Database constraints repeat critical domain invariants. The UI handles filtering, text search, and sorting on the small list returned by the API.
 
 ## HTTP contract
@@ -30,6 +32,7 @@ The server validates every write. SQL statements use placeholders for values. Da
 | `GET /api/issues/:id` | Issue ownership and execution history. |
 | `GET /api/workbench` | Repository, requirement, job, and run indexes. |
 | `GET /api/repos`, `POST /api/repos` | List and register local repositories. |
+| `GET /api/repos/:id/harness` | Inspect bounded committed configuration at the enrolled target; does not execute checks. |
 | `GET /api/requirements`, `POST /api/requirements` | List and create business requirements. |
 | `POST /api/requirements/:id/start` | Queue decomposition or retry unfinished issues. |
 | `POST /api/plan-submissions` | Atomically create a submitted plan and independent-review job; replay returns the existing IDs. |
@@ -44,15 +47,19 @@ Automated callers may condition API mutations with `X-Issue-Tracker-Target: enco
 
 ## Persistence and ownership
 
-`IssueStore` applies ordered migrations inside an initialization transaction using `PRAGMA user_version`. Version 2 adds labels; version 3 adds workbench tables; version 4 adds submissions without rewriting existing history. Unknown newer versions are rejected without resetting them. SQLite is a file under `.data/` by default. API and queue have distinct exclusive lock files, and reset checks both. WAL and atomic claims support their concurrent connections. The test suite checks reopening, upgrade preservation, and real process restarts.
+`IssueStore` applies ordered migrations inside an initialization transaction using `PRAGMA user_version`. Unknown newer versions are rejected without resetting them. SQLite is a file under `.data/` by default. API and queue have distinct exclusive lock files, and reset checks both. WAL and atomic claims support their concurrent connections. The test suite checks reopening, upgrade preservation, and real process restarts.
+
+`resolveDatabasePath` in `src/instance.ts` resolves supported paths and rejects database-file symlinks, including dangling links, and files with multiple hard links before storage, API ownership, queue leasing or reset. Doctor and conversation intake apply the same policy. Existing directory symlinks and new nested database paths remain supported; path identity retains its existing resolved spelling. Do not add file aliases to an active database or replace its path while an owner is running.
 
 ## Engineering control plane
 
 `factory/daemon.ts` owns one durable serial queue. `factory/planner.ts` uses fresh read-only sessions for decomposition and requirement review. `factory/controller.ts` owns issue phases and protected admission checks; `factory/integration.ts` verifies combined changes before advancing a target. `factory/delivery.ts` generates standard reports. `factory/recovery.ts` reconciles durable merge receipts after interruption. Execution records live in `.data/evidence/`, outside candidate checkouts; the API exposes their read-only reports and hashed files. Application code does not import the factory. Read [the controller boundary](../factory/README.md).
 
+The current [review and recovery protocol](harness-reliability.md) runs owner red proofs before independent acceptance review and freezing. An ordinary integrated candidate receives full candidate verification, full integrated verification and one final independent code review of the integrated source. Whole-goal verification and review remain required. Explicit GitHub enrollment additionally requires exact-head CI, confirmed PR merge and clean local synchronization before requirement completion; see [GitHub delivery](github-delivery.md).
+
 ## Explicit omissions
 
-No GitHub synchronization, remote publishing, authentication, cloud deployment, parallel scheduling, or automatic stale-lock removal. Enrolled local targets can merge automatically after machine verification and independent agent review. Candidate source, application metadata, and execution evidence have separate owners.
+No authentication, hosted multi-user authorization, cloud deployment, parallel development scheduling or hostile-worker isolation. API and integration locks require owner inspection after a crash. Queue execution leases can be reclaimed only under the serialized admission guard when the recorded PID is absent; a stale admission guard still requires explicit inspection. GitHub publication is available only for explicitly enrolled new requirements. Local-only requirements and standalone maintenance retain their enrolled local target.
 
 ## Issue inspection
 
@@ -62,7 +69,7 @@ The issue title and LOC identifier open one read-only diagnostics dialog. The br
 
 On phones, repository navigation has a bounded height and scrolls independently. Growing the enrolled registry therefore keeps the issue search and rows near the top of the page; every repository and its subviews remain reachable by scrolling or keyboard focus.
 
-Workspace views starts with All repositories, including unassigned issues. Its Repositories group lists enrolled repositories and marks exactly one primary selection with `aria-pressed`. A selected repository exposes Issues and Repo harness, with the active subview marked by `aria-current`. The breadcrumb identifies the repository. Repository changes open Issues and clear search, status, label, sort, details and pending harness reads. Subview switches retain issue filters. Reset filters returns to All repositories. Totals and label options use the repository scope before applying the remaining filters; matching counts use all filters.
+Workspace views starts with All repositories, including unassigned issues. Its Repositories group lists enrolled repositories and marks exactly one primary selection with `aria-pressed`. A selected repository exposes Issues and Repo harness, with the active subview marked by `aria-current`. The breadcrumb identifies the repository. Switching enrolled repositories retains the current subview and clears search, status, label, sort, details, pending harness reads and disclosure state. All repositories and Reset filters return to Issues. Subview switches retain issue filters. Totals and label options use the repository scope before applying the remaining filters; matching counts use all filters.
 
 `GET /api/repos/:id/harness` is an application-owned read operation. `src/harness.ts` owns response types and pure configuration parsing; `src/harness-reader.ts` reads committed sources without importing the factory. Invalid positive-safe-integer IDs and any query overrides receive 400; unknown enrolled IDs receive 404. An unavailable repository or target branch returns a sanitized 200 response with `status: unavailable`, repository identity and no source contents. Available responses identify the repository, enrolled target branch, one immutable resolved commit and every file's status, commit, blob identity and byte size when available. Responses are not cached.
 

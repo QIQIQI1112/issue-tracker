@@ -54,6 +54,8 @@ Checkpoints live in the run evidence directory, outside disposable worktrees. Th
 
 The controller can reuse accepted planning/test evidence only when the goal, criteria, scope, budget, controls, original tests, dependency lock, runtime, active harness, and proof hashes match. It records every invalidation reason. Unapproved drafts remain evidence and cannot authorize implementation. Every restored draft gets fresh full verification and code review. Verified merge recovery runs before replay so a crash after integration cannot apply the change twice.
 
+Delivery-only baseline reconstruction uses the recorded immutable `baselineTree`, which may contain original uncommitted modifications and new files absent from `baseCommit`. Restore that tree before applying `checkpoint.patch`, then validate the exact source and frozen test inventory. Keep the original baseline as the final patch/change-attribution boundary. Set `resume.reused` only after reconstruction and enforcement succeed; a failed restoration remains false and blocks without consuming a new implementation attempt. Clean-target queue admission, cumulative budgets and fresh verification/review remain unchanged.
+
 Accepted checkpoints retain initial browser logs, machine reports and `browserRedChecks`, bound to the independent acceptance receipt and approved spec hashes. Missing, emptied, altered or orphaned browser proof metadata rejects reuse. A control revision invalidates older checkpoints through the existing environment identity; absent browser metadata is never treated as approval. Successful restoration copies the original browser proof files into the new run without regenerating planning or accepted checks; fresh complete verification and final review remain mandatory.
 
 Acceptance attempts, implementation attempts, and active execution time are cumulative per issue. Waiting between completed runs is not charged. A hard crash conservatively spends its active phase reservation. Retry cannot silently increase budgets or alter criteria. Exhaustion requires a separate owner decision.
@@ -63,6 +65,8 @@ Owned subprocess receipts include all discovered process groups and their cleanu
 ## Read a delivery
 
 The issue report presents the goal, result, changed files, decisions, named behavior checks, verification counts, review outcome, merge commit, execution timeline, cumulative budget, predecessor, and reuse decision. Legacy reports remain readable without the new optional fields.
+
+The controller's final Result and current limitations reflect its outcome and actual failure reason. Optional `workerObservations` preserves each implementation summary in an explicitly historical UI/Markdown section, alongside the original worker JSON. Sandbox-only or pending worker observations are not current blockers after owner verification passes. If later queue admission or recovery changes a proposal to Blocked, its Result must also show the owner blocker. Existing historical evidence is retained as recorded rather than rewritten.
 
 For workflow improvement, retain `state.json`, `task.json`, `plan.json`, review receipts, checkpoint manifests/patches, machine reports, and phase logs. The evidence manifest provides file sizes and hashes. Successful browser tests do not retain full traces; failed tests keep their debugging artifacts. Read the compact delivery first and open detailed evidence only for a concrete question.
 

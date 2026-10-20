@@ -1,14 +1,13 @@
 import { unlinkSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { parseCreateIssue } from '../src/domain.ts';
-import { acquireDatabaseLock } from '../src/instance.ts';
+import { acquireDatabaseLock, resolveDatabasePath } from '../src/instance.ts';
 import { IssueStore } from '../src/storage.ts';
 
 if (!process.argv.includes('--confirm')) {
   console.error('Reset replaces repositories, requirements, issue records, and queue history with disposable demo data. Stop the app, then run npm run reset -- --confirm.');
   process.exit(1);
 }
-const path = resolve(process.env.DB_PATH ?? '.data/issues.sqlite');
+const path = resolveDatabasePath(process.env.DB_PATH ?? '.data/issues.sqlite');
 const release = acquireDatabaseLock(path, 'reset');
 let releaseQueue: (() => void) | undefined;
 try {

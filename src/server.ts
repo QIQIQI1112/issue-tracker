@@ -3,14 +3,14 @@ import { existsSync, readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import { createApp } from './api.ts';
-import { acquireDatabaseLock } from './instance.ts';
+import { acquireDatabaseLock, resolveDatabasePath } from './instance.ts';
 import { IssueStore } from './storage.ts';
 import { parseRepository } from './repository.ts';
 import { spawnSync } from 'node:child_process';
 
 const port = Number(process.env.API_PORT ?? 4310);
 if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('API_PORT must be between 1 and 65535.');
-const databasePath = resolve(process.env.DB_PATH ?? '.data/issues.sqlite');
+const databasePath = resolveDatabasePath(process.env.DB_PATH ?? '.data/issues.sqlite');
 const instanceId = process.env.INSTANCE_ID ?? randomUUID();
 const version = (JSON.parse(readFileSync('package.json', 'utf8')) as { version: string }).version;
 const release = acquireDatabaseLock(databasePath, instanceId);

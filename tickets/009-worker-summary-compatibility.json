@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "recordType": "owner-maintenance",
+  "id": "worker-summary-compatibility",
+  "issueId": 31,
+  "changeKind": "acceptance_contract",
+  "goal": "Preserve the existing integration worker-explanation acceptance guarantee across the separation of final owner outcomes and historical worker observations.",
+  "acceptance": [
+    "Keep both successful integration case identities, the original retained-worker prose regex and every other verification, review, ownership and merge assertion.",
+    "Read attempt-one historical worker observations when the optional field exists; use the legacy summary only when that field is absent.",
+    "Require exact equality with the original worker-1.json summary, so filtering, truncation, missing or altered retained text cannot satisfy the guarantee.",
+    "Independently approve the exact proposal and actual failed full-run evidence before applying this narrow revision; freeze the revised inventory and require fresh complete verification and final source-bound approval."
+  ],
+  "revisedFiles": ["tests/integration.test.ts"],
+  "dependentIssues": [30],
+  "execution": "Separate owner acceptance-contract maintenance. Required test identities, full and critical manifests, verification gates, budgets and role prompts remain unchanged. Record the verified delivery before dependent issue30."
+}

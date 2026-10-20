@@ -1,10 +1,11 @@
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { dirname } from 'node:path';
 import type { Issue, IssuePatch, NewIssue } from './domain.ts';
 import { parseLabels } from './domain.ts';
 import { WorkflowStore } from './workflow-store.ts';
 import { ConflictError } from './workflow.ts';
+import { resolveDatabasePath } from './instance.ts';
 
 const columns = 'id, title, description, status, priority, labels, created_at AS createdAt, updated_at AS updatedAt';
 const migrations = [
@@ -47,7 +48,7 @@ export class IssueStore {
   readonly work: WorkflowStore;
 
   constructor(path: string) {
-    this.path = path === ':memory:' ? path : resolve(path);
+    this.path = path === ':memory:' ? path : resolveDatabasePath(path);
     if (this.path !== ':memory:') mkdirSync(dirname(this.path), { recursive: true });
     this.database = new DatabaseSync(this.path);
     try {
