@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync, lstatSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parsePlan, parseTask, parseReview, parseWorkerReport, parseRegressionReport, scoped } from './contracts.ts';
+import { parsePlan, parseTask, parseReview, parseWorkerReport, parseRegressionReport, scoped, ReviewResponseFormatError } from './contracts.ts';
 import type { Task, Plan, Review } from './contracts.ts';
 import { parseVerificationContract, readJson, snapshot, writeJson } from './evidence.ts';
 import { runProcess } from './process.ts';
@@ -12,8 +12,8 @@ import { digest, environmentIdentity, loadCheckpoint, restoreCheckpoint, saveChe
 import { assertRunQuiescent, processIdentity } from './ownership.ts';
 import { executionBudget } from './budget.ts';
 import type { Delivery } from '../src/workflow.ts';
-import { enforceRegressionDraft, proveRegression } from './regression.ts';
-import type { PendingRegression, AcceptedRegression } from './regression.ts';
+import { enforceRegressionDraft, proveRegression, BehaviorProofError } from './regression.ts';
+import type { PendingRegression, AcceptedRegression, RedCheck } from './regression.ts';
 import { integrate } from './integration.ts';
 
 export type Phase = 'plan' | 'tests' | 'regression-tests' | 'acceptance-review' | 'implement' | 'repair' | 'review';
@@ -22,7 +22,7 @@ export type Agent = { run: (input: AgentInput) => Promise<unknown> };
 export type Verification = { status: string; snapshot: { hash: string }; runDirectory: string; checks: { name: string; status: string; durationMs?: number }[]; node?: { passed: number }; browser?: { passed: number }; error?: string };
 class IntegrationRejected extends Error {}
 
-export type ControllerState = { schemaVersion: 1; taskId: string; runId: string; phases?: Delivery['phases']; reviewReceipts?: Delivery['reviewReceipts']; failedPhase?: string; failureKind?: 'integrity' | 'timeout' | 'cancelled' | 'budget' | 'ownership' | 'verification' | 'review' | 'worker'; cleanupSafe?: boolean; budget?: { usedMs: number; implementationAttempts: number; acceptanceAttempts: number; maxAttempts: number; totalTimeoutMs: number }; resume?: { fromRunId?: string; reused: boolean; reason: string }; runDirectory: string; workspace: string; status: 'running' | 'ready' | 'merged' | 'blocked'; phase: string; startedAt: string; completedAt?: string; reason?: string; sourceHash?: string; baseCommit?: string; baselineTree?: string; plan?: Plan; regressions?: AcceptedRegression[]; pendingRegression?: PendingRegression; redChecks: { file: string; title: string; status: string; logPath: string; reportPath?: string }[]; attempts: { id: string; number: number; verification?: Verification; review?: Review }[]; verification?: Verification; review?: Review; ports?: [string, string]; changes?: { path: string; status: string }[]; integration?: { branch: string; before: string; commit?: string; verification?: Verification; review?: Review } };
+export type ControllerState = { schemaVersion: 1; taskId: string; runId: string; phases?: Delivery['phases']; reviewReceipts?: Delivery['reviewReceipts']; failedPhase?: string; failureKind?: 'integrity' | 'timeout' | 'cancelled' | 'budget' | 'ownership' | 'verification' | 'review' | 'worker'; cleanupSafe?: boolean; budget?: { usedMs: number; implementationAttempts: number; acceptanceAttempts: number; maxAttempts: number; totalTimeoutMs: number }; resume?: { fromRunId?: string; reused: boolean; reason: string }; runDirectory: string; workspace: string; status: 'running' | 'ready' | 'merged' | 'blocked'; phase: string; startedAt: string; completedAt?: string; reason?: string; sourceHash?: string; baseCommit?: string; baselineTree?: string; plan?: Plan; regressions?: AcceptedRegression[]; pendingRegression?: PendingRegression; browserRedChecks?: RedCheck[]; redChecks: { file: string; title: string; status: string; logPath: string; reportPath?: string }[]; attempts: { id: string; number: number; verification?: Verification; review?: Review }[]; verification?: Verification; review?: Review; ports?: [string, string]; changes?: { path: string; status: string }[]; integration?: { branch: string; before: string; commit?: string; verification?: Verification; review?: Review } };
 
 export async function runController(options: { repository: string; task: unknown; agent: Agent; baseRef?: string; evidenceRoot?: string; runId?: string; mergeTarget?: string; signal?: AbortSignal; resumeFrom?: string; budgetKey?: string }): Promise<ControllerState> {
   const task = parseTask(options.task);
@@ -31,7 +31,7 @@ export async function runController(options: { repository: string; task: unknown
   if (!/^[a-z0-9-]+$/.test(runId)) throw new Error('Invalid run ID.');
   const runDirectory = join(options.evidenceRoot ?? join(repository, '.data', 'evidence'), runId);
   mkdirSync(runDirectory, { recursive: true });
-  const state: ControllerState = { schemaVersion: 1, taskId: task.id, runId, runDirectory, workspace: join(runDirectory, 'workspace'), status: 'running', phase: 'prepare', startedAt: new Date().toISOString(), redChecks: [], attempts: [], phases: [], reviewReceipts: [] };
+  const state: ControllerState = { schemaVersion: 1, taskId: task.id, runId, runDirectory, workspace: join(runDirectory, 'workspace'), status: 'running', phase: 'prepare', startedAt: new Date().toISOString(), redChecks: [], browserRedChecks: [], attempts: [], phases: [], reviewReceipts: [] };
   const engineRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
   let budget: ReturnType<typeof executionBudget> | undefined;
   let checkpoint: (() => void) | undefined;
@@ -61,11 +61,12 @@ export async function runController(options: { repository: string; task: unknown
     if (value <= 0) throw new Error('Total task timeout exceeded.');
     return value;
   };
-  const invoke = async (phase: Phase, attempt: number, feedback = '', cwd = state.workspace) => {
+  const invoke = async (phase: Phase, attempt: number, feedback = '', cwd = state.workspace, deadline = Infinity) => {
     state.phase = phase; save();
     const directory = join(runDirectory, `phase-${++counter}-${phase}`);
     mkdirSync(directory);
-    const timeoutMs = Math.min(task.budget.workerTimeoutMs, remaining());
+    const timeoutMs = Math.min(task.budget.workerTimeoutMs, remaining(), deadline - Date.now());
+    if (timeoutMs <= 0) throw new Error(`Agent ${phase} timed out.`);
     budget!.phase(timeoutMs);
     const abort = new AbortController();
     const onCancel = () => abort.abort();
@@ -161,6 +162,7 @@ export async function runController(options: { repository: string; task: unknown
       if (state.pendingRegression) state.reviewReceipts!.push({ ...state.pendingRegression.receipt, reusedFromRunId: restored.runId });
       if (restored.acceptanceReceipt) state.reviewReceipts!.push({ ...restored.acceptanceReceipt, reusedFromRunId: restored.runId });
       state.redChecks = restored.redChecks.map(check => ({ ...check, logPath: join(runDirectory, check.logPath.split('/').at(-1)!), reportPath: join(runDirectory, check.logPath.split('/').at(-1)!.replace(/\.log$/, '.jsonl')) }));
+      state.browserRedChecks = restored.browserRedChecks!.map(check => ({ ...check, logPath: join(runDirectory, check.logPath.split('/').at(-1)!), reportPath: join(runDirectory, check.reportPath!.split('/').at(-1)!) }));
       for (const proof of restored.proofs) copyFileSync(join(options.resumeFrom!, proof.path), join(runDirectory, proof.path));
       for (const file of restored.acceptedChecks) protectedFiles.set(file.path, file.hash);
       checksFrozen = true; proofsComplete = true; enforce();
@@ -183,8 +185,31 @@ export async function runController(options: { repository: string; task: unknown
     writeJson(contractPath, contract);
     const reviewCandidate = async (phase: 'acceptance-review' | 'review', purpose: string, attempt: number, feedback: Record<string, unknown>, cwd = state.workspace, effectiveContract = contract) => {
       const sourceHash = snapshot(cwd).hash;
-      const response = parseReview(await invoke(phase, attempt, JSON.stringify({ ...feedback, purpose, sourceHash }), cwd), task);
-      if (snapshot(cwd).hash !== sourceHash) throw new Error(`Read-only ${purpose} changed the code snapshot.`);
+      const deadline = Date.now() + Math.min(task.budget.workerTimeoutMs, remaining());
+      let response: Review | undefined;
+      let protocolRepair: { validationError: string; previousResponse: unknown; instruction: string } | undefined;
+      for (let number = 1; number <= 2; number += 1) {
+        let value: unknown;
+        let validationError: string | undefined;
+        let invocationFailed = false;
+        let invocationError: unknown;
+        try {
+          value = await invoke(phase, attempt, JSON.stringify({ ...feedback, purpose, sourceHash, ...(protocolRepair ? { protocolRepair } : {}) }), cwd, deadline);
+        } catch (error) { invocationError = error; invocationFailed = true; }
+        if (snapshot(cwd).hash !== sourceHash) throw new Error(`Read-only ${purpose} changed the code snapshot.`);
+        if (invocationFailed) {
+          if (!(invocationError instanceof ReviewResponseFormatError)) throw invocationError;
+          value = invocationError.response; validationError = invocationError.message;
+        }
+        if (!validationError) {
+          try { response = parseReview(value, task); break; }
+          catch (error) { validationError = error instanceof Error ? error.message : String(error); }
+        }
+        writeJson(join(runDirectory, `phase-${counter}-${phase}`, 'contract-error.json'), { purpose, sourceHash, attempt, responseNumber: number, validationError, previousResponse: value });
+        if (number === 2) throw new Error(`Review response protocol repair exhausted: ${validationError}`);
+        protocolRepair = { validationError, previousResponse: value, instruction: 'Correct only the response format. Keep the same source, task, evidence, role and review judgment. Approved reviews require findings: []; blocking findings require approved: false. Do not edit files.' };
+      }
+      if (!response) throw new Error('Review response is missing.');
       const receipt = { purpose, planHash: digest(JSON.stringify(state.plan)), sourceHash, criteriaHash: digest(JSON.stringify(task.acceptance)), contractHash: digest(JSON.stringify(effectiveContract)), approved: response.approved, summary: response.summary, evidencePath: `review-receipt-${runId}-${state.reviewReceipts!.length + 1}.json` };
       writeJson(join(runDirectory, receipt.evidencePath), { ...receipt, response, feedback });
       state.reviewReceipts!.push(receipt);
@@ -241,6 +266,7 @@ export async function runController(options: { repository: string; task: unknown
         if (testReport.blockers.length) throw new Error(testReport.blockers.join('\n'));
         enforce(true);
         state.redChecks = [];
+        state.browserRedChecks = [];
         state.phase = 'red-checks'; save();
         for (const check of state.plan.slices.flatMap(slice => slice.checks)) {
           const prefix = `red-${number}-${state.redChecks.length}`;
@@ -259,7 +285,32 @@ export async function runController(options: { repository: string; task: unknown
           else throw new Error(`Red check did not establish a named behavior assertion: ${check.file}#${check.title}`);
           save();
         }
-        const acceptanceReview = await reviewCandidate('acceptance-review', 'acceptance-coverage', number - 1, { baselineTree: state.baselineTree, redChecks: state.redChecks, evidenceDirectory: runDirectory, acceptance: task.acceptance });
+        let browserFailure = '';
+        const current = enforce(true);
+        for (const check of state.plan.browserChecks) {
+          const path = `acceptance/${check.file}`;
+          const original = baseline.files.find(file => file.path === path);
+          if (original && original.hash === current.files.find(file => file.path === path)?.hash) continue;
+          const prefix = join(runDirectory, `browser-red-${number}-${state.browserRedChecks.length}`);
+          const timeoutMs = Math.min(90000, remaining());
+          budget.phase(timeoutMs);
+          try {
+            state.browserRedChecks.push(await proveRegression({ check, browser: true, cwd: state.workspace, prefix, env, reporter: join(trustedRoot, 'factory/node-reporter.mjs'), timeoutMs, signal: cancelled.signal, allowAlreadyPassed: true }));
+          } catch (error) {
+            enforce(true);
+            if (!(error instanceof BehaviorProofError)) throw error;
+            browserFailure = `Controller browser proof rejected ${check.file}#${check.title}: ${error.message}. Read ${prefix}.log and ${prefix}.json. Repair only unapproved scoped checks; preserve the plan, original test bytes, criteria and implementation.`;
+            writeJson(`${prefix}-error.json`, { check, reason: browserFailure });
+            break;
+          }
+          enforce(true); save();
+        }
+        if (browserFailure) {
+          state.phases!.at(-1)!.status = 'failed';
+          if (number === task.budget.maxAttempts) throw new Error(`Acceptance proof attempt budget exhausted. ${browserFailure}`);
+          acceptanceFeedback = browserFailure; continue;
+        }
+        const acceptanceReview = await reviewCandidate('acceptance-review', 'acceptance-coverage', number - 1, { baselineTree: state.baselineTree, redChecks: state.redChecks, browserRedChecks: state.browserRedChecks, acceptedChecks: snapshot(state.workspace).files.filter(file => /^(tests|acceptance)\//.test(file.path)), evidenceDirectory: runDirectory, acceptance: task.acceptance });
         writeJson(join(runDirectory, 'acceptance-review.json'), acceptanceReview);
         writeJson(join(runDirectory, `acceptance-review-${number}.json`), acceptanceReview);
         if (acceptanceReview.approved) break;
@@ -275,7 +326,7 @@ export async function runController(options: { repository: string; task: unknown
     checkpoint();
     if (state.pendingRegression) await regressionLoop();
     let feedback = options.resumeFrom ? `Repair the restored draft using the retained evidence from ${options.resumeFrom}. Preserve accepted checks.` : '';
-    const alreadySatisfied = state.redChecks.every(check => check.status === 'already_passed');
+    const alreadySatisfied = [...state.redChecks, ...(state.browserRedChecks ?? [])].every(check => check.status === 'already_passed');
     for (let number = 1; number <= task.budget.maxAttempts; number += 1) {
       budget.consume('implementation');
       const attempt = { id: `${runId}-${number}`, number } as ControllerState['attempts'][number];

@@ -5,6 +5,14 @@ export type Plan = { schemaVersion: 1; taskId: string; assumptions: { decision: 
 export type WorkerReport = { schemaVersion: 1; taskId: string; summary: string; blockers: string[] };
 export type Review = { schemaVersion: 1; taskId: string; approved: boolean; needsRegression?: boolean; summary: string; findings: string[] };
 
+export class ReviewResponseFormatError extends Error {
+  readonly response: string;
+  constructor(response: string, cause: SyntaxError) {
+    super(`Review response is not valid JSON: ${cause.message}`);
+    this.response = response;
+  }
+}
+
 function object(input: unknown, name: string): Record<string, unknown> {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error(`${name} must be an object.`);
   return input as Record<string, unknown>;
