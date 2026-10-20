@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "recordType": "acceptance-contract-revision",
+  "issueId": 35,
+  "activatedByIssue": 36,
+  "stage": "inactive-at-prerequisite",
+  "revision": {
+    "file": "tests/queue.test.ts",
+    "testTitle": "dependency admission, editing guards, failed cascades, and interrupted recovery preserve state",
+    "before": "    assert.equal(store.get(first.id)?.status, 'open');",
+    "after": "    assert.equal(store.get(first.id)?.status, 'blocked');",
+    "scope": "single-assertion"
+  },
+  "verification": {
+    "command": "npm run verify",
+    "gates": [
+      "lint",
+      "typecheck",
+      "test",
+      "build",
+      "test:e2e"
+    ],
+    "contracts": [
+      "factory/verification-contract.json",
+      "factory/ci-verification-contract.json"
+    ]
+  },
+  "preserved": [
+    "roles",
+    "budgets",
+    "required-test-identities",
+    "all-other-existing-test-bytes"
+  ],
+  "activation": {
+    "requires": [
+      "owner-red-proofs",
+      "independent-acceptance-review",
+      "atomic-core-implementation",
+      "fresh-full-verification",
+      "source-bound-independent-review",
+      "verified-integration"
+    ],
+    "priorIssuesMustPassUnchanged": true
+  },
+  "postPublication": {
+    "closeIssueId": 20,
+    "supersededBy": 22,
+    "expectedReplacementStatus": "done",
+    "preserveRequirementId": 4,
+    "preserve": [
+      "immutable-plan",
+      "jobs",
+      "runs",
+      "reports",
+      "evidence",
+      "cumulative-budgets"
+    ],
+    "receiptRequired": true
+  }
+}
