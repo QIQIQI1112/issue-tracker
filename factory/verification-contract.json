@@ -19,7 +19,7 @@
     },
     {
       "file": "ui.spec.ts",
-      "title": "title and description search, both status controls, and all sort orders operate on real issues"
+      "title": "title and description search, status filtering, and all sort orders operate on real issues"
     },
     {
       "file": "ui.spec.ts",

@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { appUrl, test } from './workspace.ts';
+import { expectStatusSelection, selectRepository, selectStatus } from './navigation.ts';
 import { IssueStore } from '../src/storage.ts';
 import { saveDelivery } from '../factory/delivery.ts';
 import type { Issue } from '../src/domain.ts';
@@ -59,8 +60,8 @@ test('issue navigation and identifier details support keyboard focus and status 
   const issue = await workspace.create({ title: 'Keyboard inspection', status: 'done' });
   await page.goto(appUrl(info));
   const nav = page.getByRole('navigation', { name: 'Workspace views' });
-  await nav.getByRole('button', { name: 'Done', exact: true }).click();
-  await expect(nav.getByRole('button', { name: 'Done', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await selectStatus(page, 'done');
+  await expectStatusSelection(page, 'done');
   await expect(nav.locator('[aria-pressed="true"]')).toHaveCount(1);
   const opener = page.getByRole('button', { name: `View issue ${issue.title}`, exact: true });
   await opener.focus();
@@ -71,7 +72,7 @@ test('issue navigation and identifier details support keyboard focus and status 
   await page.keyboard.press('Escape');
   await expect(dialog).not.toBeVisible();
   await expect(opener).toBeFocused();
-  await nav.getByRole('button', { name: 'All issues', exact: true }).click();
+  await selectStatus(page, 'all');
   await expect(nav.locator('[aria-pressed="true"]')).toHaveCount(1);
 });
 
@@ -323,7 +324,7 @@ test('issue workspace removes Workbench administration and retains combined repo
     await expect(page.getByRole('button', { name: 'Workbench', exact: true }), 'Workbench navigation is removed.').toHaveCount(0);
     await expect(page.getByRole('heading', { name: /Workbench|Register repository|Create requirement/i })).toHaveCount(0);
     await expect(page.locator('form').filter({ hasText: /Register repository|Create requirement/ })).toHaveCount(0);
-    await page.getByLabel('Filter by repository', { exact: true }).selectOption(String(f.repo.id));
+    await selectRepository(page, f.repo.id);
     await page.getByLabel('Filter by status', { exact: true }).selectOption('open');
     await page.getByLabel('Filter by label', { exact: true }).selectOption('diagnostic');
     await page.getByRole('searchbox', { name: 'Search issues' }).fill('Needle');

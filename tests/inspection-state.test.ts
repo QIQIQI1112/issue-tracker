@@ -28,11 +28,24 @@ test('execution context identifies real repository requirement issue and standal
 
 test('workspace issue navigation retains an explicit initial active state', () => {
   const html = renderToStaticMarkup(createElement(App));
-  assert.match(html, /aria-pressed="true"[^>]*>.*?All issues/s);
-  for (const label of ['Open', 'In progress', 'Done']) {
-    const button = [...html.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].find(item => item[0].replace(/<[^>]+>/g, '').trim() === label)?.[0];
-    assert.ok(button, label);
-    assert.match(button, /aria-pressed="false"/);
+  const buttons = [...html.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].map(item => item[0]);
+  const repositoryNavigation = html.includes('aria-label="Repositories"');
+  const activeLabel = repositoryNavigation ? 'All repositories' : 'All issues';
+  const active = buttons.find(button => button.replace(/<[^>]+>/g, '').trim() === activeLabel);
+  assert.ok(active, activeLabel);
+  assert.match(active, /aria-pressed="true"/);
+  assert.equal(buttons.filter(button => button.includes('aria-pressed="true"')).length, 1);
+  if (repositoryNavigation) {
+    const status = html.match(/<select[^>]*aria-label="Filter by status"[^>]*>[\s\S]*?<\/select>/)?.[0];
+    assert.ok(status);
+    for (const value of ['all', 'open', 'in_progress', 'done']) assert.match(status, new RegExp(`<option[^>]*value="${value}"`));
+    assert.match(status, /<option[^>]*value="all"[^>]*selected=""/);
+  } else {
+    for (const label of ['Open', 'In progress', 'Done']) {
+      const button = buttons.find(item => item.replace(/<[^>]+>/g, '').trim() === label);
+      assert.ok(button, label);
+      assert.match(button, /aria-pressed="false"/);
+    }
   }
 });
 
@@ -122,7 +135,8 @@ test('indexed delivery context preserves failed merged and whole-goal ownership'
 
 test('initial issue controls expose accessible names and live loading semantics', () => {
   const html = renderToStaticMarkup(createElement(App));
-  for (const name of ['Search issues', 'Filter by repository', 'Filter by status', 'Filter by label', 'Sort issues', 'Issue list']) assert.ok(html.includes(`aria-label="${name}"`), name);
+  for (const name of ['Search issues', 'Filter by status', 'Filter by label', 'Sort issues', 'Issue list']) assert.ok(html.includes(`aria-label="${name}"`), name);
+  assert.match(html, /aria-label="(?:Filter by repository|Repositories)"/);
   assert.match(html, /role="status"/);
   assert.match(html, /aria-busy="true"/);
   assert.match(html, /<h1>Issues<\/h1>/);

@@ -1,3 +1,4 @@
+import { selectRepository } from './navigation.ts';
 import { expect } from '@playwright/test';
 import { appUrl, test } from './workspace.ts';
 import { fixtureAgent, fixtureRepository } from '../tests/helpers/factory-fixture.ts';
@@ -28,7 +29,7 @@ test('a requirement becomes automatically merged issues with inspectable deliver
     const issue = store.list().find(issue => issue.title === 'Return ready')!;
     const run = store.work.runs().find(run => run.issueId === issue.id)!;
     await page.goto(appUrl(info));
-    await page.getByLabel('Filter by repository', { exact: true }).selectOption(String(issue.work!.repoId));
+    await selectRepository(page, issue.work!.repoId);
     await page.getByRole('button', { name: 'View issue Return ready', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: `Issue #${issue.id}`, exact: true });
     await expect(dialog.getByRole('heading', { name: 'Delivery report', exact: true })).toBeVisible();

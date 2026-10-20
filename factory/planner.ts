@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { createHash } from 'node:crypto';
+import { join, resolve } from 'node:path';
 import { runProcess } from './process.ts';
 import { writeJson } from './evidence.ts';
 import { parseReview, reviewSchema } from './contracts.ts';
@@ -22,7 +23,12 @@ export function codexPlanner(binary = 'codex'): Planner {
     const responsePath = join(input.directory, 'response.json');
     writeJson(schemaPath, mode === 'decompose' ? decompositionSchema : reviewSchema);
     const instruction = mode === 'decompose' ? 'Decompose this business requirement into at most 20 independently verifiable issues. Choose ordinary defaults and explain them. Every issue needs concrete acceptance conditions and dependencies expressed with issue keys. Keys must contain 1–64 lowercase letters, digits, or hyphens, for example ready-value. Dependencies must reference exact keys; no cycles or duplicates. Descriptions contain at most 2000 characters. Cover the whole original goal, including integration behavior. Do not invent unrelated work.' : `Independently review the requirement against the supplied decomposition or integrated delivery evidence and actual source. Check completeness, meaningful acceptance, dependency order, and the original business goal across all issues. Approve only when there are no blocking findings. Use taskId requirement-${input.requirement.id}, schemaVersion 1, and put only blocking findings in findings.`;
-    const prompt = `Follow AGENTS.md. This is a read-only ${mode} phase. Do not edit, commit, merge, push, or start servers. Return the structured response within five minutes. Write reports in English.\n\n${instruction}\n\nRequirement:\n${JSON.stringify(input.requirement)}\n\nEvidence:\n${input.evidence}`;
+    const evidence = Buffer.from(input.evidence, 'utf8');
+    const evidencePath = resolve(input.directory, 'evidence.txt');
+    writeFileSync(evidencePath, evidence);
+    const reference = { path: evidencePath, bytes: evidence.byteLength, sha256: createHash('sha256').update(evidence).digest('hex') };
+    const inline = evidence.byteLength <= 64 * 1024 ? `\n\nEvidence (inline):\n${input.evidence}` : '';
+    const prompt = `Follow AGENTS.md. This is a read-only ${mode} phase. Do not edit, commit, merge, push, or start servers. Return the structured response within five minutes. Write reports in English.\n\n${instruction}\n\nRequirement:\n${JSON.stringify(input.requirement)}\n\nEvidence file:\n${JSON.stringify(reference)}\nRead the full retained evidence file and inspect actual source and underlying machine reports. Never approve from summaries alone. The reference preserves complete evidence; large manifests are omitted from inline input without truncating the file.${inline}`;
     writeFileSync(join(input.directory, 'prompt.txt'), prompt);
     const result = await runProcess({ command: binary, args: ['-c', 'approval_policy="never"', 'exec', '--json', '--sandbox', 'read-only', '--ephemeral', '--cd', input.cwd, '--output-schema', schemaPath, '--output-last-message', responsePath, '-'], cwd: input.cwd, env: input.env, input: prompt, logPath: join(input.directory, 'events.log'), timeoutMs: 300000, signal: input.signal });
     writeJson(join(input.directory, 'process.json'), result);

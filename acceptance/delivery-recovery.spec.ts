@@ -1,3 +1,4 @@
+import { selectRepository } from './navigation.ts';
 import { expect, test } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
@@ -37,7 +38,7 @@ test('a resumed real issue exposes recovery, final review, and phase durations i
     expect(await queue.processNext()).toBe(true);
     expect(store.get(issue.id)?.status).toBe('done');
     await page.goto(running.url);
-    await page.getByLabel('Filter by repository', { exact: true }).selectOption(String(repo.id));
+    await selectRepository(page, repo.id);
     await page.getByRole('button', { name: 'View issue Recover accepted source', exact: true }).click();
     const report = page.getByRole('dialog').getByRole('article', { name: 'Delivery report', exact: true });
     await expect(report.getByRole('heading', { name: 'Execution timeline', exact: true })).toBeVisible();

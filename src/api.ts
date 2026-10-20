@@ -7,6 +7,7 @@ import { parseRepository } from './repository.ts';
 import { boundedText, ConflictError, positiveId, record } from './workflow.ts';
 import { evidenceFile, readDelivery } from './evidence-files.ts';
 import { basename } from 'node:path';
+import { readRepositoryHarness } from './harness-reader.ts';
 
 function issueId(input: string): number {
   if (!/^[1-9]\d*$/.test(input) || !Number.isSafeInteger(Number(input))) {
@@ -47,6 +48,14 @@ export function createApp(store: IssueStore, metadata: { instanceId: string; ver
   });
   app.get('/api/workbench', (_request, response) => response.json({ repos: store.work.repos(), requirements: store.work.requirements(), jobs: store.work.jobs(), runs: store.work.runs() }));
   app.get('/api/repos', (_request, response) => response.json({ repos: store.work.repos() }));
+  app.get('/api/repos/:id/harness', async (request, response) => {
+    const id = issueId(request.params.id);
+    if (Object.keys(request.query).length) throw new ValidationError('Harness inspection does not accept path, ref or profile overrides.');
+    const repo = store.work.repos().find(value => value.id === id);
+    if (!repo) { response.status(404).json({ error: 'Enrolled repository not found.' }); return; }
+    response.setHeader('Cache-Control', 'no-store');
+    response.json(await readRepositoryHarness(repo));
+  });
   app.post('/api/repos', (request, response) => response.status(201).json({ repo: store.work.addRepo(parseRepository(request.body)) }));
   app.get('/api/requirements', (_request, response) => response.json({ requirements: store.work.requirements() }));
   app.post('/api/plan-submissions', (request, response) => {

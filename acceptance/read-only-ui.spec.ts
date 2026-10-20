@@ -9,6 +9,7 @@ import type { Issue } from '../src/domain.ts';
 import type { Delivery, Job, WorkRun } from '../src/workflow.ts';
 import { saveDelivery } from '../factory/delivery.ts';
 import { appUrl, test } from './workspace.ts';
+import { expectRepositorySelection, expectStatusSelection, selectRepository, selectStatus } from './navigation.ts';
 
 const operationName = /^(?:New issue|Create issue|Create your first issue|Delete\b.*|Edit\b.*|Save changes|Start issue|Retry issue|Queued or running|Automatically merged|Starting…|Deleting…)$/i;
 
@@ -100,7 +101,8 @@ test('populated and filtered issue lists expose inspection controls only', async
     const rows = page.getByRole('region', { name: 'Issue list', exact: true }).locator('.issue-row');
     await expect(rows).toHaveCount(2);
     await noOperations(page.locator('body'));
-    await page.getByLabel('Filter by repository', { exact: true }).selectOption(String(alpha.work!.repoId));
+    await selectRepository(page, alpha.work!.repoId);
+    await search.fill(workspace.prefix);
     await page.getByLabel('Sort issues', { exact: true }).selectOption('title');
     await expect(rows.nth(0)).toHaveAttribute('data-testid', `issue-${alpha.id}`);
     await expect(rows.nth(1)).toHaveAttribute('data-testid', `issue-${zulu.id}`);
@@ -112,9 +114,8 @@ test('populated and filtered issue lists expose inspection controls only', async
     await expect(page.getByTestId(`issue-${alpha.id}`)).toBeVisible();
     await page.getByLabel('Filter by label', { exact: true }).selectOption('');
     await page.getByLabel('Filter by status', { exact: true }).selectOption('done');
-    const nav = page.getByRole('navigation', { name: 'Workspace views' });
-    await expect(nav.getByRole('button', { name: 'Done', exact: true })).toHaveAttribute('aria-pressed', 'true');
-    await nav.getByRole('button', { name: 'All issues', exact: true }).click();
+    await expectStatusSelection(page, 'done');
+    await selectStatus(page, 'all');
     await search.fill(`${workspace.prefix} description-only`);
     await expect(rows).toHaveCount(1);
     await expect(page.getByTestId(`issue-${zulu.id}`)).toBeVisible();
@@ -123,7 +124,7 @@ test('populated and filtered issue lists expose inspection controls only', async
     await noOperations(page.locator('body'));
     await page.getByRole('button', { name: 'Reset filters', exact: true }).click();
     await expect(search).toHaveValue('');
-    await expect(page.getByLabel('Filter by repository', { exact: true })).toHaveValue('');
+    await expectRepositorySelection(page, '');
     await search.fill(workspace.prefix);
     await page.setViewportSize({ width: 390, height: 844 });
     for (const name of [`View issue ${alpha.title}`, `Inspect issue ${alpha.title}`]) {

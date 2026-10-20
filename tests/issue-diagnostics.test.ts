@@ -27,7 +27,8 @@ test('issue title and identifier controls open inspection without edit actions',
 test('issue workspace omits Workbench navigation and manual administration', () => {
   const html = renderToStaticMarkup(createElement(App));
   assert.doesNotMatch(html, /Workbench|Register repository|Create requirement/, 'Issue inspection replaces the Workbench administration view.');
-  for (const name of ['Search issues', 'Filter by repository', 'Filter by status', 'Filter by label', 'Sort issues']) assert.ok(html.includes(`aria-label="${name}"`), `Retain ${name}.`);
+  for (const name of ['Search issues', 'Filter by status', 'Filter by label', 'Sort issues']) assert.ok(html.includes(`aria-label="${name}"`), `Retain ${name}.`);
+  assert.match(html, /aria-label="(?:Filter by repository|Repositories)"/, 'Repository selection remains accessible.');
   assert.match(html, /<h1>Issues<\/h1>/, 'The inspection workspace retains its main heading.');
 });
 
