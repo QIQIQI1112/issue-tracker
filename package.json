@@ -18,6 +18,7 @@
     "test": "node scripts/test.mjs",
     "test:e2e": "playwright test",
     "verify": "node scripts/verify.mjs",
+    "verify:ci": "node scripts/verify-ci.mjs",
     "doctor": "node scripts/doctor.mjs",
     "reset": "tsx scripts/reset.ts",
     "factory": "tsx factory/cli.ts",

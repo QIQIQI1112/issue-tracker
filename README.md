@@ -26,6 +26,7 @@ You can describe a business requirement directly in Codex. The repo's `$issue-tr
 | `npm run reset -- --confirm` | Replace the stopped local database with demo records. Refuses a locked database. |
 | `npm test` | Run domain, SQLite, API, and ownership tests. |
 | `npm run test:e2e` | Start separate test servers and exercise the browser. Run `npm run build` first for the restart acceptance check. |
+| `npm run verify:ci` | Run the fixed critical GitHub CI profile and write separate CI evidence. Full local acceptance still requires `npm run verify`. |
 | `npm run verify` | Lint, typecheck, tests, build, and browser checks; nonzero exit on failure. |
 | `npm run factory -- tickets/001-labels.json --validate` | Validate the task contract without launching a worker. |
 | `npm run factory -- tickets/001-labels.json` | Run a bounded Codex task in an owned worktree; requires an authenticated Codex CLI. |

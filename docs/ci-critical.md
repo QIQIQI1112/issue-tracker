@@ -1,0 +1,13 @@
+# Critical GitHub CI profile
+
+The protected `factory/ci-verification-contract.json` defines the `ci-critical` remote selection: explicit Node test files and required file/title identities for every selected file, plus six browser behaviors. It covers validation, real API/SQLite behavior, ownership, budgets, conversation intake, persistence, focus regression and all GitHub publication admission/recovery cases. Additive CI policy and runner regressions test the profile itself.
+
+GitHub runs `npm run verify:ci` in the required `verify` job for pull requests and main pushes. The initial profile runs 72 named Node cases in 19 explicit files and six named browser cases. Lint, type checks and the production build still run. The parser rejects unknown fields, empty selections, duplicate files/cases, unsafe paths and incomplete file/case mappings. The manifest is an owner-reviewed selection, not a worker-supplied filter. Changes to this selection require separate acceptance-contract review.
+
+The full `factory/verification-contract.json`, `scripts/verify.mjs`, trusted controller verifier, existing tests and all local verification gates remain unchanged. Child verification, integrated verification and whole-requirement acceptance continue to run the complete suite with independent review. A critical CI result proves only the declared remote subset and cannot replace those reports.
+
+The separate CI command uses the existing bounded owned-process runner, with the existing 180-second gate and 600-second total defaults. Node file concurrency defaults to six and accepts a positive `NODE_TEST_CONCURRENCY`. Browser checks use the existing owned server/database configuration, no retries and failure-only traces. Missing named cases, skips, failures, source drift and contract drift fail CI even when a subprocess exits successfully.
+
+Read `.runs/ci-latest.json` and its referenced `ci-summary.json`. Each unique CI directory contains source inventory, commit, contract hash and selection, gate results, machine reports, logs and process ownership receipts. CI never overwrites `.runs/latest.json`, and its six browser cases cannot satisfy the full browser contract. `CI_VERIFY_RUN_DIR` may choose a fresh evidence directory; it cannot change the fixed contract. Full local verification continues to use `.runs/latest.json` and `summary.json`.
+
+GitHub uploads CI summaries, both machine reports, logs and ownership receipts for seven days; failed runs also upload browser debugging artifacts. Strict required `verify` checks, administrator enforcement, exact-head/base matching and confirmed merge synchronization remain mandatory. Reducing the remote selection does not permit bypassing any GitHub protection or local acceptance gate.
