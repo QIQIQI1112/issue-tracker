@@ -67,7 +67,7 @@ export function App() {
     return right.createdAt.localeCompare(left.createdAt) || right.id - left.id;
   });
   function chooseRepository(id: string) {
-    setSubview('issues');
+    if (!id) setSubview('issues');
     if (id === repoFilter) return;
     setRepoFilter(id); setSearch(''); setFilter('all'); setLabelFilter(''); setSort('newest'); setDetailId(null);
   }
