@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "recordType": "owner-maintenance",
+  "id": "engineering-audit-fixes",
+  "issueId": 30,
+  "dependsOn": [31],
+  "changeKind": "harness",
+  "goal": "Repair audited database ownership, final delivery reporting and dirty-baseline checkpoint recovery, and reconcile current English operating documentation without changing the architecture, roles or verification standards.",
+  "acceptance": [
+    "Database-file aliases cannot admit independent API/queue owners, bypass reset or expose misleading discovery identities; supported normal database creation remains intact.",
+    "Final controller and queue delivery results and current blockers reflect owner outcomes while full worker observations remain historical and old reports stay readable.",
+    "Accepted delivery-only retries reconstruct their immutable original baseline before the candidate delta, retain correct patch attribution, frozen checks and cumulative budgets, and rerun complete verification and independent review.",
+    "Authoritative documentation consistently describes owner proofs before acceptance review, one final integrated code review, explicit GitHub completion gates and the read-only repository UI.",
+    "New scoped regression tests receive owner red proofs and independent acceptance approval before repair. Relative to the separately approved issue31 compatibility baseline, existing tests, verification contracts, gates and roles stay unchanged."
+  ],
+  "regressionFiles": [
+    "tests/database-alias-ownership.test.ts",
+    "tests/delivery-owner-outcome.test.ts",
+    "tests/checkpoint-initial-baseline.test.ts"
+  ],
+  "execution": "Separate owner maintenance with exact-source full verification, independent review, verified local integration and owner CLI attestation. This audit record does not grant ordinary feature-executor permissions."
+}

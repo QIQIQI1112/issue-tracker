@@ -90,7 +90,7 @@ export class SerialQueue {
       const delivery = readJson(join(run.evidencePath, 'delivery.json')) as Delivery;
       if (delivery.status !== 'blocked') {
         writeJson(join(run.evidencePath, 'admission-error.json'), { reason });
-        saveDelivery(run.evidencePath, { ...delivery, status: 'blocked', completedAt: new Date().toISOString(), limitations: [...delivery.limitations, reason] });
+        saveDelivery(run.evidencePath, { ...delivery, summary: `Controller blocked delivery: ${reason}`, status: 'blocked', completedAt: new Date().toISOString(), limitations: [...delivery.limitations, reason] });
       }
       return;
     }

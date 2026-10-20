@@ -106,11 +106,15 @@ export async function runController(options: { repository: string; task: unknown
         const previous = readJson(join(options.resumeFrom, 'state.json')) as ControllerState;
         if (previous.cleanupSafe === false) throw new Error('Previous worker did not settle; owner cleanup is required.');
         restored = loadCheckpoint(options.resumeFrom, options.evidenceRoot ?? join(repository, '.data', 'evidence'), task, environment);
-        state.resume = { fromRunId: restored.runId, reused: true, reason: 'Reused accepted checks and source draft; full verification and code review will run again.' };
+        state.resume = { fromRunId: restored.runId, reused: false, reason: 'Validated accepted checkpoint metadata; source reconstruction is pending.' };
       } catch (error) { state.resume = { ...state.resume, reused: false, reason: error instanceof Error ? error.message : String(error) }; }
     }
     if (options.mergeTarget && git(repository, ['status', '--porcelain']).trim()) throw new Error('Automatic execution requires a clean repository. Commit or preserve local changes first.');
     const workspace = prepareWorkspace(repository, runDirectory, restored?.baseCommit ?? options.baseRef ?? options.mergeTarget, restored ? false : !options.mergeTarget);
+    if (restored) {
+      git(workspace.path, ['read-tree', '--reset', '-u', restored.baselineTree]);
+      workspace.baselineTree = restored.baselineTree;
+    }
     state.workspace = workspace.path; state.baseCommit = workspace.baseCommit; state.baselineTree = workspace.baselineTree; state.sourceHash = workspace.sourceHash;
     state.ports = await allocatePorts();
     const [apiPort, uiPort] = state.ports;
@@ -167,6 +171,7 @@ export async function runController(options: { repository: string; task: unknown
       for (const file of restored.acceptedChecks) protectedFiles.set(file.path, file.hash);
       checksFrozen = true; proofsComplete = true; enforce();
       writeJson(join(runDirectory, 'accepted-checks.json'), [...protectedFiles].map(([path, hash]) => ({ path, hash })));
+      state.resume = { fromRunId: restored.runId, reused: true, reason: 'Reconstructed the original baseline and accepted draft; full verification and code review will run again.' }; save();
     } else state.plan = parsePlan(await readonly('plan', 0), task);
     writeJson(join(runDirectory, 'plan.json'), state.plan);
     const trustedRoot = join(runDirectory, 'trusted');

@@ -43,7 +43,11 @@ for (const mode of ['merge', 'advanced-target', 'integration-rejected', 'dirty',
       assert.ok(delivery.evidence.some(item => item.path.endsWith('summary.json')));
       assert.equal(JSON.parse(readFileSync(join(state.runDirectory, 'integration-owner.json'), 'utf8')).pid, process.pid);
       assert.ok(!existsSync(join(repository, '.git/loop-integration.lock')));
-      assert.match(delivery.summary!, /Prepared the fixture candidate/);
+      const workerSummary = delivery.workerObservations === undefined
+        ? delivery.summary
+        : delivery.workerObservations.find(observation => observation.attempt === 1)?.summary;
+      assert.match(workerSummary!, /Prepared the fixture candidate/);
+      assert.equal(workerSummary, JSON.parse(readFileSync(join(state.runDirectory, 'worker-1.json'), 'utf8')).summary);
       if (mode === 'advanced-target') assert.ok(existsSync(join(repository, 'src/unrelated.ts')));
       if (mode === 'merge') {
         assert.equal(recoverMerge(repository, state.runDirectory), true);

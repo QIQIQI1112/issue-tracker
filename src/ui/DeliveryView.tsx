@@ -6,6 +6,7 @@ export function DeliveryView({ delivery, runId }: { delivery: Delivery; runId: s
     <div className="report-heading"><h3>Delivery report</h3><span className="status-pill">{delivery.status}</span></div>
     <h4>Business goal</h4><p>{delivery.goal}</p>
     <h4>Result</h4><p>{delivery.summary ?? delivery.goal}</p>
+    {delivery.workerObservations && delivery.workerObservations.length > 0 && <details><summary>Historical worker observations</summary><p>These observations precede the controller's final verification and decision.</p><ul>{delivery.workerObservations.map(item => <li key={item.attempt}><strong>Attempt {item.attempt}</strong><p>{item.summary}</p></li>)}</ul></details>}
     <h4>What changed</h4>{delivery.changes.length ? <ul>{delivery.changes.map(file => <li key={file.path}><code>{file.path}</code> · {file.category} · {file.status}</li>)}</ul> : <p>No source changes were needed.</p>}
     <h4>Decisions</h4>{delivery.defaults.length ? <ul>{delivery.defaults.map((item, index) => <li key={index}><strong>{item.decision}</strong><p>{item.reason}</p></li>)}</ul> : <p>No additional defaults recorded.</p>}
     <h4>Verification</h4><p>{delivery.nodePassed} Node cases · {delivery.browserPassed} browser cases · {delivery.attempts} implementation attempts</p><ul>{delivery.checks.map((check, index) => <li key={index}>{check.name}: <strong>{check.status}</strong></li>)}</ul>

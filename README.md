@@ -12,7 +12,7 @@ npm run reset -- --confirm
 npm run dev
 ```
 
-Open http://127.0.0.1:5173. The API runs at http://127.0.0.1:4310. Both bind to loopback only. Development starts a separate queue worker. Open Development to register repositories and start requirements; use issue IDs to inspect deliveries. Reset is for disposable data only. Read [the workbench workflow](docs/workbench.md) before executing tasks.
+Open http://127.0.0.1:5173. The API runs at http://127.0.0.1:4310. Both bind to loopback only. Development starts a separate queue worker. Select a repository to inspect Issues or Repo harness; open issue titles or IDs to read deliveries. The website is read-only. Submit work through Codex or the guarded local APIs. Reset is for disposable data only. Read [the workbench workflow](docs/workbench.md) before executing tasks.
 
 You can describe a business requirement directly in Codex. The repo's `$issue-tracker-submit` skill prepares and submits a complete plan with issues, acceptance, defaults, and dependencies. Independent coverage review then releases those issues to the existing queue. Follow [conversation intake](docs/conversation-intake.md); the website shows the submitted goal, source, executions, and reports.
 
@@ -64,9 +64,9 @@ SQLite access is synchronous. That is deliberate for this single-user learning a
 | `TEST_API_PORT` | `14310` |
 | `TEST_UI_PORT` | `15173` |
 
-For another checkout, give it distinct ports and a distinct database path. Browser contexts do not isolate backend data. `.data/`, `.runs/`, and dependencies are ignored by Git.
+For another checkout, give it distinct ports and a distinct database path. Use an original regular database file: database-file symlinks and hard links are rejected by storage, API/queue startup, reset, doctor and conversation intake. Ordinary directory symlinks and new nested database paths retain their existing behavior. Do not replace a database path or add file aliases while an owner is running. Browser contexts do not isolate backend data. `.data/`, `.runs/`, and dependencies are ignored by Git.
 
-API and queue processes hold separate `<database>.lock` and `<database>.queue.lock` files with their PID and instance identity. Graceful shutdown removes them. After a crash, inspect and stop the recorded owner before removing a stale lock. Queue startup reconciles interrupted runs with durable merge evidence; automatic stale-lock removal is not implemented.
+API and queue processes hold separate `<database>.lock` and `<database>.queue.lock` files with their PID and instance identity. Graceful shutdown removes them. API and integration locks require explicit owner inspection after a crash. Queue execution-lease reclamation uses a serialized admission guard and requires the recorded PID to be absent; a crashed admission guard requires inspection. Never remove a live lock. Queue startup reconciles interrupted runs with durable merge evidence. Explicitly enrolled GitHub requirements also reconcile publication observations and require confirmed remote merge plus local synchronization; see [GitHub delivery](docs/github-delivery.md).
 
 ## Learning path
 
