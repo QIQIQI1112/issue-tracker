@@ -11,7 +11,7 @@ import { writeRoleContext } from './optimization.ts';
 
 export { parseDecomposition } from '../src/submission.ts';
 export type { Decomposition } from '../src/workflow.ts';
-export type PlannerInput = { cwd: string; directory: string; requirement: Requirement; evidence: string; env: NodeJS.ProcessEnv; signal?: AbortSignal };
+export type PlannerInput = { cwd: string; directory: string; requirement: Requirement; evidence: string; env: NodeJS.ProcessEnv; signal?: AbortSignal; onInvocation?: () => void };
 export type Planner = { decompose(input: PlannerInput): Promise<Decomposition>; review(input: PlannerInput): Promise<{ approved: boolean; summary: string; findings: string[] }> };
 
 const string = { type: 'string' };
@@ -33,6 +33,7 @@ export function codexPlanner(binary = 'codex'): Planner {
     const inline = evidence.byteLength <= 8 * 1024 ? `\n\nEvidence (inline):\n${input.evidence}` : '';
     const prompt = `Follow AGENTS.md. This is a read-only ${mode} phase. Do not edit, commit, merge, push, or start servers. Return the structured response within five minutes. Write reports in English.\n\n${instruction}\n\nRequirement:\n${JSON.stringify(input.requirement)}\n\nContext index:\n${context.indexPath}\n\nEvidence file:\n${JSON.stringify(reference)}\nRead the indexed complete retained evidence and inspect relevant actual source and underlying machine reports. Start with named checks and referenced paths; expand repository exploration when a concrete coverage gap or inconsistency requires it. Never approve from summaries alone. The reference preserves complete evidence; large manifests are omitted from inline input without truncating the file.${inline}`;
     writeFileSync(join(input.directory, 'prompt.txt'), prompt);
+    input.onInvocation?.();
     const result = await runProcess({ command: binary, args: ['-c', 'approval_policy="never"', 'exec', '--json', '--sandbox', 'read-only', '--ephemeral', '--cd', input.cwd, '--output-schema', schemaPath, '--output-last-message', responsePath, '-'], cwd: input.cwd, env: input.env, input: prompt, logPath: join(input.directory, 'events.log'), timeoutMs: 300000, signal: input.signal });
     writeJson(join(input.directory, 'process.json'), result);
     if (result.status !== 'passed') throw new Error(`Requirement ${mode} failed: ${result.status}.`);

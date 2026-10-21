@@ -177,8 +177,9 @@ export class SerialQueue {
       if (job.kind === 'plan_review' && (!submitted || submitted.planHash !== requirement.submission?.planHash || submitted.requirementId !== requirement.id)) throw new Error('Submitted plan identity mismatch.');
       if (submitted) writeJson(join(run.evidencePath, 'submission.json'), submitted);
       const planningStarted = Date.now();
-      const decomposition = submitted ? parseDecomposition({ assumptions: submitted.plan.assumptions, issues: submitted.plan.issues }, submitted.plan.schemaVersion) : parseDecomposition(await planner.decompose({ cwd: workspace.path, directory: phase('decompose'), requirement, evidence: '', env, signal: this.options.signal }));
-      if (!submitted) { agentInvocations += 1; planningMs = Date.now() - planningStarted; }
+      const planningInvocations = agentInvocations;
+      const decomposition = submitted ? parseDecomposition({ assumptions: submitted.plan.assumptions, issues: submitted.plan.issues }, submitted.plan.schemaVersion) : parseDecomposition(await planner.decompose({ cwd: workspace.path, directory: phase('decompose'), requirement, evidence: '', env, signal: this.options.signal, onInvocation: () => { agentInvocations += 1; } }));
+      if (!submitted) { if (agentInvocations === planningInvocations) agentInvocations += 1; planningMs = Date.now() - planningStarted; }
       if (snapshot(workspace.path).hash !== before) throw new Error('Decomposition changed source files.');
       writeJson(join(run.evidencePath, 'decomposition.json'), decomposition);
       evidence = JSON.stringify(decomposition); assumptions = decomposition.assumptions;
@@ -214,8 +215,9 @@ export class SerialQueue {
       evidence += `\nVerification:\n${JSON.stringify(verification)}`;
     }
     const reviewStarted = Date.now();
-    const review = reusedReview ?? await planner.review({ cwd: workspace.path, directory: phase('independent-review'), requirement, evidence, env, signal: this.options.signal });
-    if (!reusedReview) { agentInvocations += 1; reviewMs = Date.now() - reviewStarted; }
+    const reviewInvocations = agentInvocations;
+    const review = reusedReview ?? await planner.review({ cwd: workspace.path, directory: phase('independent-review'), requirement, evidence, env, signal: this.options.signal, onInvocation: () => { agentInvocations += 1; } });
+    if (!reusedReview) { if (agentInvocations === reviewInvocations) agentInvocations += 1; reviewMs = Date.now() - reviewStarted; }
     writeJson(join(run.evidencePath, 'review.json'), review);
     if (!review.approved || review.findings.length || snapshot(workspace.path).hash !== before) throw new Error(`Requirement review failed: ${review.findings.join('; ')}`);
     if (git(repo.path, ['rev-parse', `refs/heads/${targetBranch}`]).trim() !== workspace.baseCommit) throw new Error('Target branch changed during requirement verification. Retry against the latest target.');
