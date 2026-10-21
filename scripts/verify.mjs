@@ -42,9 +42,22 @@ try {
     const result = await runProcess({ command: 'npm', args: ['run', script], cwd: process.cwd(), logPath: resolve(runDirectory, `${script.replace(':', '-')}.log`), timeoutMs: Math.min(stepTimeout, remaining), graceMs: grace, signal: abort.signal, env: { ...process.env, RUN_DIR: runDirectory }, onOutput: text => process.stdout.write(text) });
     summary.checks.push({ name: script, status: result.status, exitCode: result.exitCode ?? 1, signal: result.signal, durationMs: result.durationMs });
     writeJson(resolve(runDirectory, 'summary.json'), summary);
+    if (result.spawnErrorCode && result.settled === true) summary.diagnostics = { phase: script, code: result.spawnErrorCode, origin: 'spawn', settled: true };
+    if (script === 'test' && result.status === 'failed' && result.settled === true && !result.error) {
+      try {
+        const records = readFileSync(resolve(runDirectory, 'node-results.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line));
+        const assertion = error => Boolean(error && (error.code === 'ERR_ASSERTION' || error.name === 'AssertionError' || assertion(error.cause)));
+        if (records.some(event => event.type === 'test:fail' && assertion(event.data.details?.error))) summary.diagnostics = { kind: 'product', phase: script, origin: 'node-report', settled: true };
+      } catch (error) { summary.diagnosticReadError = error.message; }
+    }
     if (result.status !== 'passed') throw new Error(`${script}: ${result.status}${result.error ? `: ${result.error}` : ''}`);
-    if (script === 'test') summary.node = inspectNodeReport(resolve(runDirectory, 'node-results.jsonl'), contract.requiredNodeTests);
-    if (script === 'test:e2e') summary.browser = inspectBrowserReport(resolve(runDirectory, 'browser-results.json'), contract);
+    try {
+      if (script === 'test') summary.node = inspectNodeReport(resolve(runDirectory, 'node-results.jsonl'), contract.requiredNodeTests);
+      if (script === 'test:e2e') summary.browser = inspectBrowserReport(resolve(runDirectory, 'browser-results.json'), contract);
+    } catch (error) {
+      if (result.settled === true && !result.error) summary.diagnostics = { kind: 'test-contract', phase: script, origin: 'report-validation', settled: true };
+      throw error;
+    }
   }
   if (readFileSync(contractPath, 'utf8') !== contractBytes) throw new Error('Verification contract changed during the run.');
   if (snapshot(process.cwd()).hash !== before.hash) throw new Error('Code snapshot changed during verification.');

@@ -33,9 +33,9 @@ This is a local autonomous development workbench with a reproducible verifier, a
 ## Workflow
 
 1. Inspect the relevant code and documentation.
-2. Add one failing behavior check and run it. Confirm the failure is for the expected reason.
-3. Implement the smallest change, run the check, then the regression suite.
-4. Run `npm run verify`. Read `.runs/latest.json` and the referenced summary; do not claim success from prose or a screenshot alone.
+2. Select meaningful existing coverage; add a failing behavior check only for a coverage gap. New checks need owner red proofs and independent coverage review before implementation. Harness changes retain targeted deterministic regression checks.
+3. Implement the smallest change and run related named checks. An adaptive integrated task runs one fresh complete verifier on the final integrated source; diagnostics alone cannot authorize delivery.
+4. Run `npm run verify` on the final candidate or integrated tree. Reuse whole-requirement proof only through the exact-source owner certificate rules in `docs/adaptive-execution-contract.md`. Read `.runs/latest.json` and the referenced summary; do not claim success from prose or a screenshot alone.
 5. Inspect the diff and use independent review before committing.
 
 Do not weaken existing acceptance checks, disable verification steps, or alter required criteria to make a feature pass. Propose changes to the verification contract separately. Stop before publishing a repository, force-pushing, deploying, or operating on non-disposable data without authorization.
@@ -45,10 +45,10 @@ Do not weaken existing acceptance checks, disable verification steps, or alter r
 - For new product behavior, use `.agents/skills/issue-tracker-submit/SKILL.md` to turn the authorized conversation into a complete submitted plan unless the user explicitly requests direct implementation. Harness/platform engineering and repository maintenance use the normal workflow above.
 - Persist one submission ID and the full original goal, source summary, acceptance conditions, defaults, and dependency graph before submitting. The platform independently reviews coverage before releasing implementation jobs. Do not run a second executor against submitted work.
 - Submission receipt and worker prose do not prove delivery. Read the platform's current run reports and whole-requirement outcome; HTTP replay must never restart blocked work.
-- Derive independently verifiable slices from the business goal. Map every acceptance ID to concrete behavior checks.
+- Derive independently verifiable slices from the business goal. Prefer one issue for a small cohesive requirement. Map every acceptance ID to meaningful named Node or browser checks; do not require both layers mechanically.
 - Choose reasonable defaults for ordinary implementation details, record each decision and reason, and continue without asking about every detail.
 - Ask only when an unresolved choice materially changes the business goal or exceeds the authorized scope.
-- Include relevant negative cases and boundary checks. Confirm a new check fails because the requested behavior is missing, not because the environment is broken.
+- Reuse equivalent frozen baseline coverage when sufficient. Invoke tests and independent acceptance coverage review only for new or revised unapproved checks. Include relevant negative cases and boundaries for actual risk; avoid duplicating established controller enforcement in feature tests. Confirm a new check fails because the requested behavior is missing, not because the environment is broken.
 - A worker report is a proposal. Only the controller can mark a task ready after verification and independent review.
 - The queue may automatically integrate into its explicitly enrolled local target after a fresh full check and independent review of the integrated tree. Worker agents must not commit or merge. Completion requires a recorded verified merge; human sampling is not a gate.
 - Whole-requirement verification must prove the original business goal after all child merges. Dependency readiness requires merge evidence, not manually edited status.
@@ -76,3 +76,5 @@ For review purpose, checkpoint reuse, cumulative budgets, and ownership recovery
 When independent code review identifies a reproducible defect missing deterministic coverage, request regression tests before repair. The tests role adds new scoped test files only; controller-owned red proofs and independent acceptance review precede freezing and repair. Existing files, accepted assertions, roles, full verification gates, and cumulative retry budgets remain protected. See `docs/harness-reliability.md` for the pending and accepted checkpoint rules.
 
 For explicitly GitHub-enrolled requirements, child integration targets the reserved requirement branch. Whole-goal acceptance precedes publication; completion requires a confirmed GitHub PR merge, exact-head CI evidence and local target synchronization. Publication is controller-owned and `.github/` verification controls remain protected. Never force-push or bypass GitHub checks/reviews. Existing local-only requirements and standalone issues retain their enrolled local target. Follow `docs/github-delivery.md` for owner enrollment and recovery.
+
+Adaptive execution is enabled only by controller-owned `factory/execution-policy.json`; missing policy and version-one tasks keep legacy behavior. Baseline reuse records real named proofs and a distinct owner receipt, always invokes implementation, and cannot change frozen tests. Keep a fresh complete integrated verifier and independent final source review. Same-requirement evidence reuse additionally binds exact target/source/runtime/engine/contract/reports; sole-child whole-goal review reuse requires an explicit exact-goal receipt. Only positively identified settled spawn resource faults permit one persistent budgeted verification retry. Read `docs/adaptive-execution-contract.md` and `docs/loop-optimization.md`.

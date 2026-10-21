@@ -8,6 +8,7 @@ import { IssueStore } from '../src/storage.ts';
 import type { Issue } from '../src/domain.ts';
 import type { Delivery, Job, WorkRun } from '../src/workflow.ts';
 import { saveDelivery } from '../factory/delivery.ts';
+import { recordDiagnosticRun } from './diagnostic-fixture.ts';
 import { appUrl, test } from './workspace.ts';
 import { expectRepositorySelection, expectStatusSelection, selectRepository, selectStatus } from './navigation.ts';
 
@@ -45,16 +46,10 @@ function fixture(info: TestInfo) {
   const requirement = store.work.addRequirement({ repoId: repo.id, title: `${prefix} requirement`, goal: 'Inspect agent-owned work and retained execution evidence.' });
   const child = (title: string, dependsOn: number[] = []) => store.create({ title: `${prefix} ${title}`, description: 'Persisted inspection description.', status: 'open', priority: 'high', labels: ['inspection'], work: { repoId: repo.id, requirementId: requirement.id, dependsOn, acceptance: ['Agent-owned delivery remains inspectable.'] } });
   const record = (issueId: number | null, status: Exclude<Job['status'], 'queued'>, reason: string | null = null, kind: Job['kind'] = 'issue', fields: Partial<Delivery> = {}): WorkRun => {
-    const id = randomUUID();
-    const now = new Date().toISOString();
-    const jobId = Number(db.prepare('INSERT INTO jobs (repo_id, requirement_id, issue_id, kind, status, payload, run_id, reason, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(repo.id, requirement.id, issueId, kind, status, '{}', id, reason, now, now).lastInsertRowid);
-    const runStatus = status === 'completed' ? kind === 'issue' ? 'merged' : 'passed' : status;
-    const evidencePath = join(root, id);
-    mkdirSync(evidencePath, { recursive: true });
-    db.prepare('INSERT INTO work_runs (id, job_id, repo_id, requirement_id, issue_id, status, evidence_path, reason, started_at, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(id, jobId, repo.id, requirement.id, issueId, runStatus, evidencePath, reason, now, status === 'running' ? null : now);
-    writeFileSync(join(evidencePath, 'worker.log'), `Retained log ${id}\n<script>untrusted evidence</script>\n`);
-    saveDelivery(evidencePath, { schemaVersion: 1, runId: id, taskId: `inspection-${jobId}`, title: requirement.title, goal: requirement.goal, summary: `Stored report ${id}`, status: runStatus, startedAt: now, completedAt: now, baseline: null, sourceHash: null, defaults: [], changes: [], checks: [{ name: 'Retained verification', status: status === 'blocked' ? 'failed' : 'passed' }], nodePassed: 1, browserPassed: 1, attempts: 1, review: { approved: status === 'completed', summary: 'Stored independent assessment.' }, integration: null, limitations: reason ? [reason] : [], ...fields });
-    return store.work.run(id)!;
+    const run = recordDiagnosticRun(store, db, { root, repoId: repo.id, requirementId: requirement.id, issueId, kind, status, reason });
+    writeFileSync(join(run.evidencePath, 'worker.log'), `Retained log ${run.id}\n<script>untrusted evidence</script>\n`);
+    saveDelivery(run.evidencePath, { schemaVersion: 1, runId: run.id, taskId: `inspection-${run.jobId}`, title: requirement.title, goal: requirement.goal, summary: `Stored report ${run.id}`, status: run.status, startedAt: run.startedAt, completedAt: run.completedAt ?? run.startedAt, baseline: null, sourceHash: null, defaults: [], changes: [], checks: [{ name: 'Retained verification', status: status === 'blocked' ? 'failed' : 'passed' }], nodePassed: 1, browserPassed: 1, attempts: 1, review: { approved: status === 'completed', summary: 'Stored independent assessment.' }, integration: null, limitations: reason ? [reason] : [], ...fields });
+    return run;
   };
   return { store, db, repo, requirement, prefix, child, record, close: () => {
     const now = new Date().toISOString();

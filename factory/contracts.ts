@@ -1,7 +1,7 @@
 export type Acceptance = { id: string; description: string };
-export type Task = { schemaVersion: 1; id: string; title: string; goal: string; acceptance: Acceptance[]; scope: string[]; verificationCommand: 'npm run verify'; budget: { maxAttempts: number; workerTimeoutMs: number; totalTimeoutMs: number }; notes: string };
-export type Check = { file: string; title: string };
-export type Plan = { schemaVersion: 1; taskId: string; assumptions: { decision: string; reason: string }[]; slices: { id: string; goal: string; acceptanceIds: string[]; checks: Check[] }[]; browserChecks: Check[] };
+export type Task = { schemaVersion: 1 | 2; id: string; title: string; goal: string; wholeGoal?: { requirementId: number; goal: string }; acceptance: Acceptance[]; scope: string[]; verificationCommand: 'npm run verify'; budget: { maxAttempts: number; workerTimeoutMs: number; totalTimeoutMs: number }; notes: string };
+export type Check = { file: string; title: string; acceptanceIds?: string[] };
+export type Plan = { schemaVersion: 1 | 2; coverage?: { mode: 'reuse' | 'extend'; reason: string }; taskId: string; assumptions: { decision: string; reason: string }[]; slices: { id: string; goal: string; acceptanceIds: string[]; checks: Check[] }[]; browserChecks: Check[] };
 export type WorkerReport = { schemaVersion: 1; taskId: string; summary: string; blockers: string[] };
 export type Review = { schemaVersion: 1; taskId: string; approved: boolean; needsRegression?: boolean; summary: string; findings: string[] };
 
@@ -51,7 +51,7 @@ function path(input: unknown, name: string): string {
 
 export function parseTask(input: unknown): Task {
   const value = object(input, 'Task');
-  if (value.schemaVersion !== 1) throw new Error('Unsupported task schema version.');
+  if (value.schemaVersion !== 1 && value.schemaVersion !== 2) throw new Error('Unsupported task schema version.');
   if (value.verificationCommand !== 'npm run verify') throw new Error('Task verification must use the controller-owned verification command.');
   const acceptance = list(value.acceptance, 'acceptance').map(input => {
     const item = object(input, 'Acceptance item');
@@ -63,12 +63,19 @@ export function parseTask(input: unknown): Task {
   const budget = object(value.budget, 'Budget');
   const parsedBudget = { maxAttempts: integer(budget.maxAttempts, 'maxAttempts', 1, 5), workerTimeoutMs: integer(budget.workerTimeoutMs, 'workerTimeoutMs', 1000, 600000), totalTimeoutMs: integer(budget.totalTimeoutMs, 'totalTimeoutMs', 1000, 3600000) };
   if (parsedBudget.totalTimeoutMs < parsedBudget.workerTimeoutMs) throw new Error('Total budget cannot be smaller than the worker budget.');
-  return { schemaVersion: 1, id: id(value.id, 'Task ID'), title: text(value.title, 'Title'), goal: text(value.goal, 'Goal'), acceptance, scope, verificationCommand: 'npm run verify', budget: parsedBudget, notes: typeof value.notes === 'string' ? value.notes : '' };
+  const wholeGoal = value.schemaVersion === 2 && value.wholeGoal !== undefined ? object(value.wholeGoal, 'Whole goal') : undefined;
+  return { schemaVersion: value.schemaVersion, ...(wholeGoal ? { wholeGoal: { requirementId: integer(wholeGoal.requirementId, 'Requirement ID', 1, Number.MAX_SAFE_INTEGER), goal: text(wholeGoal.goal, 'Whole goal') } } : {}), id: id(value.id, 'Task ID'), title: text(value.title, 'Title'), goal: text(value.goal, 'Goal'), acceptance, scope, verificationCommand: 'npm run verify', budget: parsedBudget, notes: typeof value.notes === 'string' ? value.notes : '' };
 }
 
 export function parsePlan(input: unknown, task: Task): Plan {
   const value = object(input, 'Plan');
-  if (value.schemaVersion !== 1 || value.taskId !== task.id) throw new Error('Plan version or task identity mismatch.');
+  if (value.schemaVersion !== task.schemaVersion || value.taskId !== task.id) throw new Error('Plan version or task identity mismatch.');
+  const adaptive = task.schemaVersion === 2;
+  const coverage = adaptive ? object(value.coverage, 'Coverage') : undefined;
+  if (coverage && !['reuse', 'extend'].includes(String(coverage.mode))) throw new Error('Coverage mode must be reuse or extend.');
+  const identities = new Set<string>();
+  const distinct = (file: string, title: string) => { const key = `${file}#${title}`; if (adaptive && identities.has(key)) throw new Error('Duplicate named check.'); identities.add(key); return { file, title }; };
+  const executable = new Set<string>();
   const assumptions = list(value.assumptions, 'assumptions').map(input => {
     const item = object(input, 'Assumption');
     return { decision: text(item.decision, 'Decision'), reason: text(item.reason, 'Reason') };
@@ -90,9 +97,10 @@ export function parsePlan(input: unknown, task: Task): Plan {
       const check = object(input, 'Check');
       const file = path(check.file, 'Check file');
       if (!file.startsWith('tests/') || !file.endsWith('.test.ts') || !scoped(file, task)) throw new Error('Slice checks must be scoped Node behavior tests.');
-      return { file, title: text(check.title, 'Check title') };
+      return distinct(file, text(check.title, 'Check title'));
     });
-    if (!acceptanceIds.length || !checks.length) throw new Error('Each slice needs acceptance IDs and executable checks.');
+    if (!acceptanceIds.length || !adaptive && !checks.length) throw new Error('Each slice needs acceptance IDs and executable checks.');
+    if (checks.length) acceptanceIds.forEach(id => executable.add(id));
     return { id: sliceId, goal: text(item.goal, 'Slice goal'), acceptanceIds, checks };
   });
   if (!slices.length || task.acceptance.some(item => !covered.has(item.id))) throw new Error('Plan must cover every acceptance item.');
@@ -100,10 +108,16 @@ export function parsePlan(input: unknown, task: Task): Plan {
     const check = object(input, 'Browser check');
     const file = text(check.file, 'Browser file').replace(/^acceptance\//, '');
     if (file.includes('/') || file.includes('\\') || !file.endsWith('.spec.ts') || !scoped(`acceptance/${file}`, task)) throw new Error('Browser checks must use scoped acceptance specs.');
-    return { file, title: text(check.title, 'Browser title') };
+    const parsed = distinct(file, text(check.title, 'Browser title'));
+    if (!adaptive) return parsed;
+    const acceptanceIds = list(check.acceptanceIds, 'Browser acceptance IDs').map(input => id(input, 'Browser acceptance ID'));
+    if (!acceptanceIds.length || new Set(acceptanceIds).size !== acceptanceIds.length || acceptanceIds.some(id => !task.acceptance.some(item => item.id === id))) throw new Error('Browser checks need distinct known acceptance IDs.');
+    acceptanceIds.forEach(id => executable.add(id));
+    return { ...parsed, acceptanceIds };
   });
-  if (!browserChecks.length) throw new Error('Plan needs externally observable browser acceptance.');
-  return { schemaVersion: 1, taskId: task.id, assumptions, slices, browserChecks };
+  if (!adaptive && !browserChecks.length) throw new Error('Plan needs externally observable browser acceptance.');
+  if (adaptive && task.acceptance.some(item => !executable.has(item.id))) throw new Error('Every acceptance item needs named executable coverage.');
+  return { schemaVersion: task.schemaVersion, ...(coverage ? { coverage: { mode: coverage.mode as 'reuse' | 'extend', reason: text(coverage.reason, 'Coverage reason') } } : {}), taskId: task.id, assumptions, slices, browserChecks };
 }
 
 export function parseWorkerReport(input: unknown, task: Task): WorkerReport {
@@ -127,6 +141,7 @@ const strings = { type: 'array', items: string };
 const recordSchema = (properties: Record<string, unknown>) => ({ type: 'object', additionalProperties: false, properties, required: Object.keys(properties) });
 const checkSchema = recordSchema({ file: string, title: string });
 export const planSchema = recordSchema({ schemaVersion: { type: 'integer', const: 1 }, taskId: string, assumptions: { type: 'array', items: recordSchema({ decision: string, reason: string }) }, slices: { type: 'array', items: recordSchema({ id: string, goal: string, acceptanceIds: strings, checks: { type: 'array', items: checkSchema } }) }, browserChecks: { type: 'array', items: checkSchema } });
+export const adaptivePlanSchema = recordSchema({ ...planSchema.properties, schemaVersion: { type: 'integer', const: 2 }, coverage: recordSchema({ mode: { type: 'string', enum: ['reuse', 'extend'] }, reason: string }), browserChecks: { type: 'array', items: recordSchema({ file: string, title: string, acceptanceIds: strings }) } });
 export const workerSchema = recordSchema({ schemaVersion: { type: 'integer', const: 1 }, taskId: string, summary: string, blockers: strings });
 export const reviewSchema = recordSchema({ schemaVersion: { type: 'integer', const: 1 }, taskId: string, approved: { type: 'boolean' }, needsRegression: { type: 'boolean' }, summary: string, findings: strings });
 

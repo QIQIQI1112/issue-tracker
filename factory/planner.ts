@@ -6,10 +6,12 @@ import { writeJson } from './evidence.ts';
 import { parseReview, reviewSchema } from './contracts.ts';
 import { parseDecomposition } from '../src/submission.ts';
 import type { Decomposition, Requirement } from '../src/workflow.ts';
+import { snapshot } from './evidence.ts';
+import { writeRoleContext } from './optimization.ts';
 
 export { parseDecomposition } from '../src/submission.ts';
 export type { Decomposition } from '../src/workflow.ts';
-export type PlannerInput = { cwd: string; directory: string; requirement: Requirement; evidence: string; env: NodeJS.ProcessEnv; signal?: AbortSignal };
+export type PlannerInput = { cwd: string; directory: string; requirement: Requirement; evidence: string; env: NodeJS.ProcessEnv; signal?: AbortSignal; onInvocation?: () => void };
 export type Planner = { decompose(input: PlannerInput): Promise<Decomposition>; review(input: PlannerInput): Promise<{ approved: boolean; summary: string; findings: string[] }> };
 
 const string = { type: 'string' };
@@ -22,14 +24,16 @@ export function codexPlanner(binary = 'codex'): Planner {
     const schemaPath = join(input.directory, 'output-schema.json');
     const responsePath = join(input.directory, 'response.json');
     writeJson(schemaPath, mode === 'decompose' ? decompositionSchema : reviewSchema);
-    const instruction = mode === 'decompose' ? 'Decompose this business requirement into at most 20 independently verifiable issues. Choose ordinary defaults and explain them. Every issue needs concrete acceptance conditions and dependencies expressed with issue keys. Keys must contain 1–64 lowercase letters, digits, or hyphens, for example ready-value. Dependencies must reference exact keys; no cycles or duplicates. Descriptions contain at most 2000 characters. Cover the whole original goal, including integration behavior. Do not invent unrelated work.' : `Independently review the requirement against the supplied decomposition or integrated delivery evidence and actual source. Check completeness, meaningful acceptance, dependency order, and the original business goal across all issues. Approve only when there are no blocking findings. Use taskId requirement-${input.requirement.id}, schemaVersion 1, and put only blocking findings in findings.`;
+    const instruction = mode === 'decompose' ? 'Default to one issue for a small cohesive business requirement. Split into at most 20 independently verifiable issues only when separate delivery, meaningful dependencies or owner-maintenance boundaries require it. Choose ordinary defaults and explain them. Every issue needs concrete acceptance conditions and dependencies expressed with issue keys. Keys must contain 1–64 lowercase letters, digits, or hyphens, for example ready-value. Dependencies must reference exact keys; no cycles or duplicates. Descriptions contain at most 2000 characters. Cover the whole original goal, including integration behavior. Do not invent unrelated work or require new tests when existing named checks already observe the changed behavior.' : `Independently review the requirement against the supplied decomposition or integrated delivery evidence and actual source. Check completeness, meaningful acceptance, dependency order, and the original business goal across all issues. Approve only when there are no blocking findings. Use taskId requirement-${input.requirement.id}, schemaVersion 1, and put only blocking findings in findings.`;
     const evidence = Buffer.from(input.evidence, 'utf8');
     const evidencePath = resolve(input.directory, 'evidence.txt');
     writeFileSync(evidencePath, evidence);
     const reference = { path: evidencePath, bytes: evidence.byteLength, sha256: createHash('sha256').update(evidence).digest('hex') };
-    const inline = evidence.byteLength <= 64 * 1024 ? `\n\nEvidence (inline):\n${input.evidence}` : '';
-    const prompt = `Follow AGENTS.md. This is a read-only ${mode} phase. Do not edit, commit, merge, push, or start servers. Return the structured response within five minutes. Write reports in English.\n\n${instruction}\n\nRequirement:\n${JSON.stringify(input.requirement)}\n\nEvidence file:\n${JSON.stringify(reference)}\nRead the full retained evidence file and inspect actual source and underlying machine reports. Never approve from summaries alone. The reference preserves complete evidence; large manifests are omitted from inline input without truncating the file.${inline}`;
+    const context = writeRoleContext({ directory: input.directory, role: `requirement-${mode}`, goal: input.requirement.goal, sourceHash: snapshot(input.cwd).hash, feedback: input.evidence, evidence: [{ path: evidencePath, purpose: 'Complete immutable requirement input and retained delivery references.' }] });
+    const inline = evidence.byteLength <= 8 * 1024 ? `\n\nEvidence (inline):\n${input.evidence}` : '';
+    const prompt = `Follow AGENTS.md. This is a read-only ${mode} phase. Do not edit, commit, merge, push, or start servers. Return the structured response within five minutes. Write reports in English.\n\n${instruction}\n\nRequirement:\n${JSON.stringify(input.requirement)}\n\nContext index:\n${context.indexPath}\n\nEvidence file:\n${JSON.stringify(reference)}\nRead the indexed complete retained evidence and inspect relevant actual source and underlying machine reports. Start with named checks and referenced paths; expand repository exploration when a concrete coverage gap or inconsistency requires it. Never approve from summaries alone. The reference preserves complete evidence; large manifests are omitted from inline input without truncating the file.${inline}`;
     writeFileSync(join(input.directory, 'prompt.txt'), prompt);
+    input.onInvocation?.();
     const result = await runProcess({ command: binary, args: ['-c', 'approval_policy="never"', 'exec', '--json', '--sandbox', 'read-only', '--ephemeral', '--cd', input.cwd, '--output-schema', schemaPath, '--output-last-message', responsePath, '-'], cwd: input.cwd, env: input.env, input: prompt, logPath: join(input.directory, 'events.log'), timeoutMs: 300000, signal: input.signal });
     writeJson(join(input.directory, 'process.json'), result);
     if (result.status !== 'passed') throw new Error(`Requirement ${mode} failed: ${result.status}.`);
