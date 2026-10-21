@@ -33,7 +33,7 @@ export async function proveRegression(options: { check: Check; browser: boolean;
     : ['--import', 'tsx', '--test', `--test-name-pattern=^${escaped}$`, `--test-reporter=${options.reporter}`, `--test-reporter-destination=${reportPath}`, check.file], cwd, env: { ...options.env, RUN_DIR: runDirectory, PLAYWRIGHT_JSON_OUTPUT_FILE: reportPath }, logPath, timeoutMs: options.timeoutMs, signal: options.signal });
   if (result.status === 'timeout' || result.status === 'cancelled' || result.status === 'output_limit' || result.error) throw new Error(`Behavior proof process ${result.status}: ${result.error ?? `${check.file}#${check.title}`}`);
   let assertion: boolean;
-  let passed = false;
+  let passed: boolean;
   if (browser) {
     try {
       const report = readJson(reportPath) as { errors: unknown[]; suites: BrowserSuite[]; stats: { unexpected: number; expected: number; skipped: number; flaky: number } };
@@ -52,9 +52,11 @@ export async function proveRegression(options: { check: Check; browser: boolean;
     const records = readFileSync(reportPath, 'utf8').trim().split('\n').map(line => JSON.parse(line));
     const isAssertion = (error: Record<string, unknown> | undefined): boolean => Boolean(error && (error.name === 'AssertionError' || error.code === 'ERR_ASSERTION' || isAssertion(error.cause as Record<string, unknown> | undefined)));
     const failures = records.filter(event => event.type === 'test:fail');
+    const successes = records.filter(event => event.type === 'test:pass');
+    passed = failures.length === 0 && successes.length === 1 && successes[0].data.name === check.title && successes[0].data.file === realpathSync(resolve(cwd, check.file)) && !successes[0].data.skip && !successes[0].data.todo;
     assertion = failures.length === 1 && failures[0].data.name === check.title && failures[0].data.file === realpathSync(resolve(cwd, check.file)) && isAssertion(failures[0].data.details?.error);
   }
-  if (browser && options.allowAlreadyPassed && result.status === 'passed' && passed) return { ...check, status: 'already_passed', logPath, reportPath };
+  if (options.allowAlreadyPassed && result.status === 'passed' && passed) return { ...check, status: 'already_passed', logPath, reportPath };
   if (result.status !== 'failed' || !assertion) throw new BehaviorProofError(`Regression red proof did not establish a named behavior assertion: ${check.file}#${check.title}`);
   return { ...check, status: 'expected_failure', logPath, reportPath };
 }

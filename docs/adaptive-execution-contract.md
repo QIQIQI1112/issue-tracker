@@ -1,6 +1,6 @@
 # Adaptive serial execution contract
 
-This separately reviewed acceptance-contract revision stages the authorized four-stage optimization. It is inactive until the owner integrates the implementation and the protected `factory/execution-policy.json` opts the enrolled repository into `adaptive-v2`. Repositories without policy and version-one tasks retain the existing workflow. Unknown or malformed policy fails closed.
+This separately reviewed acceptance-contract revision stages the authorized four-stage optimization. It becomes active only after the owner integrates the implementation and the protected `factory/execution-policy.json` opts the enrolled repository into `adaptive-v2`. Repositories without policy and version-one tasks retain the existing workflow. Unknown or malformed policy fails closed.
 
 ## Behavior coverage and roles
 
@@ -8,7 +8,7 @@ Every acceptance ID maps to meaningful named Node or browser checks; either laye
 
 A version-two plan declares `coverage.mode` and its reason. `reuse` selects only existing baseline tests, including their frozen helper inventory. The controller runs actual named proofs and records a distinct baseline coverage receipt bound to the plan, criteria, source, controls and environment. This receipt is an owner admission record, never a fabricated independent acceptance review. Passing old checks do not prove a new feature: implementation still runs and final independent review assesses the goal and coverage relevance. A coverage gap discovered in review enters the existing independently approved regression workflow.
 
-`extend` retains the tests role, expected assertion failures, independent acceptance coverage review and inventory freezing before implementation. Test authors add missing behavior checks at the cheapest meaningful layer. Do not write tests for markup shape, historical issue IDs, or enforcement already owned by the controller. Existing baseline and accepted bytes remain protected during implementation. A reproducible uncovered defect requires a regression check before repair.
+`extend` retains the tests role, expected assertion failures, independent acceptance coverage review and inventory freezing before implementation. Test authors add missing behavior checks at the cheapest meaningful layer. Ordinary feature tasks should not duplicate markup shape, historical issue IDs, or established enforcement owned by the controller unless the change affects that invariant. Harness changes retain focused deterministic regression checks for changed controls. Existing baseline and accepted bytes remain protected during implementation. A reproducible uncovered defect requires a regression check before repair.
 
 ## Verification and handoff
 

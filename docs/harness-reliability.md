@@ -1,10 +1,10 @@
 # Change ownership, review, and recovery
 
-Requirement planning and review retain each invocation's complete evidence string as `evidence.txt`, including response repair attempts. Prompts identify its absolute path, UTF-8 byte count and SHA-256. Evidence up to 64 KiB also remains inline for small-context compatibility; larger manifests are read from the retained file to keep CLI input bounded. Reviewers inspect complete retained evidence, actual source and underlying machine reports rather than approve from summaries. No evidence is truncated, and review schemas, sandbox, deadlines, retry counts and approval gates remain unchanged. Failed invocations retain their evidence for diagnosis.
+Requirement planning and review retain each invocation's complete evidence string as `evidence.txt`, including response repair attempts. Prompts identify its absolute path, UTF-8 byte count and SHA-256. Evidence up to 8 KiB also remains inline; larger inputs are read through the retained file and compact `context-index.json`. Role context preserves the original goal, exact source, relevant paths, decisions, full feedback bytes and owner evidence hashes. Indexed evidence remains authoritative over worker narrative. Reviewers inspect complete retained evidence, actual source and underlying machine reports rather than approve from summaries. No evidence is truncated, and review schemas, sandbox, deadlines, retry counts and approval gates remain unchanged. Failed invocations retain their evidence for diagnosis.
 
 ## Plan changes by responsibility
 
-Keep new behavior checks in their feature issue. The tests worker adds the checks; an independent acceptance reviewer evaluates their coverage before implementation. A new test is not automatically a new issue.
+Keep new behavior checks in their feature issue. First identify changed behavior, its impact, and named existing coverage. Add checks only for uncovered risks, using Node, API integration or browser checks where the behavior is observable. Ordinary feature tasks do not duplicate unchanged controller enforcement; changed harness invariants still need targeted deterministic regressions. The tests worker adds necessary checks; an independent acceptance reviewer evaluates the extension before implementation. A new test is not automatically a new issue. Small cohesive requirements default to one issue; separate delivery, real dependencies or owner-maintenance boundaries justify splitting.
 
 Create a separate `acceptance_contract` issue when changing an existing required assertion, required case, verification gate, or acceptance criterion. Create a separate `harness` issue when changing the controller, verifier, review policy, recovery, budgets, or protected workbench controls. Declare dependencies explicitly. Version-two conversation plans accept `changeKind`; version-one plans retain their original canonical identity. A classification never expands a worker's write permissions.
 
@@ -12,19 +12,19 @@ The ordinary queue leaves maintenance jobs awaiting owner verification. Maintena
 
 ## Review the right evidence at each stage
 
-Ordinary integrated feature execution follows this order:
+The owner policy `factory/execution-policy.json` selects `{ "schemaVersion": 1, "mode": "adaptive-v2" }` for newly dispatched queue tasks. A missing policy retains `legacy-v1`; malformed policy blocks instead of silently changing execution. Conversation schema version two describes issue classification and does not itself authorize an execution profile.
 
-1. Plan acceptance coverage and named behavior checks.
-2. Add or repair only unapproved scoped checks.
-3. Run controller-owned named red proofs, distinguishing missing behavior from environment/import failures and already-satisfied behavior.
-4. Independently review coverage, assertions, boundary cases, and the actual red proofs. Repeat steps 2–4 within the acceptance budget when rejected.
-5. Freeze accepted checks, implement, and run the complete verifier.
-6. Apply the patch to the latest enrolled target and run the complete verifier again.
-7. Independently review that integrated code and its evidence. Repair a rejected candidate within the implementation budget, then repeat verification and final review.
-8. Advance the local target only to the exact verified and reviewed tree.
-9. Verify and independently review the original whole requirement after all child merges.
+Adaptive version-two integrated execution follows this order:
 
-There is one authoritative code review for each integrated candidate. Candidate verification, integrated verification, and whole-requirement verification remain mandatory. A delivery without a merge target retains its independent candidate code review. Maintenance retains its separate owner review and admission requirements.
+1. Read-only planning maps every acceptance ID to meaningful named existing or proposed checks and explains `coverage.mode`: `reuse` or `extend`. Node and browser checks may cover criteria independently; neither layer is required merely to fill a template.
+2. In `reuse`, the owner resolves existing named checks and freezes the complete baseline inventory with a distinct source/plan/criteria/contract-bound reuse receipt. No tests worker or new-test acceptance review runs. The final independent code reviewer must confirm coverage remains meaningful for the actual change.
+3. In `extend`, add or repair only unapproved scoped checks. Controller-owned red proofs and independent acceptance review precede freezing. Draft rejection uses the existing cumulative acceptance budget. Existing checks remain protected.
+4. Implement within scope and run selected named checks for early diagnostic feedback. A focused pass cannot authorize readiness, integration or publication.
+5. Apply the candidate to the latest enrolled target and execute one fresh complete verifier there. Independently review that exact integrated source and evidence. Repair rejection within cumulative budgets, then repeat the necessary diagnostics, full integrated verification and review.
+6. Advance the target only to the exact verified and approved tree. A moving target requires a new integrated proof; dirty checkouts and unsafe ownership block.
+7. Run the durable whole-requirement acceptance job after all child merges. It may reference eligible unchanged integrated verification evidence. An exact sole-child combined approval may cover the original goal; otherwise obtain a fresh independent whole-goal review. Record every reused run and original timestamp.
+
+Legacy version-one execution retains planning, tests, red proofs, acceptance review/freeze, full candidate verification, full integrated verification and final integrated code review. Its whole-requirement job continues fresh verification and review. Direct delivery-only execution in either version retains fresh complete candidate verification and independent code review. Maintenance retains separate owner admission and source review. Full gate commands, required identities, permissions and cumulative budgets are unchanged.
 
 Owner receipts bind review purpose, source hash, canonical plan identity, acceptance identity, verification contract, and evidence path. Rejected reviews and earlier test generations retain separate evidence. Workers cannot approve themselves by writing a hash or claiming completion.
 
@@ -62,11 +62,27 @@ Acceptance attempts, implementation attempts, and active execution time are cumu
 
 Owned subprocess receipts include all discovered process groups and their cleanup state. Recovery refuses unsettled groups and retains unsafe workspaces for owner inspection. Stale execution lease reclamation is serialized. A crash while holding the short admission guard requires explicit inspection of that guard; automatic concurrent guard reclamation is deliberately unavailable. Inspect exact recorded PIDs and identities before cleanup, never process names.
 
+## Classify verification failures conservatively
+
+Retain the failed summary, actual reports and process ownership receipts before choosing recovery. Product assertion failures use implementation repair; invalid test preparation or contract assertions require the reviewed test-maintenance path. Unknown timeouts and error prose cannot prove an infrastructure cause.
+
+Only positive structured spawn diagnostics for `EAGAIN` or `ENFILE`, a matching failed gate and settled cleanup can authorize one same-source verification retry. Its separate infrastructure counter is cumulative across the issue lineage, active time is still charged, and it does not consume a new implementation attempt or reset any budget. A second occurrence, changed source/controls or unsafe ownership blocks ordinary recovery. Preserve both verifier executions and their diagnosis; a later pass never erases the original failure.
+
+## Reuse integrated evidence without manufacturing execution
+
+`integrated-verification-certificate.json` binds the actual integrated commit/source, executing engine/runtime, dependency installation, controls, effective required-check contract, complete five-gate report and underlying Node/browser reports to a source-bound approved code-review receipt. The latest merged child's integration commit must equal the current target. Every current child must have owned merge evidence. Missing or changed evidence, identity or environment falls back to fresh complete verification.
+
+A single-child requirement may reuse review only when the receipt purpose explicitly includes both integrated code and the original whole goal, and exact requirement ID, goal, child identity and acceptance match. Multiple-child requirements and changed goals require fresh independent whole-goal review. Verification reuse alone does not approve a business goal.
+
+The whole-goal run retains exact original report bytes and explicit `verification-reuse.json` provenance, including original run ID and start/completion times. It never invents a newly executed pass. GitHub exact-head CI, confirmed PR merge and clean target synchronization remain required.
+
 ## Read a delivery
 
 The issue report presents the goal, result, changed files, decisions, named behavior checks, verification counts, review outcome, merge commit, execution timeline, cumulative budget, predecessor, and reuse decision. Legacy reports remain readable without the new optional fields.
 
 The controller's final Result and current limitations reflect its outcome and actual failure reason. Optional `workerObservations` preserves each implementation summary in an explicitly historical UI/Markdown section, alongside the original worker JSON. Sandbox-only or pending worker observations are not current blockers after owner verification passes. If later queue admission or recovery changes a proposal to Blocked, its Result must also show the owner blocker. Existing historical evidence is retained as recorded rather than rewritten.
+
+Optional execution and efficiency fields report the chosen route, actual agent/test-authoring invocations, verification executions/retries/reuses and measured phase durations. Reused verification contributes no fresh execution time; original timestamps stay in provenance. Deterministic adapters measure orchestration, not real model latency.
 
 For workflow improvement, retain `state.json`, `task.json`, `plan.json`, review receipts, checkpoint manifests/patches, machine reports, and phase logs. The evidence manifest provides file sizes and hashes. Successful browser tests do not retain full traces; failed tests keep their debugging artifacts. Read the compact delivery first and open detailed evidence only for a concrete question.
 
@@ -82,13 +98,13 @@ The controller sends that finding to the existing tests role as `regression-test
 
 The controller runs each named new check against the reviewed defective candidate. A passing check, missing case, import failure, setup failure, skip, or timeout cannot establish a regression red proof. Browser proofs use an owned disposable server/database and machine JSON reports; Node proofs use the trusted reporter. An independent acceptance reviewer reads the finding, checks, and actual red proofs. Rejected drafts can be revised within the existing cumulative acceptance budget. Only approved checks are frozen and added to the effective verification contract. The repair worker then fixes the product while all accepted checks remain immutable.
 
-Candidate verification, integrated verification, final independent code review, verified local merge, and whole-requirement acceptance keep their existing responsibilities. An integrated review of a newer target cannot authorize red proofs against a different worker snapshot: the controller blocks for owner rebase when the reviewed source differs. Scope and criteria never expand through a regression request.
+Legacy candidate verification, mandatory fresh integrated verification, final independent code review, verified local merge, and whole-requirement acceptance retain the responsibilities of the selected profile. An integrated review of a newer target cannot authorize red proofs against a different worker snapshot: the controller blocks for owner rebase when the reviewed source differs. Scope and criteria never expand through a regression request.
 
 Before regression generation, a checkpoint retains the rejected reviewed candidate and pending request. Unapproved test drafts remain evidence and are never promoted by interruption recovery. Retry regenerates those drafts and repeats red proofs and independent acceptance review. After approval, checkpoints retain the new check hashes, red logs and machine reports, and source-bound coverage receipt; retry restores these checks frozen and runs fresh complete verification and code review. Orphan regression proof files or review receipts reject reuse, so missing pending or accepted regression metadata cannot silently authorize repair. Acceptance attempts, implementation attempts, elapsed execution time, and ownership lineage remain cumulative. Exhaustion still requires an explicit owner decision.
 
 Delivery reports include the added behavior checks, coverage receipt, phase timing, and proof paths. New test files are discovered by the ordinary test commands after integration, so later tasks run the regression automatically. `acceptance/refresh-focus.spec.ts` is the permanent regression for issue opener retention and focus restoration during a job-triggered background refresh, covering success/failure and title/identifier entry controls.
 
-The frozen contract includes the complete approved file inventory under `tests/` and `acceptance/`, including helpers. Implementation and repair cannot add test files after coverage approval. Only the initial tests phase or the independently reviewed `regression-tests` branch can extend that inventory. Accepted checkpoints read the controller-owned `accepted-checks.json` inventory and verify exact file membership and hashes before writing a patch or manifest. Interrupted draft capture uses the same checkpoint gate; unreviewed files cannot become accepted through recovery. The approved inventory is itself a hashed checkpoint proof; loaded checkpoint metadata must match it before reuse. Restoration also checks exact membership. A rejected capture retains the last valid checkpoint and its proof bytes.
+The frozen contract includes the complete approved file inventory under `tests/` and `acceptance/`, including helpers. Implementation and repair cannot add test files after coverage approval. A reuse-only plan cannot extend that inventory. Only the initial extension tests phase or the independently reviewed `regression-tests` branch can extend it. Accepted checkpoints read the controller-owned `accepted-checks.json` inventory and verify exact file membership and hashes before writing a patch or manifest. Interrupted draft capture uses the same checkpoint gate; unreviewed files cannot become accepted through recovery. The approved inventory is itself a hashed checkpoint proof; loaded checkpoint metadata must match it before reuse. Restoration also checks exact membership. A rejected capture retains the last valid checkpoint and its proof bytes.
 
 ## Publish accepted requirements
 

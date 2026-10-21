@@ -5,7 +5,7 @@ description: Turn a user's authorized business requirement from a Codex conversa
 
 # Submit a conversation requirement
 
-Keep the user in the conversation. Capture the business goal, necessary constraints, ordinary defaults with reasons, and independently verifiable issues with dependencies. Preserve the original goal for whole-requirement acceptance. Read [the submission contract](../../../docs/conversation-intake.md) for the JSON format and commands.
+Keep the user in the conversation. Capture the business goal, necessary constraints, ordinary defaults with reasons, and independently verifiable issues with dependencies. Preserve the original goal for whole-requirement acceptance. Prefer one issue for a small cohesive change; split only for independently meaningful behavior, real dependencies or separate maintenance ownership. Reuse equivalent coverage and add tests only for actual gaps; do not demand a Node and browser test for each change mechanically. Read [the submission contract](../../../docs/conversation-intake.md) for the JSON format and commands.
 
 Locate the platform checkout and running API. From that checkout, run `npm run submit-plan -- --list`. For a nondefault instance, supply `--url` and `--database`. Choose the enrolled repository matching the user's intended target. Never infer a repository ID from its position or register a different target without authorization.
 

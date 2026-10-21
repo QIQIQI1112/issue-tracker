@@ -4,7 +4,7 @@ import { processIdentity } from './ownership.ts';
 import { writeJson } from './evidence.ts';
 import { dirname } from 'node:path';
 
-export type ProcessResult = { status: 'passed' | 'failed' | 'timeout' | 'cancelled' | 'output_limit'; pid: number | null; exitCode: number | null; signal: NodeJS.Signals | null; durationMs: number; output: string; error?: string };
+export type ProcessResult = { status: 'passed' | 'failed' | 'timeout' | 'cancelled' | 'output_limit'; pid: number | null; exitCode: number | null; signal: NodeJS.Signals | null; durationMs: number; output: string; error?: string; spawnErrorCode?: string; settled?: boolean };
 export type ProcessOptions = { command: string; args: string[]; cwd: string; env?: NodeJS.ProcessEnv; logPath: string; timeoutMs: number; graceMs?: number; input?: string; signal?: AbortSignal; onOutput?: (text: string) => void };
 
 export async function runProcess(options: ProcessOptions): Promise<ProcessResult> {
@@ -18,6 +18,7 @@ export async function runProcess(options: ProcessOptions): Promise<ProcessResult
   const owner = { pid: child.pid ?? null, identity: child.pid ? processIdentity(child.pid) : '', cwd: options.cwd, command: options.command, args: options.args, groups: child.pid ? [child.pid] : [], settled: false, probeErrors: [] as string[] };
   writeJson(`${options.logPath}.owner.json`, owner);
   let status: ProcessResult['status'] | undefined;
+  let spawnErrorCode: string | undefined;
   let errorMessage: string | undefined;
   let output = '';
   let bytes = 0;
@@ -80,7 +81,7 @@ export async function runProcess(options: ProcessOptions): Promise<ProcessResult
   };
   child.stdout?.on('data', capture);
   child.stderr?.on('data', capture);
-  child.once('error', error => { errorMessage = error.message; status ??= 'failed'; });
+  child.once('error', error => { spawnErrorCode = (error as NodeJS.ErrnoException).code; errorMessage = error.message; status ??= 'failed'; });
   child.once('exit', () => { if (probeGroups().present) stop(); });
   child.stdin?.on('error', () => {});
   if (options.input !== undefined) child.stdin?.end(options.input);
@@ -100,7 +101,7 @@ export async function runProcess(options: ProcessOptions): Promise<ProcessResult
       process.removeListener('SIGTERM', ownerStopped); process.removeListener('SIGINT', ownerStopped);
       owner.settled = !remaining.present;
       writeJson(`${options.logPath}.owner.json`, owner);
-      resolve({ status: status ?? (exitCode === 0 ? 'passed' : 'failed'), pid: child.pid ?? null, exitCode, signal, durationMs: Date.now() - started, output, ...(errorMessage ? { error: errorMessage } : {}) });
+      resolve({ status: status ?? (exitCode === 0 ? 'passed' : 'failed'), pid: child.pid ?? null, exitCode, signal, durationMs: Date.now() - started, output, ...(errorMessage ? { error: errorMessage } : {}), settled: !remaining.present, ...(spawnErrorCode ? { spawnErrorCode } : {}) });
     });
   });
 }

@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import type { IssueStore } from '../src/storage.ts';
 import type { Delivery, Job, Requirement, WorkRun } from '../src/workflow.ts';
@@ -20,6 +21,8 @@ import { assertRunQuiescent } from './ownership.ts';
 import { githubHost, prepareRequirementBranch, publishRequirement } from './github.ts';
 import type { GitHubHost } from './github.ts';
 import { recoverMerge } from './recovery.ts';
+import { executionPolicy } from './optimization.ts';
+import { reusableRequirementVerification } from './verification-reuse.ts';
 
 export class SerialQueue {
   readonly evidenceRoot: string;
@@ -38,6 +41,7 @@ export class SerialQueue {
       if (!claimed) return false;
       const { job, run } = claimed;
       const repo = this.store.work.repo(job.repoId)!;
+      const policy = executionPolicy(repo.path);
       mkdirSync(run.evidencePath, { recursive: true });
       writeJson(join(run.evidencePath, 'job.json'), job);
       const publicationJobs = new Set(this.store.work.jobs().filter(prior => prior.kind === 'requirement_publish').map(prior => prior.id));
@@ -53,8 +57,9 @@ export class SerialQueue {
         const issueHistory = this.store.work.runs().filter(item => item.id !== run.id && item.repoId === repo.id && item.issueId === issue.id);
         for (const prior of issueHistory) assertRunQuiescent(prior.evidencePath);
         const previous = this.store.work.runs().filter(item => item.id !== run.id && item.repoId === repo.id && item.issueId === issue.id && item.status === 'blocked').sort((a, b) => b.jobId - a.jobId)[0];
-        const feedback = previous ? `\nPrevious blocked attempt, diagnostic context only: ${JSON.stringify({ runId: previous.id, reason: previous.reason?.slice(0, 12000) ?? null })}. Address the recorded failure without changing the original goal, criteria, or review gates.` : '';
-        const task = parseTask({ schemaVersion: 1, id: `issue-${issue.id}`, title: issue.title, goal: issue.description || issue.title, acceptance: issue.work!.acceptance.map((description, index) => ({ id: `criterion-${index + 1}`, description })), scope: ['src/', 'tests/', 'acceptance/', 'docs/'], verificationCommand: 'npm run verify', budget: { maxAttempts: 3, workerTimeoutMs: 600000, totalTimeoutMs: 3600000 }, notes: `Repository ${repo.name}; target ${targetBranch}. Complete only after independent review and automatic integration.${feedback}` });
+        const feedback = previous ? `\nPrevious blocked attempt, diagnostic context only: ${JSON.stringify({ runId: previous.id, ...(policy.mode === 'legacy-v1' ? { reason: previous.reason ?? null } : {}), reasonPath: join(previous.evidencePath, 'state.json'), deliveryPath: join(previous.evidencePath, 'delivery.json'), evidencePath: previous.evidencePath })}. Address the recorded failure without changing the original goal, criteria, or review gates.` : '';
+        const onlyChild = requirement && this.store.list().filter(child => child.work?.requirementId === requirement.id).length === 1;
+        const task = parseTask({ schemaVersion: policy.mode === 'adaptive-v2' ? 2 : 1, id: `issue-${issue.id}`, title: issue.title, goal: issue.description || issue.title, ...(policy.mode === 'adaptive-v2' && onlyChild ? { wholeGoal: { requirementId: requirement.id, goal: requirement.goal } } : {}), acceptance: issue.work!.acceptance.map((description, index) => ({ id: `criterion-${index + 1}`, description })), scope: ['src/', 'tests/', 'acceptance/', 'docs/'], verificationCommand: 'npm run verify', budget: { maxAttempts: 3, workerTimeoutMs: 600000, totalTimeoutMs: 3600000 }, notes: `Repository ${repo.name}; target ${targetBranch}. Complete only after independent review and automatic integration.${feedback}` });
         const state = await runController({ repository: repo.path, task, agent: this.options.agent ?? codexAgent(process.env.FACTORY_CODEX_BIN ?? 'codex'), baseRef: targetBranch, mergeTarget: targetBranch, evidenceRoot: this.evidenceRoot, runId: run.id, signal: this.options.signal, resumeFrom: previous?.evidencePath, budgetKey: `repo-${repo.id}:issue-${issue.id}` });
         this.store.work.finish(run.id, state.status === 'merged' ? 'merged' : 'blocked', state.reason ?? null);
       } else if (job.kind === 'requirement_publish') await this.publicationJob(job, run);
@@ -146,6 +151,13 @@ export class SerialQueue {
   }
 
   private async requirementJob(job: Job, run: WorkRun): Promise<void> {
+    const started = Date.now();
+    let agentInvocations = 0;
+    let planningMs = 0;
+    let reviewMs = 0;
+    let verificationMs = 0;
+    let verificationExecutions = 0;
+    let verificationReuses = 0;
     const repo = this.store.work.repo(job.repoId)!;
     if (git(repo.path, ['status', '--porcelain']).trim()) throw new Error('Requirement execution requires a clean repository.');
     const requirement = this.store.work.requirement(job.requirementId!) ?? JSON.parse(job.payload) as Requirement;
@@ -157,33 +169,58 @@ export class SerialQueue {
     const env = processEnvironment({ API_PORT: apiPort, UI_PORT: uiPort, TEST_API_PORT: apiPort, TEST_UI_PORT: uiPort, DB_PATH: join(run.evidencePath, 'worker.sqlite'), INSTANCE_ID: run.id });
     const phase = (name: string) => { const directory = join(run.evidencePath, name); mkdirSync(directory); return directory; };
     let verification: Verification | undefined;
+    let reusedReview: Awaited<ReturnType<Planner['review']>> | undefined;
     let evidence: string;
     let assumptions: { decision: string; reason: string }[] = [];
     if (job.kind === 'decompose' || job.kind === 'plan_review') {
       const submitted = job.kind === 'plan_review' ? this.store.work.submission(requirement.submission!.id) : undefined;
       if (job.kind === 'plan_review' && (!submitted || submitted.planHash !== requirement.submission?.planHash || submitted.requirementId !== requirement.id)) throw new Error('Submitted plan identity mismatch.');
       if (submitted) writeJson(join(run.evidencePath, 'submission.json'), submitted);
+      const planningStarted = Date.now();
       const decomposition = submitted ? parseDecomposition({ assumptions: submitted.plan.assumptions, issues: submitted.plan.issues }, submitted.plan.schemaVersion) : parseDecomposition(await planner.decompose({ cwd: workspace.path, directory: phase('decompose'), requirement, evidence: '', env, signal: this.options.signal }));
+      if (!submitted) { agentInvocations += 1; planningMs = Date.now() - planningStarted; }
       if (snapshot(workspace.path).hash !== before) throw new Error('Decomposition changed source files.');
       writeJson(join(run.evidencePath, 'decomposition.json'), decomposition);
       evidence = JSON.stringify(decomposition); assumptions = decomposition.assumptions;
     } else {
       const children = this.store.list().filter(issue => issue.work?.requirementId === requirement.id);
-      const deliveries = this.store.work.runs().filter(item => item.requirementId === requirement.id && item.status === 'merged').map(item => ({ issueId: item.issueId, report: readJson(join(item.evidencePath, 'delivery.json')) }));
+      const deliveries = this.store.work.runs().filter(item => item.requirementId === requirement.id && item.status === 'merged').map(item => {
+        const path = join(item.evidencePath, 'delivery.json');
+        const bytes = readFileSync(path);
+        const report = JSON.parse(bytes.toString()) as Delivery;
+        return { issueId: item.issueId, runId: item.id, path, sha256: createHash('sha256').update(bytes).digest('hex'), status: report.status, summary: report.summary, sourceHash: report.sourceHash, checks: report.checks };
+      });
       evidence = JSON.stringify({ children, deliveries });
       const directory = join(run.evidencePath, 'verification');
-      const verifier = trustedVerifier(join(run.evidencePath, 'trusted'), parseVerificationContract(readJson(join(workspace.path, 'factory/verification-contract.json'))));
-      const result = await runProcess({ command: process.execPath, args: [verifier.command], cwd: workspace.path, env: { ...env, VERIFY_RUN_DIR: directory, VERIFY_CONTRACT_PATH: verifier.contractPath }, logPath: join(run.evidencePath, 'verification.log'), timeoutMs: 610000, signal: this.options.signal });
-      verification = readJson(join(directory, 'summary.json')) as Verification;
-      if (result.status !== 'passed' || verification.status !== 'passed' || verification.snapshot.hash !== before) throw new Error('Whole-requirement verification failed.');
+      let reuseRejection = 'Adaptive policy is not active; execute fresh complete verification.';
+      const reused = executionPolicy(repo.path).mode === 'adaptive-v2' ? reusableRequirementVerification({ repository: repo.path, cwd: workspace.path, branch: targetBranch, requirement, children, runs: this.store.work.runs(), onRejected: reason => { reuseRejection = reason; } }) : undefined;
+      writeJson(join(run.evidencePath, 'verification-reuse.json'), reused ? { eligible: true, ...reused.provenance } : { eligible: false, reason: reuseRejection });
+      if (reused) {
+        verification = reused.verification;
+        reusedReview = reused.review;
+        verificationReuses += 1;
+        mkdirSync(directory);
+        for (const name of ['summary.json', 'node-results.jsonl', 'browser-results.json']) copyFileSync(join(verification.runDirectory, name), join(directory, name));
+        evidence += `\nRetained original verification and review provenance:\n${JSON.stringify(reused.provenance)}`;
+      } else {
+        const verifier = trustedVerifier(join(run.evidencePath, 'trusted'), parseVerificationContract(readJson(join(workspace.path, 'factory/verification-contract.json'))));
+        const verificationStarted = Date.now();
+        verificationExecutions += 1;
+        const result = await runProcess({ command: process.execPath, args: [verifier.command], cwd: workspace.path, env: { ...env, VERIFY_RUN_DIR: directory, VERIFY_CONTRACT_PATH: verifier.contractPath }, logPath: join(run.evidencePath, 'verification.log'), timeoutMs: 610000, signal: this.options.signal });
+        verificationMs = Date.now() - verificationStarted;
+        verification = readJson(join(directory, 'summary.json')) as Verification;
+        if (result.status !== 'passed' || verification.status !== 'passed' || verification.snapshot.hash !== before) throw new Error('Whole-requirement verification failed.');
+      }
       evidence += `\nVerification:\n${JSON.stringify(verification)}`;
     }
-    const review = await planner.review({ cwd: workspace.path, directory: phase('independent-review'), requirement, evidence, env, signal: this.options.signal });
+    const reviewStarted = Date.now();
+    const review = reusedReview ?? await planner.review({ cwd: workspace.path, directory: phase('independent-review'), requirement, evidence, env, signal: this.options.signal });
+    if (!reusedReview) { agentInvocations += 1; reviewMs = Date.now() - reviewStarted; }
     writeJson(join(run.evidencePath, 'review.json'), review);
     if (!review.approved || review.findings.length || snapshot(workspace.path).hash !== before) throw new Error(`Requirement review failed: ${review.findings.join('; ')}`);
     if (git(repo.path, ['rev-parse', `refs/heads/${targetBranch}`]).trim() !== workspace.baseCommit) throw new Error('Target branch changed during requirement verification. Retry against the latest target.');
     if (job.kind === 'decompose') this.store.work.applyDecomposition(requirement.id, parseDecomposition(readJson(join(run.evidencePath, 'decomposition.json'))).issues);
-    saveDelivery(run.evidencePath, { schemaVersion: 1, runId: run.id, taskId: `requirement-${requirement.id}`, title: requirement.title, goal: requirement.goal, status: 'passed', startedAt: run.startedAt, completedAt: new Date().toISOString(), baseline: workspace.baseCommit, sourceHash: before, defaults: assumptions, changes: [], checks: verification?.checks ?? [{ name: job.kind === 'plan_review' ? 'submitted plan and dependency coverage' : 'decomposition and dependency coverage', status: 'passed' }], nodePassed: verification?.node?.passed ?? 0, browserPassed: verification?.browser?.passed ?? 0, attempts: 1, review, integration: null, limitations: [] });
+    saveDelivery(run.evidencePath, { schemaVersion: 1, runId: run.id, taskId: `requirement-${requirement.id}`, title: requirement.title, goal: requirement.goal, status: 'passed', startedAt: run.startedAt, completedAt: new Date().toISOString(), baseline: workspace.baseCommit, sourceHash: before, defaults: assumptions, changes: [], checks: verification?.checks ?? [{ name: job.kind === 'plan_review' ? 'submitted plan and dependency coverage' : 'decomposition and dependency coverage', status: 'passed' }], nodePassed: verification?.node?.passed ?? 0, browserPassed: verification?.browser?.passed ?? 0, attempts: 1, review, integration: null, limitations: [], ...(executionPolicy(repo.path).mode === 'adaptive-v2' ? { efficiency: { agentInvocations, testAuthoringInvocations: 0, verificationExecutions, verificationRetries: 0, verificationReuses, elapsedMs: Date.now() - started, durations: { planningMs, testAuthoringMs: 0, acceptanceReviewMs: 0, implementationMs: 0, verificationMs, codeReviewMs: reviewMs } } } : {}) });
     if (job.kind === 'requirement_verify' && requirement.publication) this.store.work.finishRequirementVerification(run.id, workspace.baseCommit);
     else this.store.work.finish(run.id, 'passed');
   }
