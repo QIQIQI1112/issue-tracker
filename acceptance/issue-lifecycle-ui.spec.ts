@@ -8,6 +8,7 @@ import { IssueStore } from '../src/storage.ts';
 import type { Issue, IssueStatus } from '../src/domain.ts';
 import type { Delivery, WorkRun } from '../src/workflow.ts';
 import { saveDelivery } from '../factory/delivery.ts';
+import { recordDiagnosticRun } from './diagnostic-fixture.ts';
 import { appUrl, test } from './workspace.ts';
 
 function fixture(info: TestInfo) {
@@ -28,11 +29,7 @@ function fixture(info: TestInfo) {
     saveDelivery(run.evidencePath, delivery);
   };
   const record = (issue: Issue, reason: string, limitation: string, merged = false) => {
-    const id = randomUUID();
-    const now = new Date().toISOString();
-    const jobId = Number(db.prepare("INSERT INTO jobs (repo_id, requirement_id, issue_id, kind, status, payload, run_id, reason, created_at, updated_at) VALUES (?, ?, ?, 'issue', ?, '{}', ?, ?, ?, ?)").run(issue.work!.repoId, issue.work!.requirementId, issue.id, merged ? 'completed' : 'blocked', id, reason, now, now).lastInsertRowid);
-    db.prepare('INSERT INTO work_runs (id, job_id, repo_id, requirement_id, issue_id, status, evidence_path, reason, started_at, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(id, jobId, issue.work!.repoId, issue.work!.requirementId, issue.id, merged ? 'merged' : 'blocked', join(root, id), reason, now, now);
-    const run = store.work.run(id)!;
+    const run = recordDiagnosticRun(store, db, { root, repoId: issue.work!.repoId, requirementId: issue.work!.requirementId, issueId: issue.id, status: merged ? 'completed' : 'blocked', reason });
     report(run, limitation);
     return run;
   };
@@ -94,15 +91,16 @@ function observe(page: Page) {
 }
 
 async function expectClosure(dialog: Locator, issue: Issue, replacement?: Issue) {
-  await expect(dialog.getByText(issue.closure!.reason, { exact: true }), 'Closed diagnostics must display the recorded closure reason as text.').toBeVisible({ timeout: 1000 });
-  const closedTime = dialog.locator('dt').filter({ hasText: /^Closed (?:at|on)$/i }).locator('xpath=following-sibling::dd[1]');
+  const closure = dialog.getByRole('region', { name: 'Closure context', exact: true });
+  await expect(closure.getByText(issue.closure!.reason, { exact: true }), 'Closed diagnostics must display the recorded closure reason as text.').toBeVisible({ timeout: 1000 });
+  const closedTime = closure.locator('dt').filter({ hasText: /^Closed (?:at|on)$/i }).locator('xpath=following-sibling::dd[1]');
   await expect(closedTime, 'Closure time must have its own label, distinct from Created and Updated timestamps.').toContainText(issue.closure!.closedAt, { timeout: 1000 });
   if (replacement) {
-    const context = dialog.locator('dt').filter({ hasText: /^(?:Replacement(?: issue)?|Superseded by)$/i }).locator('xpath=following-sibling::dd[1]');
+    const context = closure.locator('dt').filter({ hasText: /^(?:Replacement(?: issue)?|Superseded by)$/i }).locator('xpath=following-sibling::dd[1]');
     await expect(context, 'Replacement context must preserve the recorded issue identity.').toContainText(new RegExp(`#${replacement.id}\\b|LOC-${String(replacement.id).padStart(3, '0')}\\b`), { timeout: 1000 });
     await expect(context, 'Replacement title must resolve independently of visible filters.').toContainText(replacement.title, { timeout: 1000 });
-  } else await expect(dialog.getByText('No replacement issue recorded.', { exact: true }), 'Absent replacement context must be explicit.').toBeVisible({ timeout: 1000 });
-  await expect(dialog.getByText(/(?:clos(?:ure|ed).*(?:does not|not).*(?:success|deliver)|does not (?:mean|establish|represent).*(?:success|deliver))/i), 'Application-generated closure guidance must distinguish closure from successful delivery.').toBeVisible({ timeout: 1000 });
+  } else await expect(closure.getByText('No replacement issue recorded.', { exact: true }), 'Absent replacement context must be explicit.').toBeVisible({ timeout: 1000 });
+  await expect(closure.getByText(/(?:clos(?:ure|ed).*(?:does not|not).*(?:success|deliver)|does not (?:mean|establish|represent).*(?:success|deliver))/i), 'Application-generated closure guidance must distinguish closure from successful delivery.').toBeVisible({ timeout: 1000 });
 }
 
 test('Blocked and Closed filter independently with repository search and label filters', async ({ page }, info) => {

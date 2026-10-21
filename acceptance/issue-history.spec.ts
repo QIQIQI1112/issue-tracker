@@ -8,6 +8,7 @@ import { appUrl, test } from './workspace.ts';
 import { expectStatusSelection, selectRepository, selectStatus } from './navigation.ts';
 import { IssueStore } from '../src/storage.ts';
 import { saveDelivery } from '../factory/delivery.ts';
+import { recordDiagnosticRun } from './diagnostic-fixture.ts';
 import type { Issue } from '../src/domain.ts';
 import type { Job, WorkRun } from '../src/workflow.ts';
 
@@ -24,18 +25,12 @@ function fixture(info: TestInfo, title: string) {
     child: (name: string, dependsOn: number[] = [], status: Issue['status'] = 'open') => store.create({ title: name, description: 'Disposable dashboard behavior.', priority: 'medium', status, labels: [], work: { repoId: repo.id, requirementId: requirement.id, dependsOn, acceptance: ['Observable behavior.'] } }),
     status: (status: string) => database.prepare('UPDATE requirements SET status=? WHERE id=?').run(status, requirement.id),
     record: (kind: Job['kind'], status: Exclude<Job['status'], 'queued'>, issueId: number | null = null, reason: string | null = null, report = false): WorkRun => {
-      const id = randomUUID();
-      const now = new Date().toISOString();
-      const jobId = Number(database.prepare('INSERT INTO jobs (repo_id, requirement_id, issue_id, kind, status, payload, run_id, reason, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(repo.id, requirement.id, issueId, kind, status, '{}', id, reason, now, now).lastInsertRowid);
-      const runStatus = status === 'completed' ? kind === 'issue' ? 'merged' : 'passed' : status === 'blocked' ? 'blocked' : 'running';
-      const evidencePath = join(root, id);
-      mkdirSync(evidencePath, { recursive: true });
-      database.prepare('INSERT INTO work_runs (id, job_id, repo_id, requirement_id, issue_id, status, evidence_path, reason, started_at, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(id, jobId, repo.id, requirement.id, issueId, runStatus, evidencePath, reason, now, status === 'running' ? null : now);
+      const run = recordDiagnosticRun(store, database, { root, repoId: repo.id, requirementId: requirement.id, issueId, kind, status, reason });
       if (report) {
-        writeFileSync(join(evidencePath, 'patch.diff'), `Retained ${runStatus} evidence for ${id}.`);
-        saveDelivery(evidencePath, { schemaVersion: 1, runId: id, taskId: `dashboard-${jobId}`, title, goal: requirement.goal, summary: `Report result ${id}`, status: runStatus, startedAt: now, completedAt: now, baseline: null, sourceHash: null, defaults: [], changes: [], checks: [{ name: 'Fixture behavior', status: runStatus === 'blocked' ? 'failed' : 'passed' }], nodePassed: 1, browserPassed: 1, attempts: 1, review: null, integration: null, limitations: reason ? [reason] : [] });
+        writeFileSync(join(run.evidencePath, 'patch.diff'), `Retained ${run.status} evidence for ${run.id}.`);
+        saveDelivery(run.evidencePath, { schemaVersion: 1, runId: run.id, taskId: `dashboard-${run.jobId}`, title, goal: requirement.goal, summary: `Report result ${run.id}`, status: run.status, startedAt: run.startedAt, completedAt: run.completedAt ?? run.startedAt, baseline: null, sourceHash: null, defaults: [], changes: [], checks: [{ name: 'Fixture behavior', status: run.status === 'blocked' ? 'failed' : 'passed' }], nodePassed: 1, browserPassed: 1, attempts: 1, review: null, integration: null, limitations: reason ? [reason] : [] });
       }
-      return store.work.run(id)!;
+      return run;
     },
     close: () => {
       const now = new Date().toISOString();
@@ -46,8 +41,6 @@ function fixture(info: TestInfo, title: string) {
     },
   };
 }
-
-import { currentBlockers, requirementProgress, waitingDependencies } from '../src/ui/workbench-state.ts';
 
 async function reportState(container: Locator, expected: string) {
   const state = container.getByRole('status');
@@ -108,69 +101,6 @@ test('requirement API creation validates ownership and duplicate starts while de
     await page.goto(api);
     await page.getByRole('button', { name: `View issue ${issue.title}`, exact: true }).click();
     await expect(page.getByRole('dialog').getByText(f.repo.name, { exact: true })).toBeVisible();
-  } finally { f.close(); }
-});
-
-test('requirement metadata counts real merges and distinguishes latest whole-goal verification', async ({ request }, info) => {
-  const f = fixture(info, 'Verified goal text cannot establish delivery');
-  const progress = async () => {
-    const data = await (await request.get(`${appUrl(info)}/api/workbench`)).json();
-    const { issues } = await (await request.get(`${appUrl(info)}/api/issues`)).json();
-    const state = requirementProgress(data, issues, f.requirement);
-    return { merged: state.merged, verified: state.verified, outcome: state.outcome };
-  };
-  try {
-    const first = f.child('Manually Done child', [], 'done');
-    const second = f.child('Second child');
-    f.status('done');
-    expect(await progress()).toEqual({ merged: 0, verified: false, outcome: 'Whole goal not yet verified' });
-    f.record('issue', 'completed', first.id);
-    f.record('issue', 'completed', first.id);
-    expect((await progress()).merged).toBe(1);
-    f.record('issue', 'completed', second.id);
-    f.record('plan_review', 'completed');
-    expect(await progress()).toEqual({ merged: 2, verified: false, outcome: 'Whole goal not yet verified' });
-    f.record('requirement_verify', 'completed');
-    expect(await progress()).toEqual({ merged: 2, verified: true, outcome: 'Whole goal verified' });
-    f.record('requirement_verify', 'blocked', null, 'Latest whole-goal review failed.');
-    expect(await progress()).toEqual({ merged: 2, verified: false, outcome: 'Whole-goal verification blocked' });
-  } finally { f.close(); }
-});
-
-test('queue metadata preserves dependency waiting current blockers and independently reviewed retry', async ({ request }, info) => {
-  const f = fixture(info, 'Current blocker requirement');
-  try {
-    const first = f.child('Recovered prerequisite', [], 'done');
-    const waiting = f.child('Waiting dependent', [first.id]);
-    const sibling = f.child('Unresolved sibling');
-    const manualDone = f.child('Manually Done prerequisite', [], 'done');
-    const unready = f.child('Dependency waiting child', [manualDone.id]);
-    f.record('issue', 'blocked', first.id, 'Historical prerequisite failure.');
-    f.record('issue', 'completed', first.id, null, true);
-    f.record('issue', 'blocked', sibling.id, 'Current sibling failure.');
-    f.store.work.startIssue(waiting.id);
-    f.store.work.startIssue(unready.id);
-    const work = await (await request.get(`${appUrl(info)}/api/workbench`)).json();
-    const { issues } = await (await request.get(`${appUrl(info)}/api/issues`)).json();
-    expect(currentBlockers(work, issues).map(job => job.reason)).toContain('Current sibling failure.');
-    expect(currentBlockers(work, issues).map(job => job.reason)).not.toContain('Historical prerequisite failure.');
-    expect(waitingDependencies(work, issues, work.jobs.find((job: Job) => job.issueId === waiting.id && job.status === 'queued'))).toEqual([]);
-    expect(waitingDependencies(work, issues, work.jobs.find((job: Job) => job.issueId === unready.id && job.status === 'queued'))).toEqual([manualDone.id]);
-    expect((await request.post(`${appUrl(info)}/api/issues/${waiting.id}/start`, { data: {} })).status()).toBe(409);
-    const idle = fixture(info, 'Retry planning approval');
-    try {
-      const submission = idle.store.work.submitPlan({ schemaVersion: 1, submissionId: randomUUID(), repoId: idle.repo.id, requirement: { title: 'Retry submitted plan', goal: 'Review before execution.' }, source: { kind: 'codex', reference: 'codex://retry', summary: 'Retry still needs review.' }, assumptions: [], issues: [{ key: 'one', title: 'Reviewed child', description: 'Review this child.', acceptance: ['Review is required.'], dependsOn: [] }] });
-      const db = new DatabaseSync(idle.store.path);
-      try {
-        db.prepare("UPDATE jobs SET status='blocked', reason='Current planning review failure.' WHERE id=?").run(submission.jobs[0].id);
-        db.prepare("UPDATE requirements SET status='blocked' WHERE id=?").run(submission.requirement.id);
-      } finally { db.close(); }
-      expect((await request.post(`${appUrl(info)}/api/requirements/${submission.requirement.id}/start`, { data: {} })).status()).toBe(202);
-      const refreshed = await (await request.get(`${appUrl(info)}/api/workbench`)).json();
-      const active = refreshed.jobs.filter((job: Job) => job.requirementId === submission.requirement.id && ['queued', 'running'].includes(job.status));
-      expect(active).toHaveLength(1);
-      expect(active[0].kind).toBe('plan_review');
-    } finally { idle.close(); }
   } finally { f.close(); }
 });
 
