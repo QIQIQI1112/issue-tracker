@@ -1,0 +1,87 @@
+--- a/acceptance/requirements.spec.ts
++++ b/acceptance/requirements.spec.ts
+@@ -69,6 +69,13 @@
+ const previous = (page: Page) => pagination(page).getByRole('button', { name: /Previous(?: page)?/i });
+ const next = (page: Page) => pagination(page).getByRole('button', { name: /Next(?: page)?/i });
+ const section = (page: Page, name: string) => details(page).getByRole('region', { name, exact: true });
++
++async function expectCurrentValue(field: Locator, expected: RegExp, message: string, matches = true) {
++  await expect(field, message).toBeVisible();
++  const observation = expect.poll(async () => (await field.innerText()).replace(/\s+/g, ' ').trim(), { message });
++  if (matches) await observation.toMatch(expected);
++  else await observation.not.toMatch(expected);
++}
+ 
+ async function click(control: Locator, message = 'The planned inspection control must exist before activation.') {
+   await expect(control, message).toBeVisible();
+@@ -257,14 +264,18 @@
+     const unmergedRow = children.getByTestId(`issue-${unmerged.id}`);
+     await expect(mergedRow, 'The owned child with merge evidence must have its own inspection row.').toBeVisible();
+     await expect(mergedRow).toContainText(owned.title);
+-    await expect(mergedRow.getByText(/^open$/i), 'The merged child must retain its recorded issue status.').toBeVisible();
+-    await expect(mergedRow.getByText(/^merged$/i), 'The child with an owned merged run must show affirmative merge progress in its own row.').toBeVisible();
+-    await expect(mergedRow.getByText(/^(?:not merged|unmerged)$/i)).toHaveCount(0);
++    await expect(mergedRow.getByTestId('child-recorded-status')).toBeVisible();
++    await expect(mergedRow.getByTestId('child-merge-state')).toBeVisible();
++    await expect(mergedRow.getByTestId('child-recorded-status'), 'The merged child must expose a dedicated current recorded status.').toHaveText(/^\s*open\s*$/i, { useInnerText: true });
++    await expect(mergedRow.getByTestId('child-merge-state'), 'The child with an owned merged run must show affirmative merge progress in its own current field.').toHaveText(/^\s*merged\s*$/i, { useInnerText: true });
++    await expect(mergedRow.getByTestId('child-merge-state')).not.toHaveText(/^\s*(?:not\s+merged|unmerged)\s*$/i, { useInnerText: true });
+     await expect(unmergedRow, 'An owned Done child without merge evidence must remain inspectable.').toBeVisible();
+     await expect(unmergedRow).toContainText(unmerged.title);
+-    await expect(unmergedRow.getByText(/^done$/i), 'The unmerged child must expose its recorded Done status separately from merge progress.').toBeVisible();
+-    await expect(unmergedRow.getByText(/^(?:not merged|unmerged)$/i), 'A Done label must not substitute for actual child merge evidence.').toBeVisible();
+-    await expect(unmergedRow.getByText(/^merged$/i)).toHaveCount(0);
++    await expect(unmergedRow.getByTestId('child-recorded-status')).toBeVisible();
++    await expect(unmergedRow.getByTestId('child-merge-state')).toBeVisible();
++    await expect(unmergedRow.getByTestId('child-recorded-status'), 'The unmerged child must expose its current recorded Done status separately from merge progress.').toHaveText(/^\s*done\s*$/i, { useInnerText: true });
++    await expect(unmergedRow.getByTestId('child-merge-state'), 'A Done label must not substitute for actual current child merge evidence.').toHaveText(/^\s*(?:not\s+merged|unmerged)\s*$/i, { useInnerText: true });
++    await expect(unmergedRow.getByTestId('child-merge-state')).not.toHaveText(/^\s*merged\s*$/i, { useInnerText: true });
+     for (const value of excluded) await expect(children).not.toContainText(value.title);
+     await expect(section(page, 'Current blockers')).not.toContainText('Foreign child blocker');
+     const control = children.getByRole('button', { name: `Inspect issue ${owned.title}`, exact: true });
+@@ -339,14 +350,14 @@
+       await expect(currentAcceptance, 'Current acceptance must have one distinct application-generated observation, separate from source text and historical reports.').toHaveCount(1);
+       await expect(currentDelivery, 'Current delivery must have one distinct application-generated observation, separate from publication and historical reports.').toHaveCount(1);
+       await expect(currentAcceptance, `Current acceptance for ${value.name} must be unambiguous.`).toBeVisible();
+-      await expect(currentAcceptance, `Current acceptance for ${value.name} must match the exact latest-evidence state without contradictory passed text.`).toHaveText(value.acceptance);
+-      if (value.accepted) await expect(currentAcceptance, 'Valid exact latest evidence must establish affirmative current acceptance; Unverified is not Verified.').toHaveText(affirmativeAcceptance);
+-      else await expect(currentAcceptance, 'Missing, mismatched or superseded evidence must not establish current passed acceptance.').not.toHaveText(affirmativeAcceptance);
++      await expectCurrentValue(currentAcceptance, value.acceptance, `Current acceptance for ${value.name} must match the exact latest-evidence state without contradictory passed text.`);
++      if (value.accepted) await expectCurrentValue(currentAcceptance, affirmativeAcceptance, 'Valid exact latest evidence must establish affirmative current acceptance; Unverified is not Verified.');
++      else await expectCurrentValue(currentAcceptance, affirmativeAcceptance, 'Missing, mismatched or superseded evidence must not establish current passed acceptance.', false);
+       await expect(currentDelivery, `Current delivery for ${value.name} must be unambiguous.`).toBeVisible();
+-      await expect(currentDelivery, `Current delivery for ${value.name} must match the exact evidence-based state.`).toHaveText(value.delivery);
++      await expectCurrentValue(currentDelivery, value.delivery, `Current delivery for ${value.name} must match the exact evidence-based state.`);
+       if (!value.delivered) {
+-        await expect(currentDelivery, 'Incomplete integration, acceptance or publication must exclude affirmative local delivery.').not.toHaveText(localDelivery);
+-        await expect(currentDelivery, 'A recorded merged publication cannot substitute for current acceptance and child integration.').not.toHaveText(githubDelivery);
++        await expectCurrentValue(currentDelivery, localDelivery, 'Incomplete integration, acceptance or publication must exclude affirmative local delivery.', false);
++        await expectCurrentValue(currentDelivery, githubDelivery, 'A recorded merged publication cannot substitute for current acceptance and child integration.', false);
+       }
+       const mergeProgress = section(page, 'Child integration').getByTestId('requirement-merge-progress');
+       const mergeRatio = value.integration ?? (value.children?.length === 0 ? /0\s*(?:\/|of)\s*0/ : /1\s*(?:\/|of)\s*1/);
+@@ -364,8 +375,8 @@
+         const report = details(page).getByRole('article', { name: 'Delivery report', exact: true });
+         await expect(report, 'The superseded passing attempt must remain independently inspectable in history.').toContainText(`Owned stage report ${value.historical.id}`);
+         await expect(report.locator('.report-heading').getByText('passed', { exact: true }), 'The selected historical report may show its own recorded passing result.').toBeVisible();
+-        await expect(currentAcceptance, 'Inspecting a historical pass must not replace the newer queued, running or blocked current acceptance.').toHaveText(value.acceptance);
+-        await expect(currentDelivery, 'Inspecting a historical pass must not establish final delivery.').toHaveText(value.delivery);
++        await expectCurrentValue(currentAcceptance, value.acceptance, 'Inspecting a historical pass must not replace the newer queued, running or blocked current acceptance.');
++        await expectCurrentValue(currentDelivery, value.delivery, 'Inspecting a historical pass must not establish final delivery.');
+       }
+     });
+   } finally { f.close(); }
+@@ -470,10 +481,12 @@
+     await tabTo(page, opener(page, selected));
+     const handle = await opener(page, selected).elementHandle();
+     expect(handle).not.toBeNull();
++    const currentProgress = section(page, 'Child integration').getByTestId('requirement-merge-progress');
++    await expectCurrentValue(currentProgress, /^0\s*(?:\/|of)\s*1(?:\s*(?:children\s*)?merged)?\.?$/i, 'Before polling, the owned child must be unmerged.');
+     f.record(selected, 'issue', 'completed', child.id);
+     const polling = page.waitForResponse(response => new URL(response.url()).pathname === '/api/workbench' && response.status() === 200);
+     await polling;
+-    await expect(section(page, 'Child integration')).toContainText(/1\s*(?:\/|of)\s*1/i);
++    await expectCurrentValue(currentProgress, /^1\s*(?:\/|of)\s*1(?:\s*(?:children\s*)?merged)?\.?$/i, 'Polling must update the exact visible owned merge ratio from 0/1 to 1/1.');
+     await expectPage(page, values, 2);
+     await expect(opener(page, selected), 'A background metadata update must retain keyboard focus.').toBeFocused();
+     expect(await handle!.evaluate(element => element.isConnected), 'Refresh must retain the selected opener node.').toBe(true);

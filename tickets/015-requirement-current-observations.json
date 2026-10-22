@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "recordType": "owner-maintenance",
+  "id": "requirement-current-field-observations",
+  "issueId": 50,
+  "changeKind": "acceptance_contract",
+  "dependsOn": [
+    49
+  ],
+  "stage": "inactive",
+  "goal": "Stage one consolidated exact-base revision for the three remaining concrete coverage findings from issue46 owner acceptance review: independent child recorded/merge state fields, exact visible child integration transition before and after background polling, and normalized rendered acceptance/delivery text. Preserve original seven case identities, all unrelated assertions and business criteria. Keep additive two defect cases with feature46; their unapproved normalization follows the same helper. No product implementation, public budget, verifier gate or architecture changes.",
+  "baseFile": "acceptance/requirements.spec.ts",
+  "baseSha256": "66891532a70301bd54366e40b4f870dc05b9805cdd982d21b94b1b498e839f3a",
+  "revisedSha256": "4392f16290a1ee2e6d640f50f2fca5b48c71004f9e695724619700d1f2ab2d63",
+  "patch": "tickets/015-requirement-current-observations.patch",
+  "originalCaseCount": 7,
+  "additiveDefectCasesExcluded": true,
+  "requiredNonvisualHooks": {
+    "child-recorded-status": "Each owned child row current issue status.",
+    "child-merge-state": "Each owned child row current evidence-based merge state."
+  },
+  "activation": "Only after separately verified issue50 maintenance delivery and fresh complete feature coverage approval; freeze all tests before implementation. Preserve all counts, elapsed execution, original goals and owner lineage."
+}
