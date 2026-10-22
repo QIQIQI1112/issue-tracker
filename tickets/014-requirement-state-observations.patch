@@ -1,0 +1,52 @@
+--- a/acceptance/requirements.spec.ts
++++ b/acceptance/requirements.spec.ts
+@@ -200,8 +200,13 @@
+         await expect(identity).toHaveText(`Requirement #${value.id}`);
+         await expect(identity).toBeVisible();
+         await expect(opener(page, value)).toBeVisible();
+-        await expect(row).toContainText(new RegExp(value.status, 'i'));
+-        await expect(row).toContainText(value.id === owned[2].id ? /1\s*(?:\/|of)\s*2\s*(?:children\s*)?merged/i : /0\s*(?:\/|of)\s*0\s*(?:children\s*)?merged|no child issues/i);
++        await expect(opener(page, value), 'Each requirement opener must display its title, independently of its accessible inspection name.').toHaveText(value.title, { useInnerText: true });
++        const recordedStatus = row.getByTestId('requirement-recorded-status');
++        await expect(recordedStatus, 'The list recorded-status field must be visible independently of its expected value.').toBeVisible();
++        await expect(recordedStatus, 'The complete recorded status must match; Not done cannot satisfy Done.').toHaveText(new RegExp(`^\\s*${value.status}\\s*$`, 'i'), { useInnerText: true });
++        const mergeProgress = row.getByTestId('requirement-merge-progress');
++        await expect(mergeProgress, 'Each list row must expose a visible child merge-progress field.').toBeVisible();
++        await expect(mergeProgress, 'The complete list merge count must show the exact owned numerator and denominator.').toHaveText(value.id === owned[2].id ? /^\s*1\s*(?:\/|of)\s*2\s*(?:children\s*)?merged\.?\s*$/i : /^\s*(?:0\s*(?:\/|of)\s*0\s*(?:children\s*)?merged|no child issues)\.?\s*$/i, { useInnerText: true });
+       }
+       await expect(list(page)).not.toContainText(foreign.title);
+       if (number < 3) await click(next(page));
+@@ -326,7 +331,9 @@
+       else delete parent.publication;
+       await chooseRequirements(page, f.first);
+       await inspect(page, parent);
+-      await expect(section(page, 'Recorded status'), 'Recorded Done must remain separate from generated acceptance and delivery observations.').toContainText(/done/i);
++      const recordedStatus = section(page, 'Recorded status').getByTestId('requirement-recorded-status');
++      await expect(recordedStatus, 'The current recorded-status field must be visible independently of the section heading.').toBeVisible();
++      await expect(recordedStatus, 'Recorded Done must remain separate from generated acceptance and delivery observations; Not done is not Done.').toHaveText(/^\s*done\s*$/i, { useInnerText: true });
+       const currentAcceptance = section(page, 'Whole-goal acceptance').getByRole('status');
+       const currentDelivery = section(page, 'Final delivery').getByRole('status');
+       await expect(currentAcceptance, 'Current acceptance must have one distinct application-generated observation, separate from source text and historical reports.').toHaveCount(1);
+@@ -341,10 +348,15 @@
+         await expect(currentDelivery, 'Incomplete integration, acceptance or publication must exclude affirmative local delivery.').not.toHaveText(localDelivery);
+         await expect(currentDelivery, 'A recorded merged publication cannot substitute for current acceptance and child integration.').not.toHaveText(githubDelivery);
+       }
+-      await expect(section(page, 'Child integration')).toContainText(value.integration ?? (value.children?.length === 0 ? /no child|0\s*(?:\/|of)\s*0/i : /1\s*(?:\/|of)\s*1/i));
++      const mergeProgress = section(page, 'Child integration').getByTestId('requirement-merge-progress');
++      const mergeRatio = value.integration ?? (value.children?.length === 0 ? /0\s*(?:\/|of)\s*0/ : /1\s*(?:\/|of)\s*1/);
++      await expect(mergeProgress, 'The inspection child merge-progress field must be visible independently of its heading and empty-state prose.').toBeVisible();
++      await expect(mergeProgress, 'The complete inspection merge count must show the exact numerator and denominator; 11/10 cannot satisfy 1/1.').toHaveText(new RegExp(`^\\s*(?:(?:${mergeRatio.source})(?:\\s*(?:children\\s*)?merged)?${value.children?.length === 0 ? '|no child(?: issues)?' : ''})\\.?\\s*$`, 'i'), { useInnerText: true });
+       if (!value.publication) await expect(section(page, 'Publication')).toContainText(/local.only|local delivery|not enrolled/i);
+       if (value.publication) {
+-        await expect(section(page, 'Publication')).toContainText(new RegExp(value.publication.state.replace('_', '[ _-]?'), 'i'));
++        const publicationState = section(page, 'Publication').getByTestId('requirement-publication-state');
++        await expect(publicationState, 'The current publication-state field must be visible independently of its heading and PR or CI links.').toBeVisible();
++        await expect(publicationState, 'The complete recorded publication state must match; Not merged cannot satisfy Merged.').toHaveText(new RegExp(`^\\s*${value.publication.state.replace('_', '[ _-]?')}\\s*$`, 'i'), { useInnerText: true });
+         for (const url of [value.publication.url!, value.publication.ciUrl!]) await expect(section(page, 'Publication').getByRole('link').filter({ hasText: /\S/ }).and(section(page, 'Publication').locator(`a[href="${url}"]`))).toBeVisible();
+       }
+       if (value.historical) {
+@@ -639,3 +651,4 @@
+     }
+   } finally { f.close(); }
+ });
++

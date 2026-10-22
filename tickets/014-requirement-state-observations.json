@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "recordType": "owner-maintenance",
+  "id": "requirement-state-observations",
+  "issueId": 49,
+  "changeKind": "acceptance_contract",
+  "dependsOn": [
+    47
+  ],
+  "stage": "inactive",
+  "goal": "Independently stage the additional observation-contract repairs identified by the resumed issue46 coverage review: visible list titles, exact visible recorded/publication states, and exact visible child merge ratios. Preserve the seven existing case identities, all other accepted assertions and two separately additive defect regressions. Keep the patch inactive until fresh feature acceptance approval; do not weaken verification, reset budgets or change business criteria.",
+  "baseFile": "acceptance/requirements.spec.ts",
+  "baseSha256": "bf0c3d50376f9ae349b681c168a438b43916975820d639f86d34a0e377a2adf1",
+  "revisedSha256": "66891532a70301bd54366e40b4f870dc05b9805cdd982d21b94b1b498e839f3a",
+  "patch": "tickets/014-requirement-state-observations.patch",
+  "originalCaseCount": 7,
+  "additiveDefectCasesExcluded": true,
+  "source": "Retained unapproved draft from owner continuation39f2b6e1; owner prefix protection rejected direct activation.",
+  "activation": "Only after this separately verified maintenance delivery and fresh source-bound feature coverage approval; preserve all cumulative budget and ownership lineage.",
+  "requiredNonvisualHooks": {
+    "requirement-recorded-status": "List row and Recorded status section current value, scoped independently.",
+    "requirement-merge-progress": "List row and Child integration section current ratio or accepted empty-state value, scoped independently.",
+    "requirement-publication-state": "Publication section current recorded state."
+  }
+}
