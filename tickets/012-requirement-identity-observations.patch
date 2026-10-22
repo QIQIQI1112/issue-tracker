@@ -1,0 +1,48 @@
+--- a/acceptance/requirements.spec.ts
++++ b/acceptance/requirements.spec.ts
+@@ -196,7 +196,9 @@
+       await expectPage(page, owned, number);
+       for (const value of [...owned].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id - a.id).slice((number - 1) * 10, number * 10)) {
+         const row = list(page).getByTestId(`requirement-${value.id}`);
+-        await expect(row).toContainText(new RegExp(`(?:Requirement\\s*)?#${value.id}\\b`, 'i'));
++        const identity = row.getByTestId('requirement-identity');
++        await expect(identity).toHaveText(`Requirement #${value.id}`);
++        await expect(identity).toBeVisible();
+         await expect(opener(page, value)).toBeVisible();
+         await expect(row).toContainText(new RegExp(value.status, 'i'));
+         await expect(row).toContainText(value.id === owned[2].id ? /1\s*(?:\/|of)\s*2\s*(?:children\s*)?merged/i : /0\s*(?:\/|of)\s*0\s*(?:children\s*)?merged|no child issues/i);
+@@ -239,8 +241,12 @@
+     await chooseRequirements(page, f.first);
+     await inspect(page, parent);
+     for (const text of [parent.goal, f.first.name, source.reference, source.summary, parent.submission!.id, parent.submission!.planHash]) await expect(details(page)).toContainText(text);
+-    await expect(details(page)).toContainText(new RegExp(`Requirement\\s*#${parent.id}\\b`, 'i'));
+-    await expect(details(page)).toContainText(new RegExp(`Repository\\s*#${f.first.id}\\b`, 'i'));
++    const requirementIdentity = details(page).getByTestId('requirement-identity');
++    await expect(requirementIdentity).toHaveText(`Requirement #${parent.id}`);
++    await expect(requirementIdentity).toBeVisible();
++    const repositoryIdentity = details(page).getByTestId('requirement-repository-identity');
++    await expect(repositoryIdentity).toHaveText(`Repository #${f.first.id}`);
++    await expect(repositoryIdentity).toBeVisible();
+     const children = section(page, 'Child issues');
+     const mergedRow = children.getByTestId(`issue-${owned.id}`);
+     const unmergedRow = children.getByTestId(`issue-${unmerged.id}`);
+--- a/src/ui/Requirements.tsx
++++ b/src/ui/Requirements.tsx
+@@ -21,7 +21,7 @@
+   const publication = requirement.publication;
+   const submission = requirement.submission;
+   return <section aria-label="Requirement inspection" className="requirement-inspection">
+-    <header><span className="eyebrow">Requirement #{requirement.id}</span>{' '}<h2>{requirement.title}</h2><p>Repository #{repo.id} · {repo.name}</p></header>
++    <header><span className="eyebrow" data-testid="requirement-identity">Requirement #{requirement.id}</span>{' '}<h2>{requirement.title}</h2><p><span data-testid="requirement-repository-identity">Repository #{repo.id}</span> · {repo.name}</p></header>
+     <section aria-label="Original goal"><h3>Original goal</h3><p>{requirement.goal}</p></section>
+     <section aria-label="Provenance"><h3>Conversation provenance</h3>{submission ? <dl>
+       <dt>Submission</dt><dd>{submission.id}</dd><dt>Plan hash</dt><dd><code>{submission.planHash}</code></dd>
+@@ -77,7 +77,7 @@
+       {requirements.length ? <ul className="requirement-list" ref={listRef} aria-label="Requirements on this page">{requirements.slice(offset, offset + PAGE_SIZE).map(item => {
+         const progress = requirementProgress(data, issues, item);
+         return <li className="requirement-row" key={item.id} data-testid={`requirement-${item.id}`}>
+-          <span className="issue-id">Requirement #{item.id}</span>{' '}<button className="text-button requirement-title" type="button" aria-label={`Inspect requirement ${item.title}`} aria-pressed={selectedId === item.id} onClick={() => setSelectedId(item.id)}>{item.title}</button>{' '}
++          <span className="issue-id" data-testid="requirement-identity">Requirement #{item.id}</span>{' '}<button className="text-button requirement-title" type="button" aria-label={`Inspect requirement ${item.title}`} aria-pressed={selectedId === item.id} onClick={() => setSelectedId(item.id)}>{item.title}</button>{' '}
+           <span className="requirement-row-status">{item.status}</span>{' '}<span className="requirement-row-progress">{progress.merged}/{progress.children.length} children merged</span>
+         </li>;
+       })}</ul> : <div className="state-panel"><h2>No requirements</h2><p>No requirements are recorded for this repository.</p></div>}

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "recordType": "owner-maintenance",
+  "id": "semantic-observation-guidance",
+  "issueId": 48,
+  "changeKind": "harness",
+  "dependsOn": [47],
+  "goal": "Improve assertion observations inside the existing test authoring and acceptance review roles without changing execution workflow or budgets.",
+  "acceptance": [
+    "Actual tests, regression-tests and acceptance-review adapter inputs receive guidance to locate visible identity and state fields independently of their expected value, then assert that value separately.",
+    "Distinguish opposite business states, preserve scoped prose containment, and consider both incorrect-result false passes and equivalent-presentation false failures in the existing coverage review.",
+    "Keep original sandbox permissions, response schemas, accepted checks, role separation, execution phases, budgets, complete verification and final review requirements.",
+    "Retain owner assertion red proofs and independent coverage approval for the three additive adapter checks before implementation, then require complete verification and independent exact-source approval before local integration."
+  ],
+  "limitations": [
+    "Adapter checks prove instruction delivery, not guaranteed model output quality or measured future time savings.",
+    "The preserved requirement14 candidate remains blocked. Its inactive assertion revision does not authorize feature execution or repair its known product defects."
+  ]
+}
