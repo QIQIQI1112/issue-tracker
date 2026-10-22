@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "recordType": "owner-maintenance",
+  "id": "requirement-identity-observations",
+  "issueId": 47,
+  "changeKind": "acceptance_contract",
+  "stage": "inactive",
+  "goal": "Stage field-scoped visible identity assertions for the preserved blocked requirement candidate without resuming or integrating it.",
+  "dependsOn": [],
+  "candidate": {
+    "requirementId": 14,
+    "issueId": 46,
+    "runId": "c0d9fc97-70b3-43ab-b822-52f6794a7e9c",
+    "sourceHash": "bbafec1ad0d27db4f1f2ee8c1e6cdc18c1fee7f6068eb9ec90c7d11f67fc7a87"
+  },
+  "patch": "tickets/012-requirement-identity-observations.patch",
+  "acceptance": [
+    "Preserve requirement IDs, repository identity, titles, all other accepted assertions and all seven browser case identities.",
+    "Observe the visible identity field instead of aggregate container text; correct identifiers survive adjacent element text and equivalent wrappers.",
+    "Wrong, hidden or duplicate identity fields must fail; ordinary prose containment remains allowed.",
+    "This inactive revision grants no feature retry, budget reset, checkpoint reuse, code integration, or publication authorization."
+  ],
+  "activation": "A later explicit owner continuation must apply this exact-base revision, obtain fresh source-bound acceptance evidence, freeze the revised inventory and retain cumulative history before repairing the blocked feature.",
+  "files": [
+    {
+      "path": "acceptance/requirements.spec.ts",
+      "baseSha256": "56579139605e7d8b09054bd6151b02af32fc6cbaf6a803770e05e31f0d3e8140",
+      "revisedSha256": "bf0c3d50376f9ae349b681c168a438b43916975820d639f86d34a0e377a2adf1"
+    },
+    {
+      "path": "src/ui/Requirements.tsx",
+      "baseSha256": "6a8de870cdd1952d1b540f92d61900b4e1235cef2e33ff950d2b62a7dd4d7afe",
+      "revisedSha256": "ba9386a3cc2796867bbeecbdbf19f78d285afc0c30cc23a89e8f67b4c16cbdd3"
+    }
+  ],
+  "observationHooks": "Three additive nonvisual data-testid hooks identify fields independently of their values. The repository identifier gains an inline span; rendered wording and application behavior are unchanged."
+}

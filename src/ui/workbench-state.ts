@@ -7,15 +7,38 @@ export function mergedIssue(data: Workbench, issue: Issue): boolean {
   return data.runs.some(run => run.status === 'merged' && run.issueId === issue.id && run.repoId === issue.work?.repoId && run.requirementId === issue.work?.requirementId);
 }
 
+export const requirementStages = {
+  decompose: 'Decomposition',
+  plan_review: 'Plan review',
+  requirement_verify: 'Whole-goal verification',
+  requirement_publish: 'GitHub publication',
+};
+
+export function requirementJobs(data: Workbench, requirement: Requirement, children: Issue[]): Job[] {
+  return data.jobs.filter(job => job.repoId === requirement.repoId && job.requirementId === requirement.id && (job.issueId === null
+    ? Object.hasOwn(requirementStages, job.kind)
+    : ['issue', 'maintenance'].includes(job.kind) && children.some(issue => issue.id === job.issueId))).sort((a, b) => b.id - a.id);
+}
+
+export function matchingRun(data: Workbench, job: Job) {
+  return data.runs.find(run => run.id === job.runId && run.jobId === job.id && run.repoId === job.repoId && run.requirementId === job.requirementId && run.issueId === job.issueId);
+}
+
 export function requirementProgress(data: Workbench, issues: Issue[], requirement: Requirement) {
   const children = issues.filter(issue => issue.work?.requirementId === requirement.id && issue.work.repoId === requirement.repoId);
   const merged = children.filter(issue => mergedIssue(data, issue)).length;
   const final = data.jobs.filter(job => job.repoId === requirement.repoId && job.requirementId === requirement.id && job.kind === 'requirement_verify' && job.issueId === null).sort((a, b) => b.id - a.id)[0];
-  const verified = (!requirement.publication || requirement.publication.state === 'merged') && children.length > 0 && merged === children.length && final?.status === 'completed' && data.runs.some(run => run.jobId === final.id && run.id === final.runId && run.repoId === requirement.repoId && run.requirementId === requirement.id && run.issueId === null && run.status === 'passed' && run.completedAt !== null);
-  const outcome = requirement.publication ? requirement.publication.state === 'merged' ? 'Whole goal verified and GitHub merged' : `GitHub delivery ${requirement.publication.state}` : final && final.status !== 'completed'
+  const finalRun = final && matchingRun(data, final);
+  const accepted = final?.status === 'completed' && finalRun?.status === 'passed' && finalRun.completedAt !== null;
+  const github = Boolean(requirement.publication);
+  const integrated = children.length > 0 && merged === children.length;
+  const verified = accepted && integrated && (!github || requirement.publication?.state === 'merged');
+  const acceptance = accepted ? 'Passed' : final && final.status !== 'completed' ? final.status : 'Unverified';
+  const delivery = !accepted || !integrated ? 'Incomplete' : !github ? 'Local delivery verified' : requirement.publication?.state === 'merged' ? 'GitHub merged' : requirement.publication?.state === 'awaiting_ci' ? 'Awaiting CI' : requirement.publication?.state === 'blocked' ? 'Blocked' : 'Pending';
+  const outcome = requirement.publication && accepted && integrated ? requirement.publication.state === 'merged' ? 'Whole goal verified and GitHub merged' : `GitHub delivery ${requirement.publication.state}` : final && final.status !== 'completed'
     ? `Whole-goal verification ${final.status}`
     : verified ? 'Whole goal verified' : 'Whole goal not yet verified';
-  return { children, merged, verified, outcome };
+  return { children, merged, verified, outcome, accepted, acceptance, delivery, github };
 }
 
 export function currentBlockers(data: Workbench, issues: Issue[]): Job[] {
