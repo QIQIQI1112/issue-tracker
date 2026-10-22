@@ -156,3 +156,114 @@ test('delivery reports preserve audit content and readable layout at desktop and
     store.close();
   }
 });
+
+async function readableEfficiencyMetric(report: Locator, label: string, value: string, width: number) {
+  const labelPattern = new RegExp(`^${label}$`, 'i');
+  const field = report.getByText(labelPattern).and(report.locator(':not(h3):not(h4)'));
+  await expect(field, `${width}px: the recorded metric label ${label} must be visible and complete.`).toHaveCount(1);
+  await expect(field, `${width}px: the metric label must not be hidden.`).toBeVisible();
+  await expect(report, `${width}px: ${label} must be paired with its stored value.`).toContainText(new RegExp(`${label}\\s*:?\\s*${value}`, 'i'), { useInnerText: true });
+  await field.scrollIntoViewIfNeeded();
+  await expect(field, `${width}px: the metric must be reachable by scrolling.`).toBeInViewport();
+  const clipping = await field.evaluate(element => {
+    const container = element.parentElement!;
+    return [container, ...container.querySelectorAll('*')].filter(item => item.getClientRects().length > 0).filter(item => {
+      const style = getComputedStyle(item);
+      return style.display !== 'inline' && (item.scrollWidth > item.clientWidth + 1 || item.scrollHeight > item.clientHeight + 1);
+    }).map(item => item.textContent);
+  });
+  expect.soft(clipping, `${width}px: the complete metric label and value must wrap without clipping.`).toEqual([]);
+}
+
+test('recorded execution efficiency remains readable at desktop and 390px', async ({ page }, info) => {
+  const store = new IssueStore(info.project.metadata.databasePath as string);
+  const database = new DatabaseSync(store.path);
+  database.exec('PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
+  const root = info.outputPath('efficiency-layout-fixture');
+  mkdirSync(root, { recursive: true });
+  const prefix = `Efficiency-${randomUUID()}`;
+  const repo = store.work.addRepo({ name: prefix, path: root, targetBranch: 'main' });
+  const issue = store.create({ title: `${prefix} selected report`, description: 'Inspect recorded execution cost.', status: 'open', priority: 'medium', labels: [], work: { repoId: repo.id, requirementId: null, dependsOn: [], acceptance: ['Read stored efficiency values.'] } });
+  try {
+    const run = recordDiagnosticRun(store, database, { root, repoId: repo.id, requirementId: null, issueId: issue.id, status: 'completed' });
+    const reason = `Retained route rationale: ${'Previously accepted behavior coverage required a focused extension during the recorded attempt. '.repeat(4)}Reference ${'r'.repeat(180)}.`;
+    writeFileSync(join(run.evidencePath, 'retained-cost.log'), 'Stored audit evidence remains inspectable.');
+    saveDelivery(run.evidencePath, {
+      schemaVersion: 1, runId: run.id, taskId: 'efficiency-layout', title: 'Selected report', goal: 'Read recorded execution cost.', summary: 'Stored owner outcome.',
+      status: 'merged', startedAt: run.startedAt, completedAt: run.completedAt!, baseline: 'a'.repeat(40), sourceHash: 'b'.repeat(64),
+      defaults: [], changes: [], checks: [{ name: 'Full verification', status: 'passed' }], nodePassed: 17, browserPassed: 9, attempts: 2,
+      workerObservations: [{ attempt: 1, summary: 'Earlier worker note.' }], review: { approved: true, summary: 'Stored source assessment.' },
+      integration: { branch: 'main', before: 'a'.repeat(40), commit: 'c'.repeat(40) }, limitations: [],
+      execution: { profile: 'adaptive-v2', route: 'standard', coverageMode: 'extend', reason },
+      efficiency: { elapsedMs: 187000, agentInvocations: 7, testAuthoringInvocations: 2, verificationExecutions: 3, verificationRetries: 1, verificationReuses: 4, durations: { planningMs: 125, testAuthoringMs: 2500, acceptanceReviewMs: 45000, implementationMs: 125000, verificationMs: 65250, codeReviewMs: 750 } },
+      budget: { usedMs: 901000, implementationAttempts: 2, acceptanceAttempts: 1, maxAttempts: 3, totalTimeoutMs: 3600000 },
+    });
+    await page.goto(appUrl(info));
+    const search = page.getByLabel('Search issues', { exact: true });
+    await expect(search, 'Owned issue search must exist before filtering the fixture.').toBeVisible({ timeout: 3000 });
+    await search.fill(prefix);
+    const opener = page.getByRole('button', { name: `View issue ${issue.title}`, exact: true });
+    for (const width of [1280, 390]) {
+      await page.setViewportSize({ width, height: 844 });
+      await expect(opener, `${width}px: the owned report opener must exist before inspection.`).toBeVisible({ timeout: 3000 });
+      await opener.click();
+      const dialog = page.getByRole('dialog', { name: `Issue #${issue.id}`, exact: true });
+      const report = dialog.getByRole('article', { name: 'Delivery report', exact: true });
+      await expect(report, 'The populated report must load before measuring its summary.').toBeVisible();
+      for (const [label, value] of [
+        ['(?:Selected[- ]run |Run )?Elapsed(?: time)?', '(?:3\\s*(?:m|min|minutes?)\\s*7\\s*(?:s|seconds?)|187\\s*(?:s|seconds?))\\b'],
+        ['Agent (?:invocations|calls)', '7\\b'], ['Test[- ]authoring (?:invocations|calls)', '2\\b'],
+        ['Full verifi(?:cation|er) (?:executions|runs)', '3\\b'], ['Verification retries', '1\\b'], ['Verification (?:proof )?reuses', '4\\b'],
+        ['Planning(?: duration| time)?', '(?:125\\s*(?:ms|milliseconds?)|0\\.125\\s*(?:s|seconds?))\\b'],
+        ['Test[- ]authoring(?: duration| time)?', '2\\.5\\s*(?:s|seconds?)\\b'],
+        ['Acceptance review(?: duration| time)?', '45\\s*(?:s|seconds?)\\b'],
+        ['Implementation(?: duration| time)?', '(?:2\\s*(?:m|min|minutes?)\\s*5\\s*(?:s|seconds?)|125\\s*(?:s|seconds?))\\b'],
+        ['Verification(?: duration| time)?', '(?:1\\s*(?:m|min|minutes?)\\s*5\\.25\\s*(?:s|seconds?)|65\\.25\\s*(?:s|seconds?))\\b'],
+        ['Code review(?: duration| time)?', '(?:750\\s*(?:ms|milliseconds?)|0\\.75\\s*(?:s|seconds?))\\b'],
+        ['(?:Execution )?Route', 'standard\\b'], ['Coverage(?: mode)?', 'extend\\b'],
+      ]) await readableEfficiencyMetric(report, label, value, width);
+      await readableText(report, reason, width);
+      await expect(report, 'Selected-run scope is generated by the application, separately from fixture prose.').toContainText(/selected[- ](?:execution|run)|this (?:execution|run)/i);
+      const history = report.locator('details').filter({ has: page.locator('summary', { hasText: /^Historical worker observations$/ }) });
+      const evidence = report.locator('details').filter({ has: page.locator('summary', { hasText: /^Evidence \(1 files\)$/ }) });
+      await expect(history, 'Efficiency must preserve the historical disclosure.').toHaveCount(1);
+      await expect(history, 'Historical observations remain closed initially.').not.toHaveAttribute('open');
+      await expect(evidence, 'Efficiency must preserve manifest evidence access.').toHaveCount(1);
+      await expect(evidence, 'Evidence remains closed initially.').not.toHaveAttribute('open');
+      await expect(report).toContainText('17 Node cases · 9 browser cases · 2 implementation attempts');
+      await expect(report).toContainText('Full verification: passed');
+      await expect(report).toContainText('approved · Stored source assessment.');
+      if (width === 1280) {
+        const measure = await report.getByText(reason, { exact: true }).evaluate(element => {
+          const style = getComputedStyle(element);
+          const context = document.createElement('canvas').getContext('2d')!;
+          context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+          return { width: element.getBoundingClientRect().width, maximum: 80 * context.measureText('0').width };
+        });
+        expect.soft(measure.width, 'The populated execution context retains the desktop reading column.').toBeLessThanOrEqual(measure.maximum + 1);
+      }
+      const selector = dialog.getByLabel('Select execution run', { exact: true });
+      await tabTo(page, selector);
+      await tabTo(page, history.locator('summary'));
+      await tabTo(page, selector, 'Shift+Tab');
+      await tabTo(page, evidence.locator('summary'));
+      await page.keyboard.press('Enter');
+      await expect(evidence, 'Evidence is still keyboard accessible alongside the populated summary.').toHaveAttribute('open', '');
+      await expect(evidence.getByRole('link', { name: 'retained-cost.log', exact: true }), 'Existing artifact access is retained.').toHaveAttribute('href', `/api/runs/${run.id}/evidence?file=retained-cost.log`);
+      expect.soft(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${width}px: efficiency causes no horizontal page overflow.`).toBe(true);
+      expect.soft(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth + 1), `${width}px: efficiency causes no horizontal dialog overflow.`).toBe(true);
+      expect.soft(await report.evaluate(element => element.scrollWidth <= element.clientWidth + 1), `${width}px: efficiency fits the report container.`).toBe(true);
+      await page.screenshot({ path: info.outputPath(`recorded-efficiency-${width}.png`), fullPage: true });
+      await page.keyboard.press('Escape');
+      await expect(dialog, 'The populated report retains keyboard dismissal.').toHaveCount(0);
+      await expect(opener, 'Dismissal restores the inspection opener.').toBeFocused();
+    }
+  } finally {
+    database.prepare('DELETE FROM work_runs WHERE repo_id = ?').run(repo.id);
+    database.prepare('DELETE FROM jobs WHERE repo_id = ?').run(repo.id);
+    store.delete(issue.id);
+    database.prepare('DELETE FROM repos WHERE id = ?').run(repo.id);
+    database.close();
+    store.close();
+  }
+});

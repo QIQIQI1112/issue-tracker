@@ -1,6 +1,56 @@
 import type { Delivery } from '../workflow.ts';
 import { EvidencePreview } from './EvidencePreview.tsx';
 
+function duration(milliseconds: number): string {
+  if (milliseconds < 1000) return `${milliseconds} ms`;
+  const hours = Math.floor(milliseconds / 3600000);
+  const minutes = Math.floor(milliseconds % 3600000 / 60000);
+  const seconds = milliseconds % 60000 / 1000;
+  return [hours ? `${hours} h` : '', minutes ? `${minutes} m` : '', seconds ? `${seconds} s` : ''].filter(Boolean).join(' ');
+}
+
+function ExecutionEfficiency({ delivery: { efficiency, execution } }: { delivery: Delivery }) {
+  return <div className="delivery-group delivery-efficiency">
+    {(efficiency || execution) && <h4>Execution efficiency</h4>}
+    {efficiency ? <>
+      <p>Recorded cost of the selected run, separate from cumulative budget usage and whole requirement delivery.</p>
+      <dl className="efficiency-metrics">
+        {([
+          ['Elapsed time', duration(efficiency.elapsedMs)],
+          ['Agent invocations', efficiency.agentInvocations],
+          ['Test-authoring invocations', efficiency.testAuthoringInvocations],
+          ['Full verification executions', efficiency.verificationExecutions],
+          ['Verification retries', efficiency.verificationRetries],
+          ['Verification proof reuses', efficiency.verificationReuses],
+        ] as const).map(([label, value]) => <div key={label}><dt>{label}</dt><dd> {value}</dd></div>)}
+      </dl>
+      <p className="efficiency-note">Agent invocations include test-authoring invocations. Full verification executions count actual full verifier runs, including retries; proof reuses use existing verification evidence.</p>
+      <h4>Recorded stage durations</h4>
+      <dl className="efficiency-metrics efficiency-stages">
+        {([
+          ['Planning', efficiency.durations.planningMs],
+          ['Test authoring', efficiency.durations.testAuthoringMs],
+          ['Acceptance review', efficiency.durations.acceptanceReviewMs],
+          ['Implementation', efficiency.durations.implementationMs],
+          ['Verification', efficiency.durations.verificationMs],
+          ['Code review', efficiency.durations.codeReviewMs],
+        ] as const).map(([label, value]) => <div key={label}><dt>{label}</dt><dd> {duration(value)}</dd></div>)}
+      </dl>
+      <p className="efficiency-note">Verification duration includes focused checks. Stage durations need not sum to elapsed time.</p>
+    </> : <p>Efficiency metrics were not recorded for this run and are unavailable.</p>}
+    {execution && <>
+      <h4>Execution context</h4>
+      <dl className="efficiency-context">
+        <div><dt>Execution profile</dt><dd> {execution.profile}</dd></div>
+        <div><dt>Execution route</dt><dd> {execution.route}</dd></div>
+        <div><dt>Coverage mode</dt><dd> {execution.coverageMode}</dd></div>
+      </dl>
+      <p className="efficiency-note">Coverage mode describes the recorded test coverage decision.</p>
+      <p className="efficiency-reason">{execution.reason}</p>
+    </>}
+  </div>;
+}
+
 export function DeliveryView({ delivery, runId }: { delivery: Delivery; runId: string }) {
   return <article className="delivery" aria-label="Delivery report">
     <div className="report-heading"><h3>Delivery report</h3><span className="status-pill">{delivery.status}</span></div>
@@ -11,6 +61,7 @@ export function DeliveryView({ delivery, runId }: { delivery: Delivery; runId: s
       </div>
       {delivery.workerObservations && delivery.workerObservations.length > 0 && <details><summary>Historical worker observations</summary><p>These observations precede the controller's final verification and decision.</p><ul>{delivery.workerObservations.map(item => <li key={item.attempt}><strong>Attempt {item.attempt}</strong><p>{item.summary}</p></li>)}</ul></details>}
     </div>
+    <ExecutionEfficiency delivery={delivery} />
     <div className="delivery-group">
       <h4>What changed</h4>{delivery.changes.length ? <ul>{delivery.changes.map(file => <li key={file.path}><code>{file.path}</code> · {file.category} · {file.status}</li>)}</ul> : <p>No source changes were needed.</p>}
       <h4>Decisions</h4>{delivery.defaults.length ? <ul>{delivery.defaults.map((item, index) => <li key={index}><strong>{item.decision}</strong><p>{item.reason}</p></li>)}</ul> : <p>No additional defaults recorded.</p>}
