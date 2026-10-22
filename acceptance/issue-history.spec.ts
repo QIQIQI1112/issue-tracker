@@ -670,3 +670,93 @@ test('diagnostics remain readable and keyboard operable on desktop and at 390px'
     await page.screenshot({ path: info.outputPath('diagnostics-phone.png'), fullPage: true });
   } finally { f.close(); }
 });
+
+async function expectSelectedEfficiency(report: Locator, values: NonNullable<Delivery['efficiency']>) {
+  for (const [label, value] of [
+    ['Agent (?:invocations|calls)', values.agentInvocations], ['Test[- ]authoring (?:invocations|calls)', values.testAuthoringInvocations],
+    ['Full verifi(?:cation|er) (?:executions|runs)', values.verificationExecutions], ['Verification retries', values.verificationRetries],
+    ['Verification (?:proof )?reuses', values.verificationReuses],
+  ] as const) {
+    await expect(report, `The selected report must show its own ${label} value ${value}.`).toContainText(new RegExp(`${label}\\s*:?\\s*${value}\\b`, 'i'), { useInnerText: true });
+    const occurrences = (await report.innerText()).match(new RegExp(`${label}\\s*:?\\s*\\d+`, 'gi')) ?? [];
+    expect(occurrences, `The selected report must contain only one ${label} counter, without stale previous values.`).toHaveLength(1);
+  }
+  for (const [label, milliseconds] of [
+    ['(?:Selected[- ]run |Run )?Elapsed(?: time)?', values.elapsedMs], ['Planning(?: duration| time)?', values.durations.planningMs],
+    ['Test[- ]authoring(?: duration| time)?', values.durations.testAuthoringMs], ['Acceptance review(?: duration| time)?', values.durations.acceptanceReviewMs],
+    ['Implementation(?: duration| time)?', values.durations.implementationMs], ['Verification(?: duration| time)?', values.durations.verificationMs],
+    ['Code review(?: duration| time)?', values.durations.codeReviewMs],
+  ] as const) {
+    const token = '\\d+(?:\\.\\d+)?\\s*(?:milliseconds?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h)\\b';
+    const pattern = new RegExp(`${label}\\s*:?\\s*(${token}(?:\\s+${token})*)`, 'i');
+    await expect.poll(async () => {
+      const match = (await report.innerText()).match(pattern);
+      if (!match) return null;
+      return [...match[1].matchAll(/(\d+(?:\.\d+)?)\s*(milliseconds?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h)\b/gi)].reduce((total, part) => {
+        const scale = /^ms$|^millisecond/i.test(part[2]) ? 1 : /^s/i.test(part[2]) ? 1000 : /^m/i.test(part[2]) ? 60000 : 3600000;
+        return total + Number(part[1]) * scale;
+      }, 0);
+    }, { message: `The selected report must replace ${label} with its recorded duration ${milliseconds} ms.` }).toBe(milliseconds);
+  }
+}
+
+test('selected execution reports replace efficiency metrics across issue runs and requirement audits', async ({ page }, info) => {
+  const f = fixture(info, 'Selected efficiency');
+  try {
+    const issue = f.child('Efficiency history subject');
+    const legacy = f.record('issue', 'blocked', issue.id, null, true);
+    const executionOnly = f.record('issue', 'blocked', issue.id, null, true);
+    const earlier = f.record('issue', 'blocked', issue.id, null, true);
+    const latest = f.record('issue', 'completed', issue.id, null, true);
+    const audit = f.record('requirement_verify', 'completed', null, null, true);
+    const sibling = f.child('Excluded efficiency sibling');
+    const excluded = f.record('issue', 'completed', sibling.id, null, true);
+    const current: NonNullable<Delivery['efficiency']> = { elapsedMs: 187000, agentInvocations: 7, testAuthoringInvocations: 2, verificationExecutions: 3, verificationRetries: 1, verificationReuses: 4, durations: { planningMs: 125, testAuthoringMs: 2500, acceptanceReviewMs: 45000, implementationMs: 125000, verificationMs: 65250, codeReviewMs: 750 } };
+    const historical = { ...current, elapsedMs: 41000, agentInvocations: 11, testAuthoringInvocations: 5, verificationExecutions: 6, verificationRetries: 2, verificationReuses: 0, durations: { planningMs: 900, testAuthoringMs: 1200, acceptanceReviewMs: 5000, implementationMs: 21000, verificationMs: 15000, codeReviewMs: 800 } };
+    const reused: NonNullable<Delivery['efficiency']> = { elapsedMs: 0, agentInvocations: 0, testAuthoringInvocations: 0, verificationExecutions: 0, verificationRetries: 0, verificationReuses: 1, durations: { planningMs: 0, testAuthoringMs: 0, acceptanceReviewMs: 0, implementationMs: 0, verificationMs: 0, codeReviewMs: 0 } };
+    const latestReason = 'Current selected execution rationale.';
+    const earlierReason = 'Historical selected execution rationale.';
+    const executionOnlyReason = 'Execution-only selected rationale.';
+    enrichDiagnosticRun(latest, {}, { efficiency: current, execution: { profile: 'adaptive-v2', route: 'standard', coverageMode: 'extend', reason: latestReason } });
+    enrichDiagnosticRun(earlier, {}, { efficiency: historical, execution: { profile: 'adaptive-v2', route: 'light', coverageMode: 'reuse', reason: earlierReason } });
+    enrichDiagnosticRun(executionOnly, {}, { execution: { profile: 'adaptive-v2', route: 'light', coverageMode: 'extend', reason: executionOnlyReason } });
+    enrichDiagnosticRun(audit, {}, { efficiency: reused, checks: [{ name: 'Full verification', status: 'passed' }], nodePassed: 37, browserPassed: 19 });
+    enrichDiagnosticRun(excluded, {}, { efficiency: { ...current, agentInvocations: 999 }, execution: { profile: 'adaptive-v2', route: 'standard', coverageMode: 'extend', reason: 'Excluded sibling rationale.' } });
+    await page.goto(appUrl(info));
+    const opener = page.getByRole('button', { name: `View issue ${issue.title}`, exact: true });
+    await expect(opener, 'The owned efficiency issue must exist before inspection.').toBeVisible({ timeout: 3000 });
+    await opener.click();
+    const dialog = page.getByRole('dialog', { name: `Issue #${issue.id}`, exact: true });
+    const selector = dialog.getByLabel('Select execution run', { exact: true });
+    await expect(selector, 'Run selection must exist before selecting a report.').toBeVisible({ timeout: 3000 });
+    await expect(selector, 'Run selection must be enabled.').toBeEnabled();
+    await expect(selector.locator('option').filter({ hasText: excluded.id }), 'Sibling runs must not supply the inspected report metrics.').toHaveCount(0);
+    const report = dialog.getByRole('article', { name: 'Delivery report', exact: true });
+    for (const [run, metrics, reason] of [[latest, current, latestReason], [earlier, historical, earlierReason], [audit, reused, null], [executionOnly, null, executionOnlyReason], [legacy, null, null], [latest, current, latestReason]] as const) {
+      await expect(selector, 'The report selector must remain available before every historical transition.').toBeVisible({ timeout: 3000 });
+      await selector.selectOption(run.id);
+      await expect(report, 'The newly selected stored report must replace its predecessor.').toContainText(`Report result ${run.id}`);
+      if (metrics) await expectSelectedEfficiency(report, metrics);
+      else {
+        await expect(report, 'A selected historical report without efficiency must explain missing metrics.').toContainText(/(?:efficiency|metrics)[^.]* (?:unavailable|not (?:recorded|available))|(?:unavailable|not (?:recorded|available))[^.]* (?:efficiency|metrics)/i);
+        await expect(report, 'Historical reports must clear the previous selected counters.').not.toContainText(/(?:Agent (?:invocations|calls)|Full verifi(?:cation|er) (?:executions|runs))\s*:?\s*\d+/i);
+      }
+      if (run === latest) await expect(report, 'Elapsed time belongs to the selected current execution.').toContainText(/Elapsed(?: time)?\s*:?\s*(?:3\s*(?:m|min|minutes?)\s*7\s*(?:s|seconds?)|187\s*(?:s|seconds?))\b/i, { useInnerText: true });
+      if (run === earlier) await expect(report, 'Historical elapsed time must replace the current elapsed time.').toContainText(/Elapsed(?: time)?\s*:?\s*41\s*(?:s|seconds?)\b/i, { useInnerText: true });
+      if (run === audit) {
+        await expect(report, 'Efficiency-only whole-goal reuse preserves a real zero elapsed time.').toContainText(/Elapsed(?: time)?\s*:?\s*0\s*(?:ms|milliseconds?|s|seconds?)\b/i, { useInnerText: true });
+        await expect(report, 'Copied successful gate evidence stays separate from zero fresh full executions.').toContainText('Full verification: passed');
+      }
+      for (const candidate of [latestReason, earlierReason, executionOnlyReason, 'Excluded sibling rationale.']) {
+        if (candidate === reason) await expect(report).toContainText(candidate);
+        else await expect(report, 'Unselected execution context must not leak into the report.').not.toContainText(candidate);
+      }
+      if (!reason) await expect(report, 'Reports without execution must clear the previous route and coverage context.').not.toContainText(/(?:route\s*:?\s*(?:standard|light)|coverage(?: mode)?\s*:?\s*(?:reuse|extend))/i, { useInnerText: true });
+      if (reason) {
+        await expect(report, 'The selected execution route is application-labelled.').toContainText(new RegExp(`route\\s*:?\\s*${run === latest ? 'standard' : 'light'}`, 'i'));
+        await expect(report, 'Coverage mode is distinct from verification proof reuse.').toContainText(new RegExp(`coverage(?: mode)?\\s*:?\\s*${run === earlier ? 'reuse' : 'extend'}`, 'i'));
+      }
+      await expect(report).not.toContainText(/Agent (?:invocations|calls)\s*:?\s*999\b/i);
+    }
+  } finally { f.close(); }
+});

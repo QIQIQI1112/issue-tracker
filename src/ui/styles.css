@@ -268,6 +268,12 @@ summary { cursor: pointer; }
 .evidence-preview pre { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; max-height: 480px; overflow-y: auto; padding: 12px; background: #0c0d11; border-radius: 4px; font-size: 12px; line-height: 1.6; }
 .selected-run-meta { font-size: 12px; color: var(--muted); }
 .delivery details > summary { cursor: pointer; padding-block: 12px; }
+.delivery-efficiency .efficiency-metrics, .delivery-efficiency .efficiency-context { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 12px 16px; margin: 0 0 16px; }
+.delivery-efficiency dl > div { min-width: 0; }
+.delivery-efficiency dt { font-size: 12px; line-height: 1.5; color: var(--muted); }
+.delivery-efficiency dd { margin: 4px 0 0; font-size: 18px; font-weight: 600; line-height: 1.4; font-variant-numeric: tabular-nums; }
+.delivery-efficiency .efficiency-stages dd, .delivery-efficiency .efficiency-context dd { font-size: 14px; }
+.delivery-efficiency .efficiency-note { color: var(--muted); font-size: 12px; }
 @media (max-width: 600px) {
   .detail-body { padding: 18px; }
   .detail-body dl { grid-template-columns: minmax(0, 85px) minmax(0, 1fr); gap: 10px; }
