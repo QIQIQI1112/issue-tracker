@@ -224,7 +224,7 @@ export async function runController(options: { repository: string; task: unknown
         protocolRepair = { validationError, previousResponse: value, instruction: 'Correct only the response format. Keep the same source, task, evidence, role and review judgment. Approved reviews require findings: []; blocking findings require approved: false. Do not edit files.' };
       }
       if (!response) throw new Error('Review response is missing.');
-      const receipt = { purpose, planHash: digest(JSON.stringify(state.plan)), sourceHash, criteriaHash: digest(JSON.stringify(task.acceptance)), contractHash: digest(JSON.stringify(effectiveContract)), approved: response.approved, summary: response.summary, evidencePath: `review-receipt-${runId}-${state.reviewReceipts!.length + 1}.json` };
+      const receipt = { purpose, planHash: digest(JSON.stringify(state.plan)), sourceHash, criteriaHash: digest(JSON.stringify(task.acceptance)), contractHash: digest(JSON.stringify(parseVerificationContract(effectiveContract))), approved: response.approved, summary: response.summary, evidencePath: `review-receipt-${runId}-${state.reviewReceipts!.length + 1}.json` };
       writeJson(join(runDirectory, receipt.evidencePath), { ...receipt, response, feedback });
       state.reviewReceipts!.push(receipt);
       if (!response.approved) state.phases!.at(-1)!.status = 'failed';
@@ -355,7 +355,7 @@ export async function runController(options: { repository: string; task: unknown
           acceptanceFeedback = browserFailure; continue;
         }
         if (reuse) {
-          const receipt = { purpose: 'baseline-coverage-reuse', planHash: digest(JSON.stringify(state.plan)), sourceHash: baseline.hash, criteriaHash: digest(JSON.stringify(task.acceptance)), contractHash: digest(JSON.stringify(contract)), approved: true, summary: 'Controller proved named baseline coverage and froze the complete existing test inventory. Independent final goal review remains required.', evidencePath: 'baseline-coverage-reuse.json' };
+          const receipt = { purpose: 'baseline-coverage-reuse', planHash: digest(JSON.stringify(state.plan)), sourceHash: baseline.hash, criteriaHash: digest(JSON.stringify(task.acceptance)), contractHash: digest(JSON.stringify(parseVerificationContract(contract))), approved: true, summary: 'Controller proved named baseline coverage and froze the complete existing test inventory. Independent final goal review remains required.', evidencePath: 'baseline-coverage-reuse.json' };
           writeJson(join(runDirectory, receipt.evidencePath), { ...receipt, owner: { environment, baselineTree: state.baselineTree }, feedback: { redChecks: state.redChecks, browserRedChecks: state.browserRedChecks, acceptedChecks: baseline.files.filter(file => /^(tests|acceptance)\//.test(file.path)) } });
           state.reviewReceipts!.push(receipt);
           break;
