@@ -17,8 +17,9 @@ button, select { cursor: pointer; }
 button { border: 0; }
 button:disabled { cursor: wait; opacity: .65; }
 a { color: inherit; }
-:focus-visible { outline: 2px solid #b2a6ff; outline-offset: 3px; }
-input:focus-visible, textarea:focus-visible, select:focus-visible { outline-offset: 1px; }
+:focus { outline: none; }
+:root[data-focus-intent="keyboard"] :focus:not(.modal) { outline: 2px solid #b2a6ff; outline-offset: 3px; }
+:root[data-focus-intent="keyboard"] input:focus, :root[data-focus-intent="keyboard"] textarea:focus, :root[data-focus-intent="keyboard"] select:focus { outline-offset: 1px; }
 .icon { width: 18px; height: 18px; flex: 0 0 auto; }
 .workspace { min-height: 100dvh; display: grid; grid-template-columns: 232px minmax(0, 1fr); }
 .sidebar { background: #17181c; border-right: 1px solid var(--border); padding: 28px 16px 20px; display: flex; flex-direction: column; gap: 30px; position: sticky; top: 0; height: 100dvh; }
@@ -55,8 +56,7 @@ h1 { font-size: 29px; line-height: 1.2; letter-spacing: -.8px; font-weight: 600;
 .toolbar { display: flex; align-items: center; gap: 16px; padding: 0 0 18px; }
 .search-field { flex: 1; max-width: 340px; min-width: 0; display: flex; align-items: center; gap: 8px; border: 1px solid #373842; background: #17181c; border-radius: 6px; padding-left: 11px; color: var(--muted); }
 .search-field input { width: 100%; min-width: 0; padding: 9px 11px 9px 0; border: none; background: transparent; font-size: 12px; }
-.search-field:focus-within { border-color: #afa4ed; }
-.search-field input:focus-visible { outline: none; }
+:root[data-focus-intent="keyboard"] .search-field:focus-within { border-color: #afa4ed; }
 input::placeholder, textarea::placeholder { color: #9393a0; opacity: 1; }
 .toolbar-selects { display: flex; align-items: center; gap: 10px; margin-left: auto; min-width: 0; }
 .select-field { display: flex; gap: 8px; align-items: center; min-width: 0; border: 1px solid #373842; background: var(--surface); border-radius: 6px; padding: 5px 9px; }
@@ -66,7 +66,7 @@ input::placeholder, textarea::placeholder { color: #9393a0; opacity: 1; }
 .list-heading { display: flex; justify-content: space-between; align-items: center; padding: 12px 20px; border-bottom: 1px solid var(--border); font-size: 11px; color: var(--muted); background: #191a1f; }
 .list-heading strong { color: #bdbcc9; font-size: 11px; font-weight: 500; }
 .issue-list { list-style: none; padding: 0; margin: 0; max-height: min(620px, max(180px, calc(100dvh - 410px))); overflow-y: auto; overscroll-behavior-y: contain; scrollbar-gutter: stable; }
-.issue-list:focus-visible { outline-offset: -3px; }
+:root[data-focus-intent="keyboard"] .issue-list:focus { outline-offset: -3px; }
 .issue-row { display: grid; grid-template-columns: 80px minmax(0, 1fr) 110px 80px 60px; align-items: center; gap: 14px; min-height: 80px; padding: 12px 16px 12px 20px; border-bottom: 1px solid #27282f; }
 .issue-row:last-child { border-bottom: 0; }
 .issue-row:hover { background: #1b1c22; }
