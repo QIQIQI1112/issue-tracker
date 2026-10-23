@@ -8,6 +8,8 @@ This is a local autonomous development workbench with a reproducible verifier, a
 - Development: `npm run dev`.
 - Instance identity: `npm run doctor`.
 - Complete verification: `npm run verify`.
+- Frozen owner maintenance verification: `npm run factory -- verify-maintenance <request.json>`.
+- Bounded owner continuation: `npm run factory -- owner-resume <request.json> [--validate]`.
 - Validate a task: `npm run factory -- tickets/001-labels.json --validate`.
 - Execute a bounded task: `npm run factory -- tickets/001-labels.json`.
 - Execute and integrate into an enrolled clean target: `npm run factory -- tickets/001-labels.json --merge main`.
@@ -78,3 +80,5 @@ When independent code review identifies a reproducible defect missing determinis
 For explicitly GitHub-enrolled requirements, child integration targets the reserved requirement branch. Whole-goal acceptance precedes publication; completion requires a confirmed GitHub PR merge, exact-head CI evidence and local target synchronization. Publication is controller-owned and `.github/` verification controls remain protected. Never force-push or bypass GitHub checks/reviews. Existing local-only requirements and standalone issues retain their enrolled local target. Follow `docs/github-delivery.md` for owner enrollment and recovery.
 
 Adaptive execution is enabled only by controller-owned `factory/execution-policy.json`; missing policy and version-one tasks keep legacy behavior. Baseline reuse records real named proofs and a distinct owner receipt, always invokes implementation, and cannot change frozen tests. Keep a fresh complete integrated verifier and independent final source review. Same-requirement evidence reuse additionally binds exact target/source/runtime/engine/contract/reports; sole-child whole-goal review reuse requires an explicit exact-goal receipt. Only positively identified settled spawn resource faults permit one persistent budgeted verification retry. Read `docs/adaptive-execution-contract.md` and `docs/loop-optimization.md`.
+
+Owner harness maintenance uses `docs/owner-workflow.md`: freeze independently approved complete test inventory before implementation; finish focused diagnostics before one final frozen full verifier. Use the existing owner-resume command for an explicit idempotent budget grant and native selected-job continuation; never copy the controller loop or edit canonical task limits.

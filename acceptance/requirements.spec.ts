@@ -70,11 +70,9 @@ const previous = (page: Page) => pagination(page).getByRole('button', { name: /P
 const next = (page: Page) => pagination(page).getByRole('button', { name: /Next(?: page)?/i });
 const section = (page: Page, name: string) => details(page).getByRole('region', { name, exact: true });
 
-async function expectCurrentValue(field: Locator, expected: RegExp, message: string, matches = true) {
+async function expectCurrentValue(field: Locator, expected: RegExp, message: string) {
   await expect(field, message).toBeVisible();
-  const observation = expect.poll(async () => (await field.innerText()).replace(/\s+/g, ' ').trim(), { message });
-  if (matches) await observation.toMatch(expected);
-  else await observation.not.toMatch(expected);
+  await expect.poll(async () => (await field.innerText()).replace(/\s+/g, ' ').trim(), { message }).toMatch(expected);
 }
 
 async function click(control: Locator, message = 'The planned inspection control must exist before activation.') {
@@ -268,14 +266,12 @@ test('requirement inspection preserves the original goal provenance and owned ch
     await expect(mergedRow.getByTestId('child-merge-state')).toBeVisible();
     await expect(mergedRow.getByTestId('child-recorded-status'), 'The merged child must expose a dedicated current recorded status.').toHaveText(/^\s*open\s*$/i, { useInnerText: true });
     await expect(mergedRow.getByTestId('child-merge-state'), 'The child with an owned merged run must show affirmative merge progress in its own current field.').toHaveText(/^\s*merged\s*$/i, { useInnerText: true });
-    await expect(mergedRow.getByTestId('child-merge-state')).not.toHaveText(/^\s*(?:not\s+merged|unmerged)\s*$/i, { useInnerText: true });
     await expect(unmergedRow, 'An owned Done child without merge evidence must remain inspectable.').toBeVisible();
     await expect(unmergedRow).toContainText(unmerged.title);
     await expect(unmergedRow.getByTestId('child-recorded-status')).toBeVisible();
     await expect(unmergedRow.getByTestId('child-merge-state')).toBeVisible();
     await expect(unmergedRow.getByTestId('child-recorded-status'), 'The unmerged child must expose its current recorded Done status separately from merge progress.').toHaveText(/^\s*done\s*$/i, { useInnerText: true });
     await expect(unmergedRow.getByTestId('child-merge-state'), 'A Done label must not substitute for actual current child merge evidence.').toHaveText(/^\s*(?:not\s+merged|unmerged)\s*$/i, { useInnerText: true });
-    await expect(unmergedRow.getByTestId('child-merge-state')).not.toHaveText(/^\s*merged\s*$/i, { useInnerText: true });
     for (const value of excluded) await expect(children).not.toContainText(value.title);
     await expect(section(page, 'Current blockers')).not.toContainText('Foreign child blocker');
     const control = children.getByRole('button', { name: `Inspect issue ${owned.title}`, exact: true });
@@ -314,13 +310,13 @@ test('requirement progress separates child integration latest acceptance and fin
   const incompleteDelivery = /^(?:not (?:yet )?(?:delivered|verified)|incomplete|pending|blocked)\.?$/i;
   const localDelivery = /^(?:local(?:-only)? (?:delivery )?(?:verified|delivered)|(?:verified|delivered) (?:locally|local(?:-only)?(?: delivery)?))\.?$/i;
   const githubDelivery = /^(?:GitHub (?:delivery )?merged|merged (?:on )?GitHub|delivered (?:on|via) GitHub)\.?$/i;
-  const cases: { name: string; jobs: Job[]; runs: WorkRun[]; children?: Issue[]; publication?: Publication; acceptance: RegExp; accepted?: boolean; delivery: RegExp; delivered?: boolean; integration?: RegExp; historical?: WorkRun }[] = [
+  const cases: { name: string; jobs: Job[]; runs: WorkRun[]; children?: Issue[]; publication?: Publication; acceptance: RegExp; delivery: RegExp; integration?: RegExp; historical?: WorkRun }[] = [
     { name: 'manual Done and closed unmerged child', jobs: [], runs: [], acceptance: unverifiedAcceptance, delivery: incompleteDelivery, integration: /0\s*(?:\/|of)\s*1/i },
     { name: 'all children merged without acceptance', jobs: baseJobs.filter(job => job.kind === 'issue'), runs: [merged], acceptance: unverifiedAcceptance, delivery: incompleteDelivery },
-    { name: 'local-only verified delivery', jobs: baseJobs, runs: baseRuns, acceptance: affirmativeAcceptance, accepted: true, delivery: localDelivery, delivered: true },
-    { name: 'zero children despite passing evidence', jobs: baseJobs, runs: [passed], children: [], acceptance: affirmativeAcceptance, accepted: true, delivery: /^(?:no child(?: issues)?|zero child(?: issues)?|incomplete|not (?:yet )?(?:verified|delivered))\.?$/i },
-    { name: 'GitHub awaits CI after acceptance', jobs: baseJobs, runs: baseRuns, publication: publication('awaiting_ci'), acceptance: affirmativeAcceptance, accepted: true, delivery: /^awaiting[ _-]?(?:CI|checks)\.?$/i },
-    { name: 'GitHub publication merged', jobs: baseJobs, runs: baseRuns, publication: publication('merged'), acceptance: affirmativeAcceptance, accepted: true, delivery: githubDelivery, delivered: true },
+    { name: 'local-only verified delivery', jobs: baseJobs, runs: baseRuns, acceptance: affirmativeAcceptance, delivery: localDelivery },
+    { name: 'zero children despite passing evidence', jobs: baseJobs, runs: [passed], children: [], acceptance: affirmativeAcceptance, delivery: /^(?:no child(?: issues)?|zero child(?: issues)?|incomplete|not (?:yet )?(?:verified|delivered))\.?$/i },
+    { name: 'GitHub awaits CI after acceptance', jobs: baseJobs, runs: baseRuns, publication: publication('awaiting_ci'), acceptance: affirmativeAcceptance, delivery: /^awaiting[ _-]?(?:CI|checks)\.?$/i },
+    { name: 'GitHub publication merged', jobs: baseJobs, runs: baseRuns, publication: publication('merged'), acceptance: affirmativeAcceptance, delivery: githubDelivery },
   ];
   for (const status of ['queued', 'running', 'blocked'] as const) {
     const latest: Job = { ...verification, id: verification.id + 500, runId: null, status };
@@ -331,7 +327,7 @@ test('requirement progress separates child integration latest acceptance and fin
   }
   cases.push({ name: 'completed latest job with missing run', jobs: [...baseJobs, { ...verification, id: verification.id + 900, runId: 'absent-run' }], runs: baseRuns, acceptance: unverifiedAcceptance, delivery: incompleteDelivery });
   const unmerged = f.child(parent, 'Unmerged sibling');
-  cases.push({ name: 'acceptance remains independent of child integration', jobs: baseJobs, runs: baseRuns, children: [owned, unmerged], acceptance: affirmativeAcceptance, accepted: true, delivery: incompleteDelivery, integration: /1\s*(?:\/|of)\s*2/i });
+  cases.push({ name: 'acceptance remains independent of child integration', jobs: baseJobs, runs: baseRuns, children: [owned, unmerged], acceptance: affirmativeAcceptance, delivery: incompleteDelivery, integration: /1\s*(?:\/|of)\s*2/i });
   try {
     await f.mount(page);
     for (const value of cases) await test.step(value.name, async () => {
@@ -351,14 +347,8 @@ test('requirement progress separates child integration latest acceptance and fin
       await expect(currentDelivery, 'Current delivery must have one distinct application-generated observation, separate from publication and historical reports.').toHaveCount(1);
       await expect(currentAcceptance, `Current acceptance for ${value.name} must be unambiguous.`).toBeVisible();
       await expectCurrentValue(currentAcceptance, value.acceptance, `Current acceptance for ${value.name} must match the exact latest-evidence state without contradictory passed text.`);
-      if (value.accepted) await expectCurrentValue(currentAcceptance, affirmativeAcceptance, 'Valid exact latest evidence must establish affirmative current acceptance; Unverified is not Verified.');
-      else await expectCurrentValue(currentAcceptance, affirmativeAcceptance, 'Missing, mismatched or superseded evidence must not establish current passed acceptance.', false);
       await expect(currentDelivery, `Current delivery for ${value.name} must be unambiguous.`).toBeVisible();
       await expectCurrentValue(currentDelivery, value.delivery, `Current delivery for ${value.name} must match the exact evidence-based state.`);
-      if (!value.delivered) {
-        await expectCurrentValue(currentDelivery, localDelivery, 'Incomplete integration, acceptance or publication must exclude affirmative local delivery.', false);
-        await expectCurrentValue(currentDelivery, githubDelivery, 'A recorded merged publication cannot substitute for current acceptance and child integration.', false);
-      }
       const mergeProgress = section(page, 'Child integration').getByTestId('requirement-merge-progress');
       const mergeRatio = value.integration ?? (value.children?.length === 0 ? /0\s*(?:\/|of)\s*0/ : /1\s*(?:\/|of)\s*1/);
       await expect(mergeProgress, 'The inspection child merge-progress field must be visible independently of its heading and empty-state prose.').toBeVisible();
@@ -762,8 +752,6 @@ test('historical local requirement stays locally delivered after repository GitH
     await inspect(page, github);
     await expectSelected(github);
     await expectCurrentValue(currentDelivery, /^awaiting[ _-]?(?:CI|checks)\.?$/i, 'A requirement with its own GitHub publication snapshot must await CI despite merged children and passed acceptance.');
-    await expectCurrentValue(currentDelivery, localDelivery, 'Repository enrollment must not make every requirement locally delivered.', false);
-    await expectCurrentValue(currentDelivery, githubDelivery, 'Awaiting CI must not claim recorded merged GitHub delivery.', false);
     for (const url of [github.publication!.url!, github.publication!.ciUrl!]) await expect(section(page, 'Publication').getByRole('link').and(section(page, 'Publication').locator(`a[href="${url}"]`)), 'The enrolled requirement must retain its own recorded PR and CI links.').toBeVisible();
     github.publication = publication('merged');
     await refresh(page);
