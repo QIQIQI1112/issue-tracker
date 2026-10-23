@@ -8,12 +8,14 @@ import { Requirements } from './Requirements.tsx';
 import { IssueRow, statusLabels } from './IssueRow.tsx';
 import { Modal } from './Modal.tsx';
 import { IssueDetails } from './IssueDetails.tsx';
+import { useFocusIntent } from './useFocusIntent.ts';
 import type { Workbench as WorkbenchData } from '../workflow.ts';
 
 type Filter = 'all' | IssueStatus;
 const PAGE_SIZE = 10;
 
 export function App() {
+  useFocusIntent();
   const [workbench, setWorkbench] = useState<WorkbenchData>({ repos: [], requirements: [], jobs: [], runs: [] });
   const [detailId, setDetailId] = useState<number | null>(null);
   const [repoFilter, setRepoFilter] = useState('');
