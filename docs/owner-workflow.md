@@ -23,6 +23,14 @@ Run `npm run factory -- verify-maintenance request.json`. Admission rejects abse
 
 Read `readiness.json`, `owner-verification.json`, `verification/summary.json`, raw reports and process receipts. A passing outcome updates the source checkout's `.runs/latest.json`. All five gates and required named cases remain mandatory. Retain evidence on failure; unsafe process ownership retains the worktree. A fresh independent final source review and verified local integration still precede `scripts/record-maintenance.ts` attestation. The command does not commit or authorize a different source tree.
 
+## Diagnose a failed focused check
+
+An adaptive integrated task sends an actual named focused assertion failure to the existing read-only acceptance reviewer with purpose `focused-failure-triage` before another product repair. Passing focused checks add no agent invocation. This is a failure disposition using the existing Review response, not a new role or acceptance approval. Approval permits ordinary product repair only when the original goal, frozen check, current source and actual machine report demonstrate a concrete product defect. A suspected test-contract defect or uncertain cause blocks for owner maintenance. A failed assertion alone does not establish which side is wrong.
+
+The controller retains unique `failure-proof-<runId>-<attempt>` report/log copies, their hashes, a source-bound review receipt and `failure-triage-<attempt>.json`. Its accepted checkpoint holds the failure before invoking review, so malformed responses, cancellation and interrupted review cannot release a repair. Interrupted draft capture preserves an already checkpointed hold even when `state.json` predates it. Matching checkpoint recovery re-triages that exact held source before consuming another implementation attempt. A valid approval releases only ordinary repair; rejection preserves the hold. Historical failure copies cannot be overwritten by later focused runs.
+
+Inspect the disposition and original proof before authorizing maintenance or continuation. Correct an accepted observation only through a separately reviewed acceptance-contract issue; never edit its frozen checkpoint or reset the ledger. Reviewed control revisions still invalidate incompatible native reuse. Version-one verification and other existing failure paths retain their current handling. Complete integrated verification, final independent source review, whole-goal acceptance and enrolled GitHub delivery remain mandatory.
+
 ## Resume one blocked feature
 
 Stop the normal queue worker using its verified PID and identity before issuing a continuation. Do not kill processes by name or start a competing executor. Inspect the blocked report, original goal, accepted checkpoint and cumulative ledger first. If an unknown ownership or source identity problem remains, resolve it explicitly instead of granting attempts.

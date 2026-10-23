@@ -13,7 +13,7 @@ import { assertRunQuiescent, processIdentity } from './ownership.ts';
 import { executionBudget } from './budget.ts';
 import type { Delivery } from '../src/workflow.ts';
 import { enforceRegressionDraft, proveRegression, BehaviorProofError } from './regression.ts';
-import type { PendingRegression, AcceptedRegression, RedCheck } from './regression.ts';
+import type { PendingRegression, AcceptedRegression, RedCheck, ReviewReceipt } from './regression.ts';
 import { classifyVerificationFailure, writeRoleContext } from './optimization.ts';
 import { verifyWithRecovery } from './verification-retry.ts';
 import { captureIntegratedVerification, verificationInputIdentity } from './verification-reuse.ts';
@@ -24,8 +24,11 @@ export type AgentInput = { phase: Phase; task: Task; plan?: Plan; cwd: string; a
 export type Agent = { run: (input: AgentInput) => Promise<unknown> };
 export type Verification = { diagnostics?: { phase: string; code?: string; origin: 'spawn' | 'node-report' | 'report-validation'; kind?: 'product' | 'test-contract'; settled: true }; status: string; snapshot: { hash: string }; runDirectory: string; checks: { name: string; status: string; durationMs?: number }[]; node?: { passed: number }; browser?: { passed: number }; error?: string };
 class IntegrationRejected extends Error {}
+class FocusedFailureHold extends Error {}
 
-export type ControllerState = { execution?: Delivery['execution']; efficiency?: Delivery['efficiency']; schemaVersion: 1; taskId: string; runId: string; phases?: Delivery['phases']; reviewReceipts?: Delivery['reviewReceipts']; failedPhase?: string; failureKind?: 'integrity' | 'timeout' | 'cancelled' | 'budget' | 'ownership' | 'infrastructure' | 'verification' | 'review' | 'worker'; cleanupSafe?: boolean; budget?: { usedMs: number; implementationAttempts: number; acceptanceAttempts: number; infrastructureRetries?: number; maxAttempts: number; totalTimeoutMs: number }; resume?: { fromRunId?: string; reused: boolean; reason: string }; runDirectory: string; workspace: string; status: 'running' | 'ready' | 'merged' | 'blocked'; phase: string; startedAt: string; completedAt?: string; reason?: string; sourceHash?: string; baseCommit?: string; baselineTree?: string; plan?: Plan; regressions?: AcceptedRegression[]; pendingRegression?: PendingRegression; browserRedChecks?: RedCheck[]; redChecks: { file: string; title: string; status: string; logPath: string; reportPath?: string }[]; attempts: { id: string; number: number; verification?: Verification; focused?: RedCheck[]; review?: Review }[]; verification?: Verification; review?: Review; ports?: [string, string]; changes?: { path: string; status: string }[]; integration?: { branch: string; before: string; commit?: string; verification?: Verification; review?: Review } };
+export type PendingFailureTriage = { sourceHash: string; check: RedCheck; reportHash: string; logHash: string; receipt?: ReviewReceipt };
+
+export type ControllerState = { execution?: Delivery['execution']; efficiency?: Delivery['efficiency']; schemaVersion: 1; taskId: string; runId: string; phases?: Delivery['phases']; reviewReceipts?: Delivery['reviewReceipts']; failedPhase?: string; failureKind?: 'integrity' | 'timeout' | 'cancelled' | 'budget' | 'ownership' | 'infrastructure' | 'verification' | 'review' | 'worker'; cleanupSafe?: boolean; budget?: { usedMs: number; implementationAttempts: number; acceptanceAttempts: number; infrastructureRetries?: number; maxAttempts: number; totalTimeoutMs: number }; resume?: { fromRunId?: string; reused: boolean; reason: string }; runDirectory: string; workspace: string; status: 'running' | 'ready' | 'merged' | 'blocked'; phase: string; startedAt: string; completedAt?: string; reason?: string; sourceHash?: string; baseCommit?: string; baselineTree?: string; plan?: Plan; regressions?: AcceptedRegression[]; pendingRegression?: PendingRegression; pendingFailureTriage?: PendingFailureTriage; browserRedChecks?: RedCheck[]; redChecks: { file: string; title: string; status: string; logPath: string; reportPath?: string }[]; attempts: { id: string; number: number; verification?: Verification; focused?: RedCheck[]; review?: Review }[]; verification?: Verification; review?: Review; ports?: [string, string]; changes?: { path: string; status: string }[]; integration?: { branch: string; before: string; commit?: string; verification?: Verification; review?: Review } };
 
 export async function runController(options: { repository: string; task: unknown; agent: Agent; baseRef?: string; evidenceRoot?: string; runId?: string; mergeTarget?: string; signal?: AbortSignal; resumeFrom?: string; budgetKey?: string }): Promise<ControllerState> {
   const task = parseTask(options.task);
@@ -79,7 +82,7 @@ export async function runController(options: { repository: string; task: unknown
     let timer: ReturnType<typeof setTimeout> | undefined;
     let finished = false;
     const verification = state.integration?.verification ?? state.verification;
-    const evidenceFiles = [...(options.resumeFrom ? ['state.json', 'delivery.json'].map(file => join(options.resumeFrom!, file)) : []), join(runDirectory, 'task.json'), join(runDirectory, 'plan.json'), ...state.redChecks.flatMap(check => [check.logPath, ...(check.reportPath ? [check.reportPath] : [])]), ...(state.browserRedChecks ?? []).flatMap(check => [check.logPath, ...(check.reportPath ? [check.reportPath] : [])]), ...(verification ? ['summary.json', 'node-results.jsonl', 'browser-results.json', 'test.log', 'test-e2e.log'].map(file => join(verification.runDirectory, file)) : [])].filter(existsSync);
+    const evidenceFiles = [...(options.resumeFrom ? ['state.json', 'delivery.json'].map(file => join(options.resumeFrom!, file)) : []), join(runDirectory, 'task.json'), join(runDirectory, 'plan.json'), ...state.redChecks.flatMap(check => [check.logPath, ...(check.reportPath ? [check.reportPath] : [])]), ...(state.browserRedChecks ?? []).flatMap(check => [check.logPath, ...(check.reportPath ? [check.reportPath] : [])]), ...(state.pendingFailureTriage ? [state.pendingFailureTriage.check.logPath, state.pendingFailureTriage.check.reportPath!] : []), ...(verification ? ['summary.json', 'node-results.jsonl', 'browser-results.json', 'test.log', 'test-e2e.log'].map(file => join(verification.runDirectory, file)) : [])].filter(existsSync);
     const context = task.schemaVersion === 2 ? writeRoleContext({ directory, role: phase, goal: task.wholeGoal?.goal ?? task.goal, sourceHash: snapshot(cwd).hash, feedback, relevantPaths: [...new Set([...(state.plan?.slices.flatMap(slice => slice.checks.map(check => check.file)) ?? []), ...(state.plan?.browserChecks.map(check => `acceptance/${check.file}`) ?? []), ...snapshot(cwd).files.filter(file => file.path.startsWith('src/') && scoped(file.path, task)).map(file => file.path)])], decisions: state.plan?.assumptions ?? [], evidence: [...new Set(evidenceFiles)].map(path => ({ path, purpose: 'Retained controller task, plan or actual machine proof; inspect the file before making a delivery judgment.' })) }) : undefined;
     const work = options.agent.run({ phase, task, plan: state.plan, cwd, attempt, feedback, context, directory, timeoutMs, signal: abort.signal, env: { ...env, RUN_DIR: join(cwd, '.runs', 'worker-checks', `phase-${counter}`) } }).finally(() => { finished = true; });
     work.catch(() => {});
@@ -167,6 +170,11 @@ export async function runController(options: { repository: string; task: unknown
       state.plan = restored.plan!;
       state.regressions = restored.regressions ?? [];
       state.pendingRegression = restored.pendingRegression;
+      if (restored.pendingFailureTriage) {
+        const pending = restored.pendingFailureTriage;
+        state.pendingFailureTriage = { ...pending, check: { ...pending.check, logPath: join(runDirectory, pending.check.logPath.split('/').at(-1)!), reportPath: join(runDirectory, pending.check.reportPath!.split('/').at(-1)!) } };
+        if (pending.receipt) state.reviewReceipts!.push({ ...pending.receipt, reusedFromRunId: restored.runId });
+      }
       for (const regression of state.regressions) {
         state.reviewReceipts!.push({ ...regression.receipt, reusedFromRunId: restored.runId });
         regression.redChecks = regression.redChecks.map(check => ({ ...check, logPath: join(runDirectory, check.logPath.split('/').at(-1)!), reportPath: join(runDirectory, check.reportPath!.split('/').at(-1)!) }));
@@ -230,6 +238,38 @@ export async function runController(options: { repository: string; task: unknown
       if (!response.approved) state.phases!.at(-1)!.status = 'failed';
       save();
       return response;
+    };
+    const triageFocusedFailure = async (check: RedCheck, attempt: number) => {
+      const source = enforce();
+      if (!check.reportPath || check.status !== 'expected_failure') throw new Error('Focused failure triage requires an actual named assertion report.');
+      if (state.pendingFailureTriage && state.pendingFailureTriage.sourceHash !== source.hash) throw new Error('Pending failure triage source identity changed.');
+      const report = readFileSync(check.reportPath);
+      const log = readFileSync(check.logPath);
+      const prefix = join(runDirectory, `failure-proof-${runId}-${attempt}`);
+      const held = { ...check, logPath: `${prefix}.log`, reportPath: `${prefix}.${check.file.startsWith('tests/') ? 'jsonl' : 'json'}` };
+      writeFileSync(held.logPath, log);
+      writeFileSync(held.reportPath, report);
+      const pending: PendingFailureTriage = { sourceHash: source.hash, check: held, reportHash: digest(report), logHash: digest(log) };
+      state.pendingFailureTriage = pending;
+      checkpoint!();
+      const path = join(runDirectory, `failure-triage-${attempt}.json`);
+      const diagnostic = { schemaVersion: 1, purpose: 'focused-failure-triage', sourceHash: source.hash, check: held, reportHash: pending.reportHash, logHash: pending.logHash };
+      writeJson(path, { ...diagnostic, status: 'pending-review' });
+      try {
+        const review = await reviewCandidate('acceptance-review', 'focused-failure-triage', attempt, { ...diagnostic, baselineTree: state.baselineTree, acceptance: task.acceptance, originalGoal: task.wholeGoal?.goal ?? task.goal, acceptedChecksPath: join(runDirectory, 'accepted-checks.json'), evidenceDirectory: runDirectory });
+        enforce();
+        if (digest(readFileSync(held.reportPath)) !== pending.reportHash || digest(readFileSync(held.logPath)) !== pending.logHash || digest(readFileSync(check.reportPath)) !== pending.reportHash || digest(readFileSync(check.logPath)) !== pending.logHash) throw new Error('Read-only focused failure triage changed the machine evidence.');
+        const receipt = state.reviewReceipts!.at(-1)!;
+        if (review.approved) state.pendingFailureTriage = undefined;
+        else pending.receipt = receipt;
+        writeJson(path, { ...diagnostic, status: review.approved ? 'repair-approved' : 'owner-maintenance-required', receipt, summary: review.summary, findings: review.findings });
+        checkpoint!();
+        if (!review.approved) throw new FocusedFailureHold(`Focused check requires owner maintenance before product repair: ${review.findings.join('; ') || review.summary}. Preserve frozen checks and read ${path}.`);
+        return review;
+      } catch (error) {
+        if (!(error instanceof FocusedFailureHold)) writeJson(path, { ...diagnostic, status: 'owner-maintenance-required', reason: error instanceof Error ? error.message : String(error) });
+        throw error;
+      }
     };
     const fullVerification = async (cwd: string, directory: string, effectiveContractPath: string, attemptId?: string) => {
       let execution: Awaited<ReturnType<typeof runProcess>> | undefined;
@@ -375,6 +415,7 @@ export async function runController(options: { repository: string; task: unknown
     proofsComplete = true;
     checkpoint();
     if (state.pendingRegression) await regressionLoop();
+    if (state.pendingFailureTriage) await triageFocusedFailure(state.pendingFailureTriage.check, 0);
     let feedback = options.resumeFrom ? `Repair the restored draft using the retained evidence from ${options.resumeFrom}. Preserve accepted checks.` : '';
     const alreadySatisfied = [...state.redChecks, ...(state.browserRedChecks ?? [])].every(check => check.status === 'already_passed');
     for (let number = 1; number <= task.budget.maxAttempts; number += 1) {
@@ -405,7 +446,12 @@ export async function runController(options: { repository: string; task: unknown
           if (failedCheck) break;
         }
         writeJson(join(runDirectory, `focused-${number}.json`), { purpose: 'development-diagnostics', sourceHash: snapshot(state.workspace).hash, checks: attempt.focused });
-        if (failedCheck) { state.phases!.at(-1)!.status = 'failed'; feedback = `Focused behavior assertion failed: ${failedCheck.file}#${failedCheck.title}. Read ${failedCheck.reportPath}. Preserve frozen checks.`; continue; }
+        if (failedCheck) {
+          state.phases!.at(-1)!.status = 'failed';
+          const diagnosis = await triageFocusedFailure(failedCheck, number);
+          feedback = `Independent focused failure triage confirmed a product defect: ${diagnosis.summary} Focused assertion: ${failedCheck.file}#${failedCheck.title}. Read ${failedCheck.reportPath} and ${join(runDirectory, `failure-triage-${number}.json`)}. Preserve frozen checks.`;
+          continue;
+        }
       } else {
         state.phase = 'verify'; save();
         const { execution, verification } = await fullVerification(state.workspace, verificationDirectory, contractPath, attempt.id);
@@ -474,7 +520,7 @@ export async function runController(options: { repository: string; task: unknown
     state.failedPhase = state.phase;
     try { checkpoint?.(); } catch (checkpointError) { writeJson(join(runDirectory, 'checkpoint-error.json'), { reason: String(checkpointError) }); }
     state.status = 'blocked'; state.reason = error instanceof Error ? error.message : String(error);
-    state.failureKind = /protected|scope|identity changed|changed during|changed after|read.only/i.test(state.reason) ? 'integrity' : /cancelled/i.test(state.reason) ? 'cancelled' : /timeout|timed out/i.test(state.reason) ? 'timeout' : /budget.*exhausted/i.test(state.reason) ? 'budget' : /owner|process group|locked/i.test(state.reason) ? 'ownership' : /infrastructure.*retry/i.test(state.reason) ? 'infrastructure' : /verification/i.test(state.reason) ? 'verification' : /review/i.test(state.reason) ? 'review' : 'worker';
+    state.failureKind = error instanceof FocusedFailureHold ? 'review' : /protected|scope|identity changed|changed during|changed after|read.only/i.test(state.reason) ? 'integrity' : /cancelled/i.test(state.reason) ? 'cancelled' : /timeout|timed out/i.test(state.reason) ? 'timeout' : /budget.*exhausted/i.test(state.reason) ? 'budget' : /owner|process group|locked/i.test(state.reason) ? 'ownership' : /infrastructure.*retry/i.test(state.reason) ? 'infrastructure' : /verification/i.test(state.reason) ? 'verification' : /review/i.test(state.reason) ? 'review' : 'worker';
   } finally {
     process.removeListener('SIGINT', cancel); process.removeListener('SIGTERM', cancel);
     options.signal?.removeEventListener('abort', cancel);
