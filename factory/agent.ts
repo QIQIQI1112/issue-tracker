@@ -15,6 +15,8 @@ const testSelfCheck = `Before returning checks, apply this focused self-check wi
 - Record a known sandbox startup EPERM once and stop repeated server/browser launches; the controller owns HTTP/browser red proofs.`;
 
 const assertionObservations = `Within the existing phase, select observations that express the behavior:
+- Apply risk-proportionate coverage to fields required by the goal or an actual defect. One exact positive assertion is sufficient when it already excludes the opposite value on the same current field; avoid redundant negative assertions. A separate negative scenario needs a concrete business risk or counterexample.
+- Do not require an exhaustive DOM mutation matrix or stable test IDs for every widget. Accessible semantic locators remain preferred where suitable. Block only confirmed actionable gaps with a concrete incorrect business outcome; put speculative presentation preferences in summary. Consolidate confirmed actionable findings together across affected positive and negative observations.
 - Observe each field in a specific visible semantic element; locate identity and state fields independently of their expected values using dedicated labels/roles or stable test IDs, then assert the value separately. A matching title or historical text cannot substitute for a missing field.
 - Avoid aggregate container text or concatenated textContent as a substitute for a specific field observation.
 - Use exact identifiers and business states: Verified must differ from Unverified, and Merged from Not merged. Scoped containment checks remain valid for prose, descriptions and reports when they express the requirement.

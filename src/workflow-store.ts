@@ -192,14 +192,14 @@ export class WorkflowStore {
     const result = this.database.prepare("INSERT INTO jobs (repo_id, requirement_id, issue_id, kind, status, payload, created_at, updated_at) VALUES (?, ?, ?, ?, 'queued', ?, ?, ?)").run(repoId, requirementId, issueId, kind, JSON.stringify(payload), now, now);
     return this.jobs().find(job => job.id === Number(result.lastInsertRowid))!;
   }
-  startIssue(id: number): Job {
+  startIssue(id: number, ownerResumeRequestId?: string): Job {
     return this.transaction(() => {
       const issue = this.issues.get(id);
       if (issue?.status === 'closed') throw new ConflictError('Closed issues cannot restart. Create a follow-up issue.');
       if (!issue?.work) throw new ValidationError('Assign a repository and acceptance conditions before starting the issue.');
       if (issue.work.requirementId && this.submissionForRequirement(issue.work.requirementId) && !this.approvedSubmission(issue.work.requirementId)) throw new ConflictError('Submitted issues require independent plan approval before execution.');
       if (this.runs().some(run => run.issueId === id && run.status === 'merged')) throw new ConflictError('This issue has already been merged. Create a follow-up issue.');
-      return this.enqueue(!issue.work.changeKind || issue.work.changeKind === 'feature' ? 'issue' : 'maintenance', issue.work.repoId, issue.work.requirementId, id, issue);
+      return this.enqueue(!issue.work.changeKind || issue.work.changeKind === 'feature' ? 'issue' : 'maintenance', issue.work.repoId, issue.work.requirementId, id, ownerResumeRequestId ? { ...issue, ownerResumeRequestId } : issue);
     });
   }
   startRequirement(id: number): Job[] {
@@ -241,10 +241,10 @@ export class WorkflowStore {
       } finally { this.decomposing = false; }
     });
   }
-  claim(evidenceRoot: string): { job: Job; run: WorkRun } | undefined {
+  claim(evidenceRoot: string, targetJobId?: number): { job: Job; run: WorkRun } | undefined {
     return this.transaction(() => {
       if (this.jobs().some(job => job.status === 'running')) return undefined;
-      const job = this.jobs().find(job => job.status === 'queued' && (job.availableAt ?? 0) <= Date.now() && job.kind !== 'maintenance' && (job.kind !== 'issue' || this.context(job.issueId!)!.dependsOn.every(id => this.dependencyReady(id, job.requirementId))));
+      const job = this.jobs().find(job => (targetJobId === undefined || job.id === targetJobId) && job.status === 'queued' && (job.availableAt ?? 0) <= Date.now() && job.kind !== 'maintenance' && (job.kind !== 'issue' || this.context(job.issueId!)!.dependsOn.every(id => this.dependencyReady(id, job.requirementId))));
       if (!job) return undefined;
       return this.claimJob(job, evidenceRoot);
     });

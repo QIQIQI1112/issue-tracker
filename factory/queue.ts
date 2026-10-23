@@ -24,6 +24,15 @@ import { recoverMerge } from './recovery.ts';
 import { executionPolicy } from './optimization.ts';
 import { reusableRequirementVerification } from './verification-reuse.ts';
 
+export function issueTask(store: IssueStore, issue: Issue, feedback = '') {
+  const repo = store.work.repo(issue.work!.repoId)!;
+  const requirement = issue.work!.requirementId ? store.work.requirement(issue.work!.requirementId) : undefined;
+  const targetBranch = requirement?.publication?.branch ?? repo.targetBranch;
+  const policy = executionPolicy(repo.path);
+  const onlyChild = requirement && store.list().filter(child => child.work?.requirementId === requirement.id).length === 1;
+  return parseTask({ schemaVersion: policy.mode === 'adaptive-v2' ? 2 : 1, id: `issue-${issue.id}`, title: issue.title, goal: issue.description || issue.title, ...(policy.mode === 'adaptive-v2' && onlyChild ? { wholeGoal: { requirementId: requirement.id, goal: requirement.goal } } : {}), acceptance: issue.work!.acceptance.map((description, index) => ({ id: `criterion-${index + 1}`, description })), scope: ['src/', 'tests/', 'acceptance/', 'docs/'], verificationCommand: 'npm run verify', budget: { maxAttempts: 3, workerTimeoutMs: 600000, totalTimeoutMs: 3600000 }, notes: `Repository ${repo.name}; target ${targetBranch}. Complete only after independent review and automatic integration.${feedback}` });
+}
+
 export class SerialQueue {
   readonly evidenceRoot: string;
   private busy = false;
@@ -32,12 +41,12 @@ export class SerialQueue {
     mkdirSync(this.evidenceRoot, { recursive: true });
   }
 
-  async processNext(): Promise<boolean> {
+  async processNext(targetJobId?: number): Promise<boolean> {
     if (this.busy || this.options.signal?.aborted) return false;
     this.busy = true;
     let claimed: { job: Job; run: WorkRun } | undefined;
     try {
-      claimed = this.store.work.claim(this.evidenceRoot);
+      claimed = this.store.work.claim(this.evidenceRoot, targetJobId);
       if (!claimed) return false;
       const { job, run } = claimed;
       const repo = this.store.work.repo(job.repoId)!;
@@ -58,8 +67,7 @@ export class SerialQueue {
         for (const prior of issueHistory) assertRunQuiescent(prior.evidencePath);
         const previous = this.store.work.runs().filter(item => item.id !== run.id && item.repoId === repo.id && item.issueId === issue.id && item.status === 'blocked').sort((a, b) => b.jobId - a.jobId)[0];
         const feedback = previous ? `\nPrevious blocked attempt, diagnostic context only: ${JSON.stringify({ runId: previous.id, ...(policy.mode === 'legacy-v1' ? { reason: previous.reason ?? null } : {}), reasonPath: join(previous.evidencePath, 'state.json'), deliveryPath: join(previous.evidencePath, 'delivery.json'), evidencePath: previous.evidencePath })}. Address the recorded failure without changing the original goal, criteria, or review gates.` : '';
-        const onlyChild = requirement && this.store.list().filter(child => child.work?.requirementId === requirement.id).length === 1;
-        const task = parseTask({ schemaVersion: policy.mode === 'adaptive-v2' ? 2 : 1, id: `issue-${issue.id}`, title: issue.title, goal: issue.description || issue.title, ...(policy.mode === 'adaptive-v2' && onlyChild ? { wholeGoal: { requirementId: requirement.id, goal: requirement.goal } } : {}), acceptance: issue.work!.acceptance.map((description, index) => ({ id: `criterion-${index + 1}`, description })), scope: ['src/', 'tests/', 'acceptance/', 'docs/'], verificationCommand: 'npm run verify', budget: { maxAttempts: 3, workerTimeoutMs: 600000, totalTimeoutMs: 3600000 }, notes: `Repository ${repo.name}; target ${targetBranch}. Complete only after independent review and automatic integration.${feedback}` });
+        const task = issueTask(this.store, issue, feedback);
         const state = await runController({ repository: repo.path, task, agent: this.options.agent ?? codexAgent(process.env.FACTORY_CODEX_BIN ?? 'codex'), baseRef: targetBranch, mergeTarget: targetBranch, evidenceRoot: this.evidenceRoot, runId: run.id, signal: this.options.signal, resumeFrom: previous?.evidencePath, budgetKey: `repo-${repo.id}:issue-${issue.id}` });
         this.store.work.finish(run.id, state.status === 'merged' ? 'merged' : 'blocked', state.reason ?? null);
       } else if (job.kind === 'requirement_publish') await this.publicationJob(job, run);
