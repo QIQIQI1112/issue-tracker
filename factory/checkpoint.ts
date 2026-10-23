@@ -5,7 +5,7 @@ import type { ControllerState } from './controller.ts';
 import type { Task, Plan } from './contracts.ts';
 import { parsePlan, parseReview, parseRegressionReport } from './contracts.ts';
 import { snapshot, readJson, writeJson } from './evidence.ts';
-import type { PendingRegression, AcceptedRegression } from './regression.ts';
+import type { PendingRegression, AcceptedRegression, RedCheck } from './regression.ts';
 import { git, protectedPath } from './workspace.ts';
 
 export const digest = (value: string | Buffer) => createHash('sha256').update(value).digest('hex');
@@ -18,7 +18,7 @@ export function environmentIdentity(repository: string, engine: string): string 
   return digest(JSON.stringify({ controls, runtime }));
 }
 
-type Checkpoint = { schemaVersion: 1; runId: string; taskHash: string; environment: string; baselineTree: string; baseCommit: string; sourceHash: string; patchHash: string; accepted: boolean; regressions?: AcceptedRegression[]; pendingRegression?: PendingRegression; plan?: Plan; acceptanceReceipt?: NonNullable<ControllerState['reviewReceipts']>[number]; acceptedChecks: { path: string; hash: string }[]; redChecks: ControllerState['redChecks']; browserRedChecks?: ControllerState['browserRedChecks']; proofs: { path: string; hash: string }[] };
+type Checkpoint = { schemaVersion: 1; runId: string; taskHash: string; environment: string; baselineTree: string; baseCommit: string; sourceHash: string; patchHash: string; accepted: boolean; regressions?: AcceptedRegression[]; pendingRegression?: PendingRegression; pendingFailureTriage?: ControllerState['pendingFailureTriage']; plan?: Plan; acceptanceReceipt?: NonNullable<ControllerState['reviewReceipts']>[number]; acceptedChecks: { path: string; hash: string }[]; redChecks: ControllerState['redChecks']; browserRedChecks?: ControllerState['browserRedChecks']; proofs: { path: string; hash: string }[] };
 
 export function assertTestInventory(files: { path: string; hash: string }[], approved: { path: string; hash: string }[]): void {
   const current = new Map(files.filter(file => /^(tests|acceptance)\//.test(file.path)).map(file => [file.path, file.hash]));
@@ -30,6 +30,8 @@ export function assertTestInventory(files: { path: string; hash: string }[], app
 export function saveCheckpoint(state: ControllerState, task: Task, environment: string, accepted: boolean): void {
   if (!state.baselineTree || !state.baseCommit) return;
   const source = snapshot(state.workspace);
+  const triage = state.pendingFailureTriage;
+  if (triage && (triage.sourceHash !== source.hash || !triage.check.reportPath || digest(readFileSync(triage.check.reportPath)) !== triage.reportHash || digest(readFileSync(triage.check.logPath)) !== triage.logHash)) throw new Error('Pending failure triage source or evidence identity changed.');
   const acceptedChecks = accepted ? (readJson(join(state.runDirectory, 'accepted-checks.json')) as { path: string; hash: string }[]).filter(file => /^(tests|acceptance)\//.test(file.path)) : source.files.filter(file => /^(tests|acceptance)\//.test(file.path));
   if (accepted) assertTestInventory(source.files, acceptedChecks);
   const present = source.files.filter(file => existsSync(join(state.workspace, file.path))).map(file => file.path);
@@ -43,8 +45,12 @@ export function saveCheckpoint(state: ControllerState, task: Task, environment: 
   if (acceptanceReceipt) paths.push(acceptanceReceipt.evidencePath);
   for (const regression of state.regressions ?? []) paths.push(regression.receipt.evidencePath, ...regression.redChecks.flatMap(check => [relative(state.runDirectory, check.logPath), relative(state.runDirectory, check.reportPath!)]));
   if (state.pendingRegression) paths.push(state.pendingRegression.receipt.evidencePath);
+  if (triage) {
+    paths.push(relative(state.runDirectory, triage.check.logPath), relative(state.runDirectory, triage.check.reportPath!));
+    if (triage.receipt) paths.push(triage.receipt.evidencePath);
+  }
   const proofs = accepted ? paths.map(path => ({ path, hash: digest(readFileSync(join(state.runDirectory, path))) })) : [];
-  const checkpoint: Checkpoint = { schemaVersion: 1, runId: state.runId, taskHash: taskIdentity(task), environment, baselineTree: state.baselineTree, baseCommit: state.baseCommit, sourceHash: source.hash, patchHash: digest(patch), accepted, regressions: state.regressions, pendingRegression: state.pendingRegression, plan: state.plan, acceptanceReceipt, acceptedChecks, redChecks: state.redChecks, browserRedChecks: state.browserRedChecks ?? [], proofs };
+  const checkpoint: Checkpoint = { schemaVersion: 1, runId: state.runId, taskHash: taskIdentity(task), environment, baselineTree: state.baselineTree, baseCommit: state.baseCommit, sourceHash: source.hash, patchHash: digest(patch), accepted, regressions: state.regressions, pendingRegression: state.pendingRegression, pendingFailureTriage: triage, plan: state.plan, acceptanceReceipt, acceptedChecks, redChecks: state.redChecks, browserRedChecks: state.browserRedChecks ?? [], proofs };
   renameSync(join(state.runDirectory, 'checkpoint.patch.tmp'), join(state.runDirectory, 'checkpoint.patch'));
   writeJson(join(state.runDirectory, 'checkpoint.json'), checkpoint);
 }
@@ -61,7 +67,7 @@ export function loadCheckpoint(directory: string, root: string, task: Task, envi
   if (!value.proofs.length || value.redChecks.length !== value.plan.slices.flatMap(slice => slice.checks).length) throw new Error('Checkpoint behavior proofs are incomplete.');
   if (!Array.isArray(value.browserRedChecks)) throw new Error('Checkpoint browser proof metadata is missing.');
   for (const proof of value.proofs) {
-    if (relative(directory, resolve(directory, proof.path)) !== proof.path || proof.path.startsWith('..') || !/^(baseline\.json|accepted-checks\.json|acceptance-review\.json|baseline-coverage-reuse\.json|(?:red-\d+(?:-\d+)?|regression-red-\d+-\d+|browser-red-\d+-\d+)\.(log|jsonl|json)|review-receipt-[a-z0-9-]+\.json)$/.test(proof.path)) throw new Error('Invalid checkpoint proof path.');
+    if (relative(directory, resolve(directory, proof.path)) !== proof.path || proof.path.startsWith('..') || !/^(baseline\.json|accepted-checks\.json|acceptance-review\.json|baseline-coverage-reuse\.json|(?:red-\d+(?:-\d+)?|regression-red-\d+-\d+|browser-red-\d+-\d+|failure-proof-[a-z0-9-]+)\.(log|jsonl|json)|review-receipt-[a-z0-9-]+\.json)$/.test(proof.path)) throw new Error('Invalid checkpoint proof path.');
     if (digest(readFileSync(join(directory, proof.path))) !== proof.hash) throw new Error('Checkpoint proof hash mismatch.');
   }
   if (!value.proofs.some(proof => proof.path === 'accepted-checks.json')) throw new Error('Checkpoint has no approved test inventory proof.');
@@ -69,13 +75,16 @@ export function loadCheckpoint(directory: string, root: string, task: Task, envi
   const regressionReceipts = new Set((value.regressions ?? []).map(regression => regression.receipt.evidencePath));
   const regressionProofs = new Set((value.regressions ?? []).flatMap(regression => regression.redChecks.flatMap(check => [check.logPath.split('/').at(-1)!, check.reportPath?.split('/').at(-1)])));
   const browserProofs = new Set(value.browserRedChecks.flatMap(check => [check.logPath.split('/').at(-1), check.reportPath?.split('/').at(-1)]));
+  const triageProofs = new Set(value.pendingFailureTriage ? [value.pendingFailureTriage.check.logPath.split('/').at(-1), value.pendingFailureTriage.check.reportPath?.split('/').at(-1)] : []);
   for (const proof of value.proofs) {
     if (proof.path.startsWith('browser-red-') && !browserProofs.has(proof.path)) throw new Error('Orphan browser red proof in checkpoint.');
     if (proof.path.startsWith('regression-red-') && !regressionProofs.has(proof.path)) throw new Error('Orphan regression red proof in checkpoint.');
+    if (proof.path.startsWith('failure-proof-') && !triageProofs.has(proof.path)) throw new Error('Orphan pending failure triage proof in checkpoint.');
     if (!proof.path.startsWith('review-receipt-')) continue;
     const bound = readJson(join(directory, proof.path)) as { purpose: string; response: unknown };
     const response = parseReview(bound.response, task);
     if (bound.purpose === 'regression-coverage' && !regressionReceipts.has(proof.path)) throw new Error('Orphan regression coverage receipt in checkpoint.');
+    if (bound.purpose === 'focused-failure-triage' && value.pendingFailureTriage?.receipt?.evidencePath !== proof.path) throw new Error('Orphan pending failure triage receipt in checkpoint.');
     if (['integrated-code', 'integrated-code-and-whole-goal', 'delivery-code'].includes(bound.purpose) && response.needsRegression && value.pendingRegression?.receipt.evidencePath !== proof.path) throw new Error('Orphan regression request receipt in checkpoint.');
   }
   const reuse = value.plan.coverage?.mode === 'reuse';
@@ -113,6 +122,21 @@ export function loadCheckpoint(directory: string, root: string, task: Task, envi
     if (!approvedBrowserFiles.has(path) || approvedBrowserFiles.get(path) !== value.acceptedChecks.find(file => file.path === path)?.hash) throw new Error('Checkpoint browser test hash does not match approval.');
   }
   const requireProof = (path: string) => { if (!value.proofs.some(proof => proof.path === path)) throw new Error('Checkpoint regression proof is incomplete.'); };
+  if (value.pendingFailureTriage) {
+    const pending = value.pendingFailureTriage;
+    const checks = [...value.plan.slices.flatMap(slice => slice.checks), ...value.plan.browserChecks, ...(value.regressions ?? []).flatMap(item => [...item.checks, ...item.browserChecks])];
+    if (pending.sourceHash !== value.sourceHash || pending.check.status !== 'expected_failure' || !pending.check.reportPath || !checks.some(check => check.file === pending.check.file && check.title === pending.check.title)) throw new Error('Checkpoint pending failure triage identity is invalid.');
+    for (const [path, hash] of [[pending.check.reportPath, pending.reportHash], [pending.check.logPath, pending.logHash]]) {
+      const name = path.split('/').at(-1)!;
+      if (!name.startsWith('failure-proof-') || value.proofs.find(proof => proof.path === name)?.hash !== hash) throw new Error('Checkpoint pending failure triage proof is incomplete.');
+    }
+    if (pending.receipt) {
+      const receipt = pending.receipt;
+      requireProof(receipt.evidencePath);
+      const bound = readJson(join(directory, receipt.evidencePath)) as typeof receipt & { response: unknown; feedback: { check: RedCheck; reportHash: string; logHash: string } };
+      if (receipt.purpose !== 'focused-failure-triage' || receipt.approved || parseReview(bound.response, task).approved || fields.some(field => receipt[field] !== bound[field]) || receipt.sourceHash !== pending.sourceHash || receipt.planHash !== digest(JSON.stringify(value.plan)) || receipt.criteriaHash !== digest(JSON.stringify(task.acceptance)) || bound.feedback.reportHash !== pending.reportHash || bound.feedback.logHash !== pending.logHash || JSON.stringify(normalizeProofs([bound.feedback.check])) !== JSON.stringify(normalizeProofs([pending.check]))) throw new Error('Checkpoint pending failure triage receipt is invalid.');
+    }
+  }
   for (const regression of value.regressions ?? []) {
     const report = parseRegressionReport({ schemaVersion: 1, taskId: task.id, summary: 'Checkpoint regression checks.', blockers: [], checks: regression.checks, browserChecks: regression.browserChecks }, task);
     const receipt = regression.receipt;
@@ -151,7 +175,7 @@ export function captureInterruptedDraft(directory: string): void {
   const value = readJson(join(directory, 'checkpoint.json')) as Checkpoint;
   if (!value.accepted) return;
   const state = readJson(join(directory, 'state.json')) as ControllerState;
-  if (state.pendingRegression) return;
+  if (value.pendingFailureTriage || state.pendingRegression || state.pendingFailureTriage) return;
   const task = readJson(join(directory, 'task.json')) as Task;
   const original = readJson(join(directory, 'baseline.json')) as ReturnType<typeof snapshot>;
   const current = snapshot(state.workspace);
