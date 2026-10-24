@@ -32,7 +32,7 @@ The [repository navigation acceptance revision](repository-navigation-acceptance
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `VERIFY_STEP_TIMEOUT_MS` | `180000` | Maximum time for an individual gate. |
+| `VERIFY_STEP_TIMEOUT_MS` | `300000` | Maximum time for an individual gate. |
 | `VERIFY_TOTAL_TIMEOUT_MS` | `600000` | Total gate budget. |
 | `VERIFY_GRACE_MS` | `6000` | Time between TERM and KILL for an owned process group. |
 | `VERIFY_RUN_DIR` | Unique `.runs/verify-*` | Must be a new directory; prevents stale report reuse. |

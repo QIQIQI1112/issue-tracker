@@ -8,9 +8,9 @@ import { repositoryButton, repositoryFixture } from './repository-fixture.ts';
 import { recordDiagnosticRun } from './diagnostic-fixture.ts';
 import { saveDelivery } from '../factory/delivery.ts';
 import type { Issue } from '../src/domain.ts';
+import { expectThemeMode as mode, withThemeControl } from './theme-observation.ts';
+import type { ThemeMode as Mode } from './theme-observation.ts';
 
-type Mode = 'light' | 'dark';
-const toggle = (page: Page) => page.getByRole('switch', { name: /dark (?:mode|theme)/i });
 const view = (page: Page, name: string) => {
   const nav = page.getByRole('navigation', { name: 'Workspace views', exact: true });
   return nav.getByRole('button', { name, exact: true }).or(nav.getByRole('link', { name, exact: true }));
@@ -33,22 +33,18 @@ async function reach(page: Page, control: Locator, direction: 'Tab' | 'Shift+Tab
   await expect(control, 'The keyboard destination must exist before ordinary traversal.').toBeVisible({ timeout: 3000 });
   await expect(control).toBeEnabled();
   for (let step = 0; step < 100; step++) {
+    if (await control.evaluateAll(elements => elements.length === 1 && document.activeElement === elements[0])) break;
     await page.keyboard.press(direction);
-    if (await control.evaluate(element => document.activeElement === element)) break;
+    if (!await control.isVisible()) break;
   }
   await expect(control, `Normal ${direction} traversal must reach the theme or inspection control.`).toBeFocused();
   await expect(control).toBeInViewport();
 }
 
-async function mode(page: Page, expected: Mode) {
-  await expect(toggle(page), 'A visible named switch must expose the current local theme.').toBeVisible({ timeout: 3000 });
-  await expect(toggle(page), 'The switch state must exactly match the effective theme.').toHaveAttribute('aria-checked', String(expected === 'dark'));
-  await expect.poll(() => page.locator('html').evaluate(element => getComputedStyle(element).colorScheme), { message: 'The rendered root must apply the selected native color scheme.' }).toBe(expected);
-}
-
 async function switchTo(page: Page, expected: Mode) {
-  await expect(toggle(page), 'Theme switching must have an accessible control.').toBeVisible({ timeout: 3000 });
-  if (await toggle(page).getAttribute('aria-checked') !== String(expected === 'dark')) await click(toggle(page));
+  await withThemeControl(page, async control => {
+    if (await control.getAttribute('aria-checked') !== String(expected === 'dark')) await click(control);
+  });
   await mode(page, expected);
 }
 
@@ -76,6 +72,11 @@ async function fits(page: Page, controls: Locator[]) {
       return box.left >= 0 && box.right <= innerWidth + 1 && element.scrollWidth <= element.clientWidth + 1;
     }), 'Controls must fit their own boxes and viewport without clipped labels.').toBe(true);
   }
+}
+
+async function fitsWithTheme(page: Page, controls: Locator[]) {
+  await withThemeControl(page, control => fits(page, [control]));
+  await fits(page, controls);
 }
 
 function fixture(info: TestInfo) {
@@ -156,8 +157,10 @@ test('accessible theme controls switch with pointer and keyboard and persist acr
   await seed(page);
   await page.goto('/');
   await mode(page, 'light');
-  await reach(page, toggle(page), 'Tab');
-  await page.keyboard.press('Space');
+  await withThemeControl(page, async control => {
+    await reach(page, control, 'Tab');
+    await page.keyboard.press('Space');
+  });
   await mode(page, 'dark');
   expect(await page.evaluate(() => localStorage.getItem('loop.theme')), 'The exact dark preference must be stored locally.').toBe('dark');
   await page.reload();
@@ -165,20 +168,22 @@ test('accessible theme controls switch with pointer and keyboard and persist acr
   traffic.enterPreview();
   await page.goto('/__ui/components');
   await mode(page, 'dark');
-  await reach(page, toggle(page), 'Shift+Tab');
-  await page.keyboard.press('Enter');
+  await withThemeControl(page, async control => {
+    await reach(page, control, 'Shift+Tab');
+    await page.keyboard.press('Enter');
+  });
   await mode(page, 'light');
   expect(await page.evaluate(() => localStorage.getItem('loop.theme')), 'The preview must write the same exact light preference.').toBe('light');
   await page.reload();
   await mode(page, 'light');
-  await click(toggle(page));
+  await withThemeControl(page, click);
   await mode(page, 'dark');
   await page.waitForTimeout(2200);
   expect(traffic.preview, 'Standalone preview switching and reload must make no app API calls.').toEqual([]);
   traffic.leavePreview();
   await page.goto('/');
   await mode(page, 'dark');
-  await click(toggle(page));
+  await withThemeControl(page, click);
   await mode(page, 'light');
   await page.reload();
   await mode(page, 'light');
@@ -189,10 +194,12 @@ test('accessible theme controls switch with pointer and keyboard and persist acr
     await page.evaluate(() => {
       Object.defineProperty(Storage.prototype, 'setItem', { configurable: true, value: () => { throw new DOMException('Writes denied', 'QuotaExceededError'); } });
     });
-    await click(toggle(page));
+    await withThemeControl(page, click);
     await mode(page, 'dark');
-    await reach(page, toggle(page), 'Tab');
-    await page.keyboard.press('Space');
+    await withThemeControl(page, async control => {
+      await reach(page, control, 'Tab');
+      await page.keyboard.press('Space');
+    });
     await mode(page, 'light');
     expect(await page.evaluate(() => localStorage.getItem('loop.theme')), 'Failed writes must leave the existing valid preference intact while local switching still works.').toBe('light');
   }
@@ -330,7 +337,7 @@ test('both themes render consistent UTG workspace inspection and preview surface
         await expect(heading, 'The compact reference title hierarchy must apply at both widths.').toHaveCSS('font-size', '22px');
         await expect(page.locator('body')).toHaveCSS('font-family', /system-ui/);
         await expect(page.locator('body')).toHaveCSS('font-family', /PingFang SC|Noto Sans CJK SC|Microsoft YaHei/);
-        await fits(page, [toggle(page), page.getByLabel('Search issues', { exact: true }), page.getByLabel('Filter by status', { exact: true }), page.getByLabel('Filter by label', { exact: true }), page.getByLabel('Sort issues', { exact: true })]);
+        await fitsWithTheme(page, [page.getByLabel('Search issues', { exact: true }), page.getByLabel('Filter by status', { exact: true }), page.getByLabel('Filter by label', { exact: true }), page.getByLabel('Sort issues', { exact: true })]);
         await info.attach(`${expected}-${width}-issues`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
         const search = page.getByLabel('Search issues', { exact: true });
         await search.fill(f.issue.title);
@@ -352,7 +359,7 @@ test('both themes render consistent UTG workspace inspection and preview surface
         const requirement = f.requirements.at(-1)!;
         await click(page.getByRole('button', { name: `Inspect requirement ${requirement.title}`, exact: true }));
         await expect(page.getByRole('region', { name: 'Original goal', exact: true })).toContainText(requirement.goal);
-        await fits(page, [toggle(page), page.getByRole('region', { name: 'Requirement inspection', exact: true }).getByTestId('requirement-identity')]);
+        await fitsWithTheme(page, [page.getByRole('region', { name: 'Requirement inspection', exact: true }).getByTestId('requirement-identity')]);
         await info.attach(`${expected}-${width}-requirements`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
         await click(view(page, 'Repo harness'));
         const source = page.locator('details.harness-source').filter({ has: page.locator('summary .harness-source-path', { hasText: /^package\.json$/ }) });
@@ -364,14 +371,14 @@ test('both themes render consistent UTG workspace inspection and preview surface
         await click(raw.locator('summary'));
         await expect(raw).toHaveJSProperty('open', true);
         await expect(raw.getByLabel('package.json committed source', { exact: true })).toBeVisible();
-        await fits(page, [toggle(page), sourceControl]);
+        await fitsWithTheme(page, [sourceControl]);
         await info.attach(`${expected}-${width}-harness`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
         await page.goto('/__ui/components');
         await switchTo(page, expected);
         await expect(page.getByRole('region', { name: 'Error state', exact: true }).getByRole('alert')).toHaveText('Sample read failed. Try the local action again.');
         await expect(page.getByRole('region', { name: 'Loading state', exact: true }).getByRole('status')).toBeVisible();
         await expect(page.getByRole('heading', { name: 'No sample items', exact: true })).toBeVisible();
-        await fits(page, [toggle(page), page.getByRole('button', { name: 'Preview action', exact: true }), page.getByLabel('Sample issue status', { exact: true })]);
+        await fitsWithTheme(page, [page.getByRole('button', { name: 'Preview action', exact: true }), page.getByLabel('Sample issue status', { exact: true })]);
         await info.attach(`${expected}-${width}-preview-states`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' });
         await click(page.getByRole('button', { name: 'Open preview dialog', exact: true }));
         await expect(page.getByRole('dialog', { name: 'Preview dialog', exact: true })).toBeVisible();

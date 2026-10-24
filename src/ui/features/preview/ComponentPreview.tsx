@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '../../components/Button.tsx';
-import { ThemeSwitch } from '../../components/ThemeSwitch.tsx';
+import { UserMenu } from '../../components/UserMenu.tsx';
 import { Icon } from '../../components/Icon.tsx';
 import { Badge } from '../../components/Badge.tsx';
 import { EmptyState } from '../../components/EmptyState.tsx';
@@ -18,7 +18,7 @@ export function ComponentPreview() {
   const [page, setPage] = useState(1);
   const [activations, setActivations] = useState(0);
   return <main id="main-content" className="component-preview" tabIndex={-1}>
-    <header><div className="preview-heading"><div><span className="eyebrow">LOCAL DEVELOPMENT</span><h1>Component preview</h1></div><ThemeSwitch /></div><p>Shared production primitives with isolated static samples. No backend is needed.</p></header>
+    <header><div className="preview-heading"><div><span className="eyebrow">LOCAL DEVELOPMENT</span><h1>Component preview</h1></div><UserMenu /></div><p>Shared production primitives with isolated static samples. No backend is needed.</p></header>
     <section aria-label="Buttons"><h2>Buttons</h2><div className="preview-actions"><Button onClick={() => setActivations(value => value + 1)}>Preview action</Button><Button disabled>Disabled action</Button><Button loading>Loading action</Button><Button className="icon-button" aria-label="Icon action" onClick={() => setActivations(value => value + 1)}><Icon name="check" /></Button></div><p role="status">Local activations: {activations}</p></section>
     <section aria-label="Badges"><h2>Badges</h2><Badge className="status-pill in_progress" aria-label="Sample issue status"><span className="status-dot in_progress" aria-hidden="true" />In progress</Badge></section>
     <section aria-label="Empty state"><h2>Empty state</h2><EmptyState icon="issues" title="No sample items"><p>Choose a different collection or clear the local filters.</p></EmptyState></section>

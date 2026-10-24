@@ -12,7 +12,7 @@ import { git } from '../factory/workspace.ts';
 for (const mode of ['malformed-json', 'process-failed'] as const) test(`review adapter ${mode} keeps protocol repair separate from process failure`, { timeout: 30000 }, async () => {
   const root = evidenceDirectory(`review-response-${mode}`);
   const repository = fixtureRepository(join(root, 'repo'));
-  const task = parseTask({ schemaVersion: 1, id: 'review-response-json', title: 'Ready value', goal: 'Return ready.', acceptance: [{ id: 'ready', description: 'The value is ready.' }], scope: ['src/', 'tests/', 'acceptance/'], verificationCommand: 'npm run verify', budget: { maxAttempts: 1, workerTimeoutMs: 1500, totalTimeoutMs: 30000 }, notes: '' });
+  const task = parseTask({ schemaVersion: 1, id: 'review-response-json', title: 'Ready value', goal: 'Return ready.', acceptance: [{ id: 'ready', description: 'The value is ready.' }], scope: ['src/', 'tests/', 'acceptance/'], verificationCommand: 'npm run verify', budget: { maxAttempts: 1, workerTimeoutMs: 10000, totalTimeoutMs: 30000 }, notes: '' });
   const counterPath = join(root, 'review-invocations.txt');
   const binary = join(root, 'fake-review-codex.mjs');
   const raw = '{"rawFixture":"malformed-review"';

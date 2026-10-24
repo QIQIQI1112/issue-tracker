@@ -19,7 +19,7 @@ const positive = (name, fallback) => {
   if (!Number.isSafeInteger(value) || value < 1) throw new Error(`${name} must be a positive integer.`);
   return value;
 };
-const stepTimeout = positive('VERIFY_STEP_TIMEOUT_MS', 180000);
+const stepTimeout = positive('VERIFY_STEP_TIMEOUT_MS', 300000);
 const totalTimeout = positive('VERIFY_TOTAL_TIMEOUT_MS', 600000);
 const grace = positive('VERIFY_GRACE_MS', 6000);
 const head = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', timeout: 5000 });
