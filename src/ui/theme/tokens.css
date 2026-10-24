@@ -245,6 +245,7 @@
   --info-tint: #2a3340;
   --shadow-action: rgb(0 0 0 / 28%);
   --shadow-card: 0 1px 2px rgb(0 0 0 / 40%), 0 2px 6px rgb(0 0 0 / 30%);
+  --shadow-menu: 0 0 0 1px var(--border), 0 2px 6px rgb(0 0 0 / 24%), 0 8px 24px rgb(0 0 0 / 36%);
   --shadow-overlay: 0 18px 48px rgb(0 0 0 / 48%);
   --backdrop: rgb(0 0 0 / 62%);
 }
