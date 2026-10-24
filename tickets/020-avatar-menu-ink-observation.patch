@@ -1,0 +1,13 @@
+--- a/acceptance/avatar-menu-fidelity.spec.ts
++++ b/acceptance/avatar-menu-fidelity.spec.ts
+@@ -62,6 +62,10 @@
+ 
+ async function paintedIcon(icon: Locator, drawing: string, size: number, ink: string, name: string) {
+   await expect(icon, `The ${name} glyph must be rendered before its paint is assessed.`).toBeVisible({ timeout: 3000 });
++  await expect.poll(() => icon.evaluate((element, expectedInk) => {
++    const shapes = [...element.querySelectorAll('path, ellipse, circle, line, polyline, polygon, rect')];
++    return shapes.length > 0 && shapes.every(shape => getComputedStyle(shape).stroke === expectedInk);
++  }, ink), { timeout: 3000, message: `The ${name} glyph must settle to the exact destination theme ink after its permitted color transition.` }).toBe(true);
+   const observed = await icon.evaluate(async (element, reference) => {
+     const root = element as SVGSVGElement;
+     const box = root.getBoundingClientRect();
