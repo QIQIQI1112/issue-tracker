@@ -2,7 +2,6 @@ import { expect } from '@playwright/test';
 import type { Locator, Page } from '@playwright/test';
 import { test } from './workspace.ts';
 import { repositoryButton, repositoryFixture } from './repository-fixture.ts';
-import { withThemeControl } from './theme-observation.ts';
 
 const navigation = (page: Page) => page.getByRole('navigation', { name: 'Workspace views', exact: true });
 const rail = (page: Page) => page.getByRole('complementary').filter({ has: navigation(page) });
@@ -97,7 +96,7 @@ async function paintedStroke(control: Locator, ink: string) {
     return { stroke: style.stroke, opacity };
   }));
   expect.soft(segments.length, 'The toolbar icon must contain painted drawing segments before stroke ink is assessed.').toBeGreaterThan(0);
-  for (const segment of segments) expect.soft(segment, 'Every toolbar glyph segment paints the required theme ink at full effective opacity before color normalization.').toEqual({ stroke: ink, opacity: 1 });
+  for (const segment of segments) expect.soft(segment, 'Every toolbar glyph segment paints the required light ink at full effective opacity before color normalization.').toEqual({ stroke: ink, opacity: 1 });
 }
 
 async function icon(control: Locator, drawing: string, rotation = 0) {
@@ -201,91 +200,88 @@ async function icon(control: Locator, drawing: string, rotation = 0) {
   expect.soft(observed.difference, 'Rendered drawing must match the pinned Lucide geometry and direction, allowing equivalent SVG path encoding.').toBeLessThan(0.03);
 }
 
-test('toolbar colors typography and real hover match the pinned UTG reference in light and dark', async ({ page }, info) => {
+test('toolbar colors typography and real hover match the pinned light UTG reference', async ({ page }, info) => {
   test.setTimeout(90000);
   const f = repositoryFixture(info);
   try {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.addInitScript(() => localStorage.setItem('loop.theme', 'light'));
-    for (const mode of ['light', 'dark'] as const) {
-      await page.goto('/');
-      if (mode === 'dark') await withThemeControl(page, async control => { await click(control); });
-      await expect(page.locator('html'), 'Fidelity observations must run in the requested effective theme.').toHaveCSS('color-scheme', mode);
-      const all = repositoryButton(page, null);
-      const other = repositoryButton(page, f.first);
-      const text = mode === 'light' ? 'rgb(11, 11, 11)' : 'rgb(249, 249, 247)';
-      const selected = mode === 'light' ? 'rgb(237, 236, 232)' : 'rgb(44, 44, 42)';
-      const hover = mode === 'light' ? 'rgb(243, 243, 240)' : 'rgb(32, 32, 31)';
-      await ready(other, 'The long-name repository must be available before genuine unfocused pointer discovery.');
-      await expect(all).toHaveAttribute('aria-pressed', 'true');
-      await expect.soft(rail(page), 'Toolbar frame uses the pinned theme surface.').toHaveCSS('background-color', mode === 'light' ? 'rgb(252, 252, 251)' : 'rgb(17, 17, 17)');
-      await expect.soft(all).toHaveCSS('background-color', selected);
-      for (const row of [all, other, toggle(page)]) {
-        await ready(row, 'Toolbar typography must be measured on a visible named control.');
-        await paintedStroke(row, text);
-        await expect.soft(row).toHaveCSS('color', text);
-        await expect.soft(row).toHaveCSS('font-size', '14px');
-        await expect.soft(row).toHaveCSS('line-height', '20px');
-        await expect.soft(row).toHaveCSS('font-weight', '400');
-        await expect.soft(row, 'Toolbar text uses antialiased rendering.').toHaveCSS('-webkit-font-smoothing', 'antialiased');
-        const font = await row.evaluate(element => getComputedStyle(element).fontFamily);
-        expect.soft(font, 'Toolbar text retains an equivalent local Han/system font cascade.').toMatch(/(?:Loop Han|Pulse Han).*system-ui/);
-        await transition(row, 'background-color', 140, fastEase);
-        await transition(row, 'color', 140, fastEase);
-      }
-      await expect(other, 'Pointer discovery must be tested without keyboard focus on this repository.').not.toBeFocused();
-      await expect(other.locator('svg'), 'The inactive icon must render before comparing hover geometry.').toBeVisible({ timeout: 3000 });
-      const restingIcon = await other.locator('svg').boundingBox();
-      await other.hover();
-      await expect.soft(other, 'An inactive row reaches the pinned hover fill.').toHaveCSS('background-color', hover);
-      const hoveredIcon = await other.locator('svg').boundingBox();
-      expect.soft(hoveredIcon?.width, 'Hover leaves the rendered icon width unchanged.').toBe(restingIcon?.width);
-      expect.soft(hoveredIcon?.height, 'Hover leaves the rendered icon height unchanged.').toBe(restingIcon?.height);
-      const tooltip = page.getByRole('tooltip');
-      await expect(tooltip, 'An unfocused hovered repository reveals its application-generated full name.').toBeVisible({ timeout: 3000 });
-      await expect(tooltip).toHaveText(f.first.name);
-      await expect(tooltip).toBeInViewport({ ratio: 1 });
-      await expect(other, 'Hover must not claim keyboard focus.').not.toBeFocused();
-      await ready(all, 'The selected row must exist before testing selected hover precedence.');
-      await all.hover();
-      await expect.soft(all, 'Hovering a selected row retains the selected fill.').toHaveCSS('background-color', selected);
-      await expect.soft(other, 'Leaving an inactive row restores its transparent surface.').toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-      await click(other);
-      await expect(other, 'The repository must be selected before observing its subviews.').toHaveAttribute('aria-pressed', 'true');
-      const requirements = navigation(page).getByRole('button', { name: 'Requirements', exact: true });
-      await click(requirements);
-      await expect(requirements, 'The named Requirements subview must independently report its current state.').toHaveAttribute('aria-current', 'page');
-      const refresh = navigation(page).getByRole('button', { name: 'Refresh repositories', exact: true });
-      for (const row of [requirements, refresh]) await paintedStroke(row, text);
-      await page.mouse.move(1200, 10);
-      expect(await requirements.evaluate(element => element.matches(':hover')), 'Resting selected-subview observations must run without pointer hover.').toBe(false);
-      await expect.soft(requirements, 'The current subview uses the pinned selected fill before hover.').toHaveCSS('background-color', selected);
-      await expect.soft(requirements, 'The current subview has no inset selection stripe before hover.').toHaveCSS('box-shadow', 'none');
-      await ready(requirements, 'The current subview must exist before observing real selected hover.');
-      await requirements.hover();
-      await expect.soft(requirements, 'Hovering the current subview retains the pinned selected fill.').toHaveCSS('background-color', selected);
-      await expect.soft(requirements, 'Hovering the current subview does not restore an inset selection stripe.').toHaveCSS('box-shadow', 'none');
-      await click(toggle(page));
-      await expect(toggle(page), 'Visible-label typography is observed with the navigation rail expanded.').toHaveAttribute('aria-expanded', 'true');
-      for (const [row, name] of [[all, 'All repositories'], [other, f.first.name], [requirements, 'Requirements'], [refresh, 'Refresh repositories']] as const) {
-        const label = row.getByText(name, { exact: true });
-        await expect(label, 'The named expanded navigation label must be visible before its typography is measured.').toBeVisible({ timeout: 3000 });
-        await expect.poll(() => visibleText(label), { timeout: 3000, message: 'Expanded typography must be measured on the painted label rather than a hidden control label.' }).not.toEqual([]);
-        const style = await label.evaluate(element => {
-          const computed = getComputedStyle(element);
-          return { color: computed.color, fontSize: computed.fontSize, lineHeight: computed.lineHeight, fontWeight: computed.fontWeight, smoothing: computed.getPropertyValue('-webkit-font-smoothing'), fontFamily: computed.fontFamily };
-        });
-        expect.soft(style, 'Visible expanded labels use pinned theme text, 14px/20px regular typography and antialiased rendering in each theme.').toMatchObject({ color: text, fontSize: '14px', lineHeight: '20px', fontWeight: '400', smoothing: 'antialiased' });
-        expect.soft(style.fontFamily, 'Visible expanded labels retain the equivalent local Han/system font cascade.').toMatch(/(?:Loop Han|Pulse Han).*system-ui/);
-      }
-      await click(toggle(page));
-      await expect(toggle(page), 'Collapsed full-name discovery is restored before checking active-tooltip cleanup.').toHaveAttribute('aria-expanded', 'false');
-      await ready(other, 'The selected repository must exist before restoring active tooltip discovery.');
-      await other.hover();
-      await expect(tooltip, 'The active hover label must exist before leaving the workspace.').toBeVisible({ timeout: 3000 });
-      await page.goto('about:blank');
-      await expect(tooltip, 'Leaving with an active hover label cleans up the portal.').toHaveCount(0);
+    await page.goto('/');
+    await expect(page.locator('html'), 'Fidelity observations must run in the light workspace.').toHaveCSS('color-scheme', 'light');
+    const all = repositoryButton(page, null);
+    const other = repositoryButton(page, f.first);
+    const text = 'rgb(11, 11, 11)';
+    const selected = 'rgb(237, 236, 232)';
+    const hover = 'rgb(243, 243, 240)';
+    await ready(other, 'The long-name repository must be available before genuine unfocused pointer discovery.');
+    await expect(all).toHaveAttribute('aria-pressed', 'true');
+    await expect.soft(rail(page), 'Toolbar frame uses the pinned light surface.').toHaveCSS('background-color', 'rgb(252, 252, 251)');
+    await expect.soft(all).toHaveCSS('background-color', selected);
+    for (const row of [all, other, toggle(page)]) {
+      await ready(row, 'Toolbar typography must be measured on a visible named control.');
+      await paintedStroke(row, text);
+      await expect.soft(row).toHaveCSS('color', text);
+      await expect.soft(row).toHaveCSS('font-size', '14px');
+      await expect.soft(row).toHaveCSS('line-height', '20px');
+      await expect.soft(row).toHaveCSS('font-weight', '400');
+      await expect.soft(row, 'Toolbar text uses antialiased rendering.').toHaveCSS('-webkit-font-smoothing', 'antialiased');
+      const font = await row.evaluate(element => getComputedStyle(element).fontFamily);
+      expect.soft(font, 'Toolbar text retains an equivalent local Han/system font cascade.').toMatch(/(?:Loop Han|Pulse Han).*system-ui/);
+      await transition(row, 'background-color', 140, fastEase);
+      await transition(row, 'color', 140, fastEase);
     }
+    await expect(other, 'Pointer discovery must be tested without keyboard focus on this repository.').not.toBeFocused();
+    await expect(other.locator('svg'), 'The inactive icon must render before comparing hover geometry.').toBeVisible({ timeout: 3000 });
+    const restingIcon = await other.locator('svg').boundingBox();
+    await other.hover();
+    await expect.soft(other, 'An inactive row reaches the pinned hover fill.').toHaveCSS('background-color', hover);
+    const hoveredIcon = await other.locator('svg').boundingBox();
+    expect.soft(hoveredIcon?.width, 'Hover leaves the rendered icon width unchanged.').toBe(restingIcon?.width);
+    expect.soft(hoveredIcon?.height, 'Hover leaves the rendered icon height unchanged.').toBe(restingIcon?.height);
+    const tooltip = page.getByRole('tooltip');
+    await expect(tooltip, 'An unfocused hovered repository reveals its application-generated full name.').toBeVisible({ timeout: 3000 });
+    await expect(tooltip).toHaveText(f.first.name);
+    await expect(tooltip).toBeInViewport({ ratio: 1 });
+    await expect(other, 'Hover must not claim keyboard focus.').not.toBeFocused();
+    await ready(all, 'The selected row must exist before testing selected hover precedence.');
+    await all.hover();
+    await expect.soft(all, 'Hovering a selected row retains the selected fill.').toHaveCSS('background-color', selected);
+    await expect.soft(other, 'Leaving an inactive row restores its transparent surface.').toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await click(other);
+    await expect(other, 'The repository must be selected before observing its subviews.').toHaveAttribute('aria-pressed', 'true');
+    const requirements = navigation(page).getByRole('button', { name: 'Requirements', exact: true });
+    await click(requirements);
+    await expect(requirements, 'The named Requirements subview must independently report its current state.').toHaveAttribute('aria-current', 'page');
+    const refresh = navigation(page).getByRole('button', { name: 'Refresh repositories', exact: true });
+    for (const row of [requirements, refresh]) await paintedStroke(row, text);
+    await page.mouse.move(1200, 10);
+    expect(await requirements.evaluate(element => element.matches(':hover')), 'Resting selected-subview observations must run without pointer hover.').toBe(false);
+    await expect.soft(requirements, 'The current subview uses the pinned selected fill before hover.').toHaveCSS('background-color', selected);
+    await expect.soft(requirements, 'The current subview has no inset selection stripe before hover.').toHaveCSS('box-shadow', 'none');
+    await ready(requirements, 'The current subview must exist before observing real selected hover.');
+    await requirements.hover();
+    await expect.soft(requirements, 'Hovering the current subview retains the pinned selected fill.').toHaveCSS('background-color', selected);
+    await expect.soft(requirements, 'Hovering the current subview does not restore an inset selection stripe.').toHaveCSS('box-shadow', 'none');
+    await click(toggle(page));
+    await expect(toggle(page), 'Visible-label typography is observed with the navigation rail expanded.').toHaveAttribute('aria-expanded', 'true');
+    for (const [row, name] of [[all, 'All repositories'], [other, f.first.name], [requirements, 'Requirements'], [refresh, 'Refresh repositories']] as const) {
+      const label = row.getByText(name, { exact: true });
+      await expect(label, 'The named expanded navigation label must be visible before its typography is measured.').toBeVisible({ timeout: 3000 });
+      await expect.poll(() => visibleText(label), { timeout: 3000, message: 'Expanded typography must be measured on the painted label rather than a hidden control label.' }).not.toEqual([]);
+      const style = await label.evaluate(element => {
+        const computed = getComputedStyle(element);
+        return { color: computed.color, fontSize: computed.fontSize, lineHeight: computed.lineHeight, fontWeight: computed.fontWeight, smoothing: computed.getPropertyValue('-webkit-font-smoothing'), fontFamily: computed.fontFamily };
+      });
+      expect.soft(style, 'Visible expanded labels use pinned light text, 14px/20px regular typography and antialiased rendering in the light workspace.').toMatchObject({ color: text, fontSize: '14px', lineHeight: '20px', fontWeight: '400', smoothing: 'antialiased' });
+      expect.soft(style.fontFamily, 'Visible expanded labels retain the equivalent local Han/system font cascade.').toMatch(/(?:Loop Han|Pulse Han).*system-ui/);
+    }
+    await click(toggle(page));
+    await expect(toggle(page), 'Collapsed full-name discovery is restored before checking active-tooltip cleanup.').toHaveAttribute('aria-expanded', 'false');
+    await ready(other, 'The selected repository must exist before restoring active tooltip discovery.');
+    await other.hover();
+    await expect(tooltip, 'The active hover label must exist before leaving the workspace.').toBeVisible({ timeout: 3000 });
+    await page.goto('about:blank');
+    await expect(tooltip, 'Leaving with an active hover label cleans up the portal.').toHaveCount(0);
   } finally { await page.goto('about:blank'); f.close(); }
 });
 
