@@ -33,8 +33,9 @@ async function reach(page: Page, control: Locator, direction: 'Tab' | 'Shift+Tab
   await expect(control, 'The keyboard destination must exist before ordinary traversal.').toBeVisible({ timeout: 3000 });
   await expect(control).toBeEnabled();
   for (let step = 0; step < 100; step++) {
+    if (await control.evaluateAll(elements => elements.length === 1 && document.activeElement === elements[0])) break;
     await page.keyboard.press(direction);
-    if (await control.evaluate(element => document.activeElement === element)) break;
+    if (!await control.isVisible()) break;
   }
   await expect(control, `Normal ${direction} traversal must reach the theme or inspection control.`).toBeFocused();
   await expect(control).toBeInViewport();
