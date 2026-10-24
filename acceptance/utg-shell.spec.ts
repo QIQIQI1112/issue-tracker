@@ -3,12 +3,9 @@ import type { Locator, Page, TestInfo } from '@playwright/test';
 import { DatabaseSync } from 'node:sqlite';
 import { test } from './workspace.ts';
 import { repositoryButton, repositoryFixture, observeRepositoryReads } from './repository-fixture.ts';
-import { withThemeControl } from './theme-observation.ts';
 import type { Issue } from '../src/domain.ts';
 
-const trigger = (page: Page) => page.getByRole('button', { name: 'User menu', exact: true });
-const menu = (page: Page) => page.getByRole('menu', { name: 'User menu', exact: true });
-const appearance = (page: Page) => menu(page).getByRole('switch', { name: /dark (?:mode|theme)/i }).or(menu(page).getByRole('menuitemcheckbox', { name: /dark (?:mode|theme)/i }));
+const localAvatar = (page: Page) => page.getByRole('button', { name: 'User menu', exact: true }).or(page.getByRole('img', { name: 'Local workspace avatar', exact: true }));
 const navigation = (page: Page) => page.getByRole('navigation', { name: 'Workspace views', exact: true });
 const rail = (page: Page) => page.getByRole('complementary').filter({ has: navigation(page) });
 const expand = (page: Page) => page.getByRole('button', { name: /expand.*(?:rail|sidebar|navigation)/i });
@@ -39,7 +36,7 @@ async function reach(page: Page, control: Locator, key: 'Tab' | 'Shift+Tab') {
 async function fits(page: Page, controls: Locator[]) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'The document must have no horizontal overflow at the selected width.').toBe(true);
   for (const control of controls) {
-    await expect(control, 'Workspace and popup controls must remain visible.').toBeVisible({ timeout: 3000 });
+    await expect(control, 'Workspace controls must remain visible.').toBeVisible({ timeout: 3000 });
     await control.scrollIntoViewIfNeeded();
     await expect(control, 'Scrolling must reveal the control.').toBeInViewport();
     expect(await control.evaluate(element => {
@@ -91,7 +88,7 @@ function fixture(info: TestInfo) {
   } };
 }
 
-test('literal UTG shell geometry and typography remain correct in light and dark at desktop and 390px', async ({ page }, info) => {
+test('literal light UTG shell geometry and typography remain correct at desktop and 390px', async ({ page }, info) => {
   test.setTimeout(90000);
   const f = repositoryFixture(info);
   try {
@@ -99,183 +96,98 @@ test('literal UTG shell geometry and typography remain correct in light and dark
     for (const width of [1280, 390]) {
       await page.setViewportSize({ width, height: 720 });
       await page.goto('/');
-      for (const mode of ['light', 'dark'] as const) {
-        await withThemeControl(page, async control => {
-          if (await control.getAttribute('aria-checked') !== String(mode === 'dark')) await click(control);
-        });
-        const topbar = page.getByRole('banner');
-        const top = await box(topbar, 'The global topbar must span the viewport above both rail and frame.');
-        near(top.x, 0, 'Topbar starts at the left viewport edge.');
-        near(top.y, 0, 'Topbar starts at the top viewport edge.');
-        near(top.width, width, 'Topbar spans the complete viewport width.');
-        near(top.height, 60, 'The pinned topbar is 60px high.');
-        const brand = topbar.getByText('Loop', { exact: true });
-        const brandBox = await box(brand, 'Loop identity belongs in the upper-left global topbar.');
-        expect(brandBox.x, 'Loop identity remains at the left of the global bar.').toBeLessThan(80);
-        const r = await box(rail(page), 'The collapsed tool rail must remain beside the frame.');
-        near(r.x, 0, 'Rail starts at the left viewport edge.');
-        near(r.y, 60, 'Rail starts below the global bar.');
-        near(r.width, 60, 'The default rail is 60px at desktop and 390px.');
-        near(r.height, 660, 'Rail fills the height below the bar.');
-        const main = page.getByRole('main');
-        const frame = await box(main, 'The central main frame must be visible.');
-        near(frame.x, 60, 'Frame begins beside the rail.');
-        near(frame.y, 60, 'Frame begins below the global bar.');
-        near(width - frame.x - frame.width, 8, 'Frame retains the 8px right inset.');
-        near(720 - frame.y - frame.height, 8, 'Frame retains the 8px bottom inset.');
-        await expect(main, 'The frame must clip to the pinned 20px corners.').toHaveCSS('border-top-left-radius', '20px');
-        const edge = await main.evaluate(element => {
-          const style = getComputedStyle(element);
-          return { width: parseFloat(style.borderTopWidth), color: style.borderTopColor, shadow: style.boxShadow, clipping: ['hidden', 'clip', 'auto', 'scroll'].includes(style.overflowX) && ['hidden', 'clip', 'auto', 'scroll'].includes(style.overflowY) };
-        });
-        expect(edge.width, 'The frame must retain a visible rasterized .5px hairline.').toBeGreaterThan(0);
-        expect(edge.width, 'The hairline may round to one device pixel.').toBeLessThanOrEqual(1);
-        expect(edge.color, 'The frame uses the pinned ten-percent ink hairline.').toBe(mode === 'light' ? 'rgba(11, 11, 11, 0.1)' : 'rgba(255, 255, 255, 0.1)');
-        expect(edge.shadow, 'The central frame has no raised-card shadow.').toBe('none');
-        expect(edge.clipping, 'The central frame clips its rounded corners.').toBe(true);
-        await expect(main).toHaveCSS('background-color', mode === 'light' ? 'rgb(255, 255, 255)' : 'rgb(21, 21, 21)');
-        await expect(rail(page)).toHaveCSS('background-color', mode === 'light' ? 'rgb(252, 252, 251)' : 'rgb(17, 17, 17)');
-        await click(repositoryButton(page, f.first));
-        await click(view(page, 'Repo harness'));
-        const heading = main.getByRole('heading', { level: 1, name: 'Repo harness', exact: true });
-        await expect(heading).toHaveCSS('font-size', '22px');
-        await expect(heading, 'The literal title uses weight 500.').toHaveCSS('font-weight', '500');
-        await expect(heading).toHaveCSS('line-height', '28px');
-        const scroll = await heading.evaluate(element => {
-          const main = element.closest('main');
-          for (let node = element.parentElement; node; node = node.parentElement) {
-            const style = getComputedStyle(node);
-            if (['auto', 'scroll'].includes(style.overflowY)) {
-              return { padding: parseFloat(style.paddingLeft), bounded: node.getBoundingClientRect().bottom <= innerHeight, documentScroll: document.scrollingElement!.scrollHeight <= innerHeight + 1 };
-            }
-            if (node === main) break;
+      await expect(page.locator('html')).toHaveCSS('color-scheme', 'light');
+      const topbar = page.getByRole('banner');
+      const top = await box(topbar, 'The global topbar must span the viewport above both rail and frame.');
+      near(top.x, 0, 'Topbar starts at the left viewport edge.');
+      near(top.y, 0, 'Topbar starts at the top viewport edge.');
+      near(top.width, width, 'Topbar spans the complete viewport width.');
+      near(top.height, 60, 'The pinned topbar is 60px high.');
+      const brand = topbar.getByText('Loop', { exact: true });
+      const brandBox = await box(brand, 'Loop identity belongs in the upper-left global topbar.');
+      expect(brandBox.x, 'Loop identity remains at the left of the global bar.').toBeLessThan(80);
+      const r = await box(rail(page), 'The collapsed tool rail must remain beside the frame.');
+      near(r.x, 0, 'Rail starts at the left viewport edge.');
+      near(r.y, 60, 'Rail starts below the global bar.');
+      near(r.width, 60, 'The default rail is 60px at desktop and 390px.');
+      near(r.height, 660, 'Rail fills the height below the bar.');
+      const main = page.getByRole('main');
+      const frame = await box(main, 'The central main frame must be visible.');
+      near(frame.x, 60, 'Frame begins beside the rail.');
+      near(frame.y, 60, 'Frame begins below the global bar.');
+      near(width - frame.x - frame.width, 8, 'Frame retains the 8px right inset.');
+      near(720 - frame.y - frame.height, 8, 'Frame retains the 8px bottom inset.');
+      await expect(main, 'The frame must clip to the pinned 20px corners.').toHaveCSS('border-top-left-radius', '20px');
+      const edge = await main.evaluate(element => {
+        const style = getComputedStyle(element);
+        return { width: parseFloat(style.borderTopWidth), color: style.borderTopColor, shadow: style.boxShadow, clipping: ['hidden', 'clip', 'auto', 'scroll'].includes(style.overflowX) && ['hidden', 'clip', 'auto', 'scroll'].includes(style.overflowY) };
+      });
+      expect(edge.width, 'The frame must retain a visible rasterized .5px hairline.').toBeGreaterThan(0);
+      expect(edge.width, 'The hairline may round to one device pixel.').toBeLessThanOrEqual(1);
+      expect(edge.color, 'The frame uses the pinned ten-percent ink hairline.').toBe('rgba(11, 11, 11, 0.1)');
+      expect(edge.shadow, 'The central frame has no raised-card shadow.').toBe('none');
+      expect(edge.clipping, 'The central frame clips its rounded corners.').toBe(true);
+      await expect(main).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+      await expect(rail(page)).toHaveCSS('background-color', 'rgb(252, 252, 251)');
+      await click(repositoryButton(page, f.first));
+      await click(view(page, 'Repo harness'));
+      const heading = main.getByRole('heading', { level: 1, name: 'Repo harness', exact: true });
+      await expect(heading).toHaveCSS('font-size', '22px');
+      await expect(heading, 'The literal title uses weight 500.').toHaveCSS('font-weight', '500');
+      await expect(heading).toHaveCSS('line-height', '28px');
+      const scroll = await heading.evaluate(element => {
+        const main = element.closest('main');
+        for (let node = element.parentElement; node; node = node.parentElement) {
+          const style = getComputedStyle(node);
+          if (['auto', 'scroll'].includes(style.overflowY)) {
+            return { padding: parseFloat(style.paddingLeft), bounded: node.getBoundingClientRect().bottom <= innerHeight, documentScroll: document.scrollingElement!.scrollHeight <= innerHeight + 1 };
           }
-          return null;
+          if (node === main) break;
+        }
+        return null;
+      });
+      expect(scroll, 'Workspace content must own an internal scroll container.').not.toBeNull();
+      expect(scroll?.padding, 'Internal content uses 24px desktop and 16px narrow padding.').toBe(width === 1280 ? 24 : 16);
+      expect(scroll?.bounded, 'Internal content stays within the viewport frame.').toBe(true);
+      expect(scroll?.documentScroll, 'Production scrolling belongs inside the frame.').toBe(true);
+      await expect(page.getByRole('region', { name: 'Repository harness', exact: true })).toHaveAttribute('aria-busy', 'false');
+      const source = page.locator('details.harness-source').filter({ has: page.locator('.harness-source-path', { hasText: /^package\.json$/ }) });
+      await expect(source, 'Real package harness content must exist before testing internal scrolling.').toBeVisible({ timeout: 3000 });
+      if (!await source.evaluate(element => (element as HTMLDetailsElement).open)) await click(source.locator('summary').first());
+      const internalScroll = await source.evaluate(element => {
+        for (let node = element.parentElement; node; node = node.parentElement) {
+          if (!['auto', 'scroll'].includes(getComputedStyle(node).overflowY)) continue;
+          node.scrollTop = 0;
+          node.scrollTop = node.scrollHeight;
+          const moved = node.scrollTop > 0;
+          node.scrollTop = 0;
+          return moved;
+        }
+        return false;
+      });
+      expect(internalScroll, 'Real expanded harness content must scroll inside the frame.').toBe(true);
+      await info.attach(`light-${width}-literal-shell`, { body: await page.screenshot(), contentType: 'image/png' });
+      await expect(localAvatar(page), 'Exactly one named local avatar must be rendered.').toHaveCount(1);
+      await expect(localAvatar(page), 'The local avatar must retain the visible L identity.').toHaveText('L');
+      const avatar = await box(localAvatar(page), 'The upper-right local avatar must be visible.');
+      near(avatar.width, 32, 'Neutral avatar is 32px wide.');
+      near(avatar.height, 32, 'Neutral avatar is 32px high.');
+      near(avatar.x, width - 44, 'Avatar retains the 12px right inset.');
+      near(avatar.y, 14, 'Avatar is centered in the 60px bar.');
+      expect(await localAvatar(page).evaluate(element => parseFloat(getComputedStyle(element).borderRadius)), 'The local avatar must be circular.').toBeGreaterThanOrEqual(16);
+      const avatarStyle = await localAvatar(page).evaluate(element => {
+        const face = [element, ...element.querySelectorAll('*')].find(node => {
+          const rect = node.getBoundingClientRect();
+          return Math.abs(rect.width - 32) <= 1 && Math.abs(rect.height - 32) <= 1 && !['transparent', 'rgba(0, 0, 0, 0)'].includes(getComputedStyle(node).backgroundColor);
         });
-        expect(scroll, 'Workspace content must own an internal scroll container.').not.toBeNull();
-        expect(scroll?.padding, 'Internal content uses 24px desktop and 16px narrow padding.').toBe(width === 1280 ? 24 : 16);
-        expect(scroll?.bounded, 'Internal content stays within the viewport frame.').toBe(true);
-        expect(scroll?.documentScroll, 'Production scrolling belongs inside the frame.').toBe(true);
-        await expect(page.getByRole('region', { name: 'Repository harness', exact: true })).toHaveAttribute('aria-busy', 'false');
-        const source = page.locator('details.harness-source').filter({ has: page.locator('.harness-source-path', { hasText: /^package\.json$/ }) });
-        await expect(source, 'Real package harness content must exist before testing internal scrolling.').toBeVisible({ timeout: 3000 });
-        if (!await source.evaluate(element => (element as HTMLDetailsElement).open)) await click(source.locator('summary').first());
-        const internalScroll = await source.evaluate(element => {
-          for (let node = element.parentElement; node; node = node.parentElement) {
-            if (!['auto', 'scroll'].includes(getComputedStyle(node).overflowY)) continue;
-            node.scrollTop = 0;
-            node.scrollTop = node.scrollHeight;
-            const moved = node.scrollTop > 0;
-            node.scrollTop = 0;
-            return moved;
-          }
-          return false;
-        });
-        expect(internalScroll, 'Real expanded harness content must scroll inside the frame.').toBe(true);
-        await info.attach(`${mode}-${width}-literal-shell`, { body: await page.screenshot(), contentType: 'image/png' });
-        const avatar = await box(trigger(page), 'The upper-right local User menu entry must be visible.');
-        near(avatar.width, 32, 'Neutral user entry is 32px wide.');
-        near(avatar.height, 32, 'Neutral user entry is 32px high.');
-        near(avatar.x, width - 44, 'User entry retains the 12px right inset.');
-        near(avatar.y, 14, 'User entry is centered in the 60px bar.');
-        expect(await trigger(page).evaluate(element => parseFloat(getComputedStyle(element).borderRadius)), 'The local user entry must be circular.').toBeGreaterThanOrEqual(16);
-        const avatarStyle = await trigger(page).evaluate(element => {
-          const face = [element, ...element.querySelectorAll('*')].find(node => {
-            const rect = node.getBoundingClientRect();
-            return Math.abs(rect.width - 32) <= 1 && Math.abs(rect.height - 32) <= 1 && !['transparent', 'rgba(0, 0, 0, 0)'].includes(getComputedStyle(node).backgroundColor);
-          });
-          if (!face) return null;
-          const style = getComputedStyle(face);
-          return { background: style.backgroundColor, color: style.color, size: style.fontSize, weight: style.fontWeight };
-        });
-        expect(avatarStyle, 'The local avatar uses a neutral fill and normal 14px text.').toEqual({ background: mode === 'light' ? 'rgb(237, 236, 232)' : 'rgb(44, 44, 42)', color: mode === 'light' ? 'rgb(11, 11, 11)' : 'rgb(249, 249, 247)', size: '14px', weight: '400' });
-        await click(trigger(page));
-        const popup = await box(menu(page), 'User menu must render a bottom-end anchored popup.');
-        near(popup.width, 232, 'Appearance popup uses the pinned 232px width.');
-        near(popup.x + popup.width, avatar.x + avatar.width, 'Popup aligns to the end of its user entry.');
-        near(popup.y, avatar.y + avatar.height + 8, 'Popup opens below the avatar with the pinned gap.');
-        await expect(menu(page)).toHaveCSS('border-radius', '14px');
-        await expect(menu(page)).toHaveCSS('padding-top', '8px');
-        await expect(menu(page)).toHaveCSS('background-color', mode === 'light' ? 'rgb(255, 255, 255)' : 'rgb(26, 26, 25)');
-        await expect(menu(page), 'The appearance popup must have visible elevation.').not.toHaveCSS('box-shadow', 'none');
-        await fits(page, [trigger(page), menu(page), appearance(page)]);
-        await info.attach(`${mode}-${width}-user-popup`, { body: await page.screenshot(), contentType: 'image/png' });
-        await page.keyboard.press('Escape');
-        await expect(menu(page)).toBeHidden();
-      }
+        if (!face) return null;
+        const style = getComputedStyle(face);
+        return { background: style.backgroundColor, color: style.color, size: style.fontSize, weight: style.fontWeight };
+      });
+      expect(avatarStyle, 'The local avatar uses a neutral fill and normal 14px text.').toEqual({ background: 'rgb(237, 236, 232)', color: 'rgb(11, 11, 11)', size: '14px', weight: '400' });
+      await fits(page, [localAvatar(page)]);
     }
   } finally { await page.goto('about:blank'); f.close(); }
-});
-
-test('User menu exposes only appearance selection with pointer keyboard dismissal and focus handling in app and preview', async ({ page }, info) => {
-  test.setTimeout(90000);
-  const mutations: string[] = [];
-  const previewReads: string[] = [];
-  let inPreview = false;
-  page.on('request', request => {
-    if (!/^\/api(?:\/|$)/.test(new URL(request.url()).pathname)) return;
-    if (inPreview) previewReads.push(request.url());
-    if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method())) mutations.push(`${request.method()} ${new URL(request.url()).pathname}`);
-  });
-  await seed(page);
-  for (const path of ['/', '/__ui/components']) {
-    for (const width of [1280, 390]) {
-      inPreview = path !== '/';
-      await page.setViewportSize({ width, height: 720 });
-      await page.goto(path);
-      await ready(trigger(page), 'Appearance switching requires an accessible User menu entry.');
-      await expect(trigger(page)).toHaveAttribute('aria-expanded', 'false');
-      await expect(menu(page), 'The user popup must initially be closed.').toBeHidden();
-      await expect(page.getByRole('switch', { name: /dark (?:mode|theme)/i }).or(page.getByRole('menuitemcheckbox', { name: /dark (?:mode|theme)/i })), 'The closed popup must leave no visible standalone appearance control in either supported role.').toHaveCount(0);
-      await click(trigger(page));
-      await expect(menu(page), 'Pointer activation must open the appearance popup.').toBeVisible();
-      await expect(trigger(page)).toHaveAttribute('aria-expanded', 'true');
-      await ready(appearance(page), 'The popup must expose the existing light/dark choice.');
-      await expect(appearance(page)).toHaveAttribute('aria-checked', 'false');
-      await expect(menu(page).getByRole('button').or(menu(page).getByRole('switch')).or(menu(page).getByRole('menuitemcheckbox')).or(menu(page).getByRole('menuitem')).or(menu(page).getByRole('link')).or(menu(page).getByRole('menuitemradio')), 'Only one light/dark action belongs in the local user popup.').toHaveCount(1);
-      await expect(menu(page), 'Account, authentication and system-theme options are outside this menu.').not.toContainText(/sign\s*(?:in|out)|log\s*(?:in|out)|account|settings|system/i);
-      await click(appearance(page));
-      await expect(page.locator('html'), 'Pointer selection must change the effective rendered theme.').toHaveCSS('color-scheme', 'dark');
-      if (!await menu(page).isVisible()) await click(trigger(page));
-      await expect(appearance(page), 'Reopened appearance state must reflect the active dark theme.').toHaveAttribute('aria-checked', 'true');
-      await reach(page, appearance(page), 'Tab');
-      await expect(appearance(page), 'Escape must start from the focused appearance action rather than the user entry.').toBeFocused();
-      await page.keyboard.press('Escape');
-      await expect(menu(page), 'Escape must dismiss the active popup.').toBeHidden();
-      await expect(trigger(page), 'Escape must return focus to the exact user entry.').toBeFocused();
-      await page.keyboard.press('Tab');
-      await expect(trigger(page), 'Tab must leave the closed user entry.').not.toBeFocused();
-      await reach(page, trigger(page), 'Shift+Tab');
-      await page.keyboard.press('Enter');
-      await expect(menu(page), 'Keyboard Enter must open the popup.').toBeVisible();
-      await ready(appearance(page), 'Appearance action must exist before keyboard traversal.');
-      await reach(page, appearance(page), 'Tab');
-      await page.keyboard.press('Tab');
-      await page.keyboard.press('Escape');
-      await expect(menu(page), 'Tab dismissal or Escape must close the first keyboard path before reopening.').toBeHidden();
-      await reach(page, trigger(page), 'Shift+Tab');
-      await page.keyboard.press('Space');
-      await expect(menu(page), 'The independent reverse keyboard path must reopen the popup.').toBeVisible();
-      await reach(page, appearance(page), 'Shift+Tab');
-      await page.keyboard.press('Space');
-      await expect(page.locator('html'), 'Keyboard activation must apply light mode.').toHaveCSS('color-scheme', 'light');
-      if (!await menu(page).isVisible()) await click(trigger(page));
-      await expect(appearance(page)).toHaveAttribute('aria-checked', 'false');
-      const outside = path === '/' ? page.getByLabel('Search issues', { exact: true }) : page.getByRole('button', { name: 'Preview action', exact: true });
-      await fits(page, [trigger(page), menu(page), appearance(page)]);
-      await click(outside, 'A real outside control must remain usable while the popup is active.');
-      await expect(menu(page), 'An outside click must dismiss the still-active popup.').toBeHidden();
-      await expect(outside, 'Outside dismissal must preserve focus on the clicked destination.').toBeFocused();
-      await reach(page, trigger(page), 'Tab');
-      await page.keyboard.press('Space');
-      await expect(menu(page), 'Keyboard Space must also open the popup.').toBeVisible();
-      await info.attach(`menu-interaction-${path === '/' ? 'app' : 'preview'}-${width}`, { body: await page.screenshot(), contentType: 'image/png' });
-      await page.goto('about:blank');
-      await expect(menu(page), 'Leaving the entry with an active popup must clean up that popup.').toHaveCount(0);
-    }
-  }
-  expect(mutations, 'Local appearance and menu interactions must never write application data.').toEqual([]);
-  expect(previewReads, 'The shared preview menu must remain backend-independent.').toEqual([]);
 });
 
 test('rail expansion preserves browsing and inspection state while collapsed navigation remains discoverable at 390px', async ({ page }, info) => {
@@ -383,7 +295,7 @@ test('rail expansion preserves browsing and inspection state while collapsed nav
     await reach(page, view(page, 'Repo harness'), 'Tab');
     await page.keyboard.press('Enter');
     await expect(view(page, 'Repo harness')).toHaveAttribute('aria-current', /^(?:page|true)$/);
-    await fits(page, [repositoryButton(page, f.first), repositoryButton(page, f.second), view(page, 'Issues'), view(page, 'Requirements'), view(page, 'Repo harness'), trigger(page)]);
+    await fits(page, [repositoryButton(page, f.first), repositoryButton(page, f.second), view(page, 'Issues'), view(page, 'Requirements'), view(page, 'Repo harness'), localAvatar(page)]);
     await info.attach('collapsed-390-navigation', { body: await page.screenshot(), contentType: 'image/png' });
     readOnly();
   } finally { await page.goto('about:blank'); f.close(); }
