@@ -2,13 +2,15 @@
 
 The application uses React and plain CSS. Start the existing development server with `npm run dev`. Open `/` for the application or `/__ui/components` on that same frontend origin for the component preview. The preview has static samples and local state; it does not mount application reads, polling, reports, evidence loaders or mutation paths. It works without a backend. Its dynamic modules and stylesheet are gated by `import.meta.env.DEV` in the browser entry and are excluded from production output.
 
+Both entries use only the existing light appearance. A static neutral **L** avatar remains in the right corner; there is no appearance action or avatar dropdown. The historical adaptation and revision sections below retain design provenance, including retired dark-mode and menu behavior. The current runtime behavior is described in **Light-only appearance**.
+
 ## File ownership
 
 | Location | Responsibility |
 | --- | --- |
-| `src/ui/theme/tokens.css` | Light and dark semantic colors, spacing and type scales, component aliases, radii and local platform font families. `preference.ts` owns safe local preference resolution and application. |
+| `src/ui/theme/tokens.css` | Light semantic colors, spacing and type scales, component aliases, radii and local platform font families; the historical dark override is inactive. `preference.ts` owns unconditional light initialization without storage access. |
 | `src/ui/theme/base.css` | Document defaults, native control inheritance, heading type, focus intent, accessible hidden content and reduced motion, including narrow-screen document/type defaults. |
-| `src/ui/components/` | Shared native Button, Icon, Modal, Badge, Pagination, EmptyState, ThemeSwitch and UserMenu primitives. `primitives.css` owns their presentation, shared list frames/identifiers and responsive sizing. `inspection.css`, `inspection-refinements.css` and `inspection-responsive.css` own common inspection/card/form typography, wrapping, selectors and shared responsive overrides. |
+| `src/ui/components/` | Shared native Button, Icon, Modal, Badge, Pagination, EmptyState and static avatar primitives. The legacy `UserMenu` component now renders only the avatar. `primitives.css` owns their presentation, shared list frames/identifiers and responsive sizing. `inspection.css`, `inspection-refinements.css` and `inspection-responsive.css` own common inspection/card/form typography, wrapping, selectors and shared responsive overrides. |
 | `src/ui/layout/` | `WorkspaceLayout.tsx` owns workspace shell, repository navigation and breadcrumb markup and receives data/navigation callbacks. `workspace.css` owns the shell, global topbar, collapsible rail, inset frame, internal content scrolling, breadcrumbs and shared page headings. |
 | `src/ui/features/issues/` | Issue list, toolbar, rows and read-only issue diagnostics. `issues.css` owns the collection, filters, row metadata and footer; `diagnostics.css` owns the detail body and wide diagnostics dialog. Each keeps its responsive rules. |
 | `src/ui/features/requirements/` | Requirement list and original-goal inspection. `requirements.css` owns the list, inspection, observations, children, retained execution presentation and their responsive rules. |
@@ -18,13 +20,13 @@ The application uses React and plain CSS. Start the existing development server 
 | `src/ui/shared/` | API translation, workbench reads and refresh coordination, issue collection state, focus intent and pure ownership/progress calculations. |
 | `src/ui/App.tsx` | Repository/subview selection, diagnostics selection and screen composition. |
 | `src/ui/styles.css` | Thin, ordered production import entry: tokens, base, shared presentation, workspace and feature owners, with shared inspection refinements in their cascade positions. |
-| `src/ui/main.tsx` | Pre-mount theme initialization, the single production stylesheet import and gated preview loading. |
+| `src/ui/main.tsx` | Pre-mount light initialization, the single production stylesheet import and gated preview loading. |
 
 The former top-level UI modules remain thin compatibility re-exports. Existing direct imports such as `App`, `IssueRow`, `DeliveryView` and `workbench-state` continue to support Node static rendering. Feature modules, components and shared hooks do not import CSS or perform browser initialization at module evaluation.
 
 ## Choosing the change location
 
-Change theme tokens for a shared color, type, radius or spacing decision. Colors are named by purpose, including distinct status, evidence, warning, source and navigation treatments. The size scales support the reference hierarchy; semantic aliases such as `--radius-control`, `--space-panel-padding` and `--font-size-control` express common roles. Both themes resolve every feature alias through the neutral palette or a semantic status color; feature files must not embed a dark-only color.
+Change theme tokens for a shared color, type, radius or spacing decision. Colors are named by purpose, including distinct status, evidence, warning, source and navigation treatments. The size scales support the reference hierarchy; semantic aliases such as `--radius-control`, `--space-panel-padding` and `--font-size-control` express common roles. The active light palette resolves every feature alias through the neutral palette or a semantic status color; feature files must not embed a dark-only color.
 
 Change a shared component for behavior or markup used by several real screens, and `components/primitives.css` for its shared appearance and responsive sizing. Button preserves native attributes and refs, and its loading state disables activation and exposes `aria-busy`. Badge preserves a native span and accepts the existing status class hooks. EmptyState owns the common message frame. Pagination owns the exact range and boundary controls; Issues, Requirements and the preview supply their own collection and page state. Modal preserves native dialog semantics, neutral initial focus, trapped bidirectional Tab navigation, Escape dismissal and return to its connected opener. Focus outlines are enabled by intentional Tab input through the shared focus-intent hook and styled by `theme/base.css`.
 
@@ -38,7 +40,7 @@ The preview displays normal, disabled, loading, error, empty and long-content sa
 
 Run `npm run typecheck`, the relevant existing Node checks and the frozen production browser checks for the affected behavior. The accepted `tests/ui-preview-build.test.ts` inspects actual production artifacts and included modules; `acceptance/ui-components.spec.ts` observes API isolation through entry, interactions, polling intervals and cleanup, modal focus return, pagination and narrow layouts. Preserve all existing acceptance assertions and quality controls. The controller still owns final full verification, independent source review, integration, exact-head GitHub CI and publication. A worker's focused checks do not establish delivery.
 
-## UTG-TOKEN adaptation and provenance
+## UTG-TOKEN adaptation and provenance (historical)
 
 The visual reference is the actual UTG-TOKEN local workspace and database views (`/pool` and `/database`), inspected on 2026-10-24 at reference repository head `83c6d755654e860f2d7bde7e132b451ebf92812d`. The authoritative research bundle is `/Users/louis/issue-tracker/.runs/submissions/9d2706a3-0abf-45dc-b7fa-9884b3eb1d94/reference/`: `design-summary.md` records the observed product language; `manifest.json` binds each source path and its SHA-256 to its compact CSS snapshot. The snapshots are `primitives.css`, `theme.css`, `components.css` and `app-shell.css`. Their snapshot SHA-256 values are respectively `29181281e81508cba8e8d4751ef512beab98fee24cff9fa39c2172cf94ec7f7d`, `8d78afc5c0435a7bb24d44679fb604ab3f0d7922631a84fbab885a2b4d973d68`, `1a9bb142eda52bd758b3b1c9e43659231c4750e8ed94f9f606d4ab59653eda35` and `068431e509eb9fcd8389fcb559b75171a3c0fca53cc46c3f2ede74bb1dd9458d`. These paths describe provenance only. No runtime or build import depends on UTG-TOKEN, its workspace packages or the research bundle.
 
@@ -46,15 +48,15 @@ Loop retains its identity, repository navigation and read-only inspection behavi
 
 Typography uses app-owned `Loop Han` CJK-only local PingFang faces, followed by native platform, CJK and emoji fallbacks. It makes no font downloads. Shell and controls use 14px type, prose 13px/19px, section headings 15px, and page titles 22px/28px at weight 500 at desktop and mobile widths. Buttons use 10px radii, inputs 8px, cards 14px and main panels/dialogs 20px. Layout gaps use the existing spacing scale around the reference 4px grid. Mobile content controls retain 44px targets, wrapping and bounded lists. The reference rail keeps 32px navigation rows and the circular user entry remains 32px. Production document scrolling is replaced by scrolling inside the frame; the preview retains independent document scrolling.
 
-## Theme preference and interaction
+## Light-only appearance
 
-The application and development preview each expose a default-closed **User menu** button. The neutral circular entry opens a bottom-end popup with noninteractive **Local workspace** context, a divider and the sole **Dark mode** checkbox menu item. The former sidebar switch is removed. Opening focuses the appearance action; Tab and Shift+Tab follow document order, leaving the popup dismisses it, Escape returns focus to the user entry, and outside pointer dismissal preserves the clicked destination. Arrow keys also open the menu and focus its sole action. No account or authentication actions are present. The shared ThemeSwitch uses checkbox menu-item semantics and an icon-row presentation inside the popup; its standalone variant retains switch semantics, the track and On/Off text. The menu's checked state and trailing Check indicate effective dark mode. Pointer activation, Space and Enter use ordinary button behavior. Intentional Tab focus keeps the existing neutral outline and adds the same row fill as hover; pointer, passive refresh and modal entry keep their existing focus behavior.
+The application and development preview share a static neutral 32px circular **L** avatar, exposed as an image named **Local workspace avatar**. It retains the light fill, primary ink, regular 14px text, centered alignment and right-corner placement. It has no interactive wrapper, tab stop, popup, appearance action or menu listeners. The former Dark mode action and its dropdown have been removed.
 
-Light is the default regardless of the operating system preference. `main.tsx` calls `initializeTheme` before creating or mounting either React entry. The same-origin `loop.theme` localStorage key accepts only exact `light` and `dark` values. Missing, malformed or unreadable storage starts in light. Switching applies the root theme immediately and then attempts persistence; a denied write leaves local switching usable. The document theme-color metadata follows the mode. Reloads and navigation between app and preview use the same saved preference. No API calls or application mutations are part of theme handling.
+`main.tsx` calls `initializeTheme` before creating or mounting either React entry. Initialization unconditionally applies the existing light palette and light `#fcfcfb` theme-color metadata, regardless of operating-system preference. It neither reads nor writes localStorage: historical `loop.theme=dark`, missing or invalid values and unavailable storage cannot activate dark mode or prevent mounting. Existing stored preferences remain untouched. Reloads and navigation between app and preview repeat this light initialization. Appearance handling makes no API calls or application mutations.
 
-UserMenu owns only popup visibility and dismissal listeners; ThemeSwitch owns only its appearance state. It does not key or remount the workspace, selected requirement, issue filters/pages, reports, dialogs or harness disclosures. Reusable components and preference modules perform no browser work at module evaluation and remain importable for Node rendering. Styles and initialization stay in the browser entry; the preview remains gated out of production builds. The controller's frozen theme cases exercise first-mount resolution, safe storage fallback, accessible persistence, preserved browsing state and representative desktop/390px rendering in both modes. Final integrated verification and independent rendered/source review remain controller responsibilities.
+The legacy `UserMenu` name and avatar style hooks remain to preserve shared placement and paint. Its static rendering does not key or remount the workspace, selected requirement, issue filters/pages, reports, dialogs or harness disclosures. Reusable components and initialization modules perform no browser work at module evaluation and remain importable for Node rendering. Styles and initialization stay in the browser entry; the preview remains gated out of production builds. The frozen light-only case covers saved-dark first mounts, reload/navigation storage boundaries and static-avatar semantics; the revised baseline retains light palette, avatar fidelity, browsing, polling focus, inspection, responsive layout and API-isolation coverage. See [Light-only acceptance contract](light-only-acceptance.md) for the retained and retired observations. Final integrated verification and independent rendered/source review remain controller responsibilities.
 
-## Literal shell revision
+## Literal shell revision (historical)
 
 Issue 60 uses the newer pinned bundle at `/Users/louis/issue-tracker/.runs/submissions/9e7fb661-bc5c-4517-b665-420be562aa69/reference/`. Its `manifest.json` binds seven complete snapshots: `product-shell.css`, `reference-App.tsx`, `theme.css`, `primitives.css`, `components.css`, `Menu.tsx` and `Avatar.tsx`. The design summary records the actual 1280×720 observation at the same UTG repository head. This bundle supersedes the earlier visual adaptation for shell geometry, avatar/menu placement and title weight. It is read-only provenance; application modules and builds do not import it.
 
@@ -68,7 +70,7 @@ The frame uses `overflow: clip` for its rounded corners while `.workspace-conten
 
 The approved Issue 59 observation helper, Issue 63 bounded keyboard traversal revision and frozen theme case identities remain intact. Issue 60's three frozen browser cases retain representative light/dark desktop and 390px screenshots and geometry, menu/focus and rail-state observations. Browser evidence, reference comparison and final integrated verification remain controller responsibilities when the worker sandbox denies loopback binding.
 
-## Toolbar fidelity revision
+## Toolbar fidelity revision (historical)
 
 Issue 64 uses the actual pinned UTG-TOKEN capsule at `/Users/louis/issue-tracker/.runs/submissions/8ed1ee98-37a0-4bf2-bad0-43e860e515f4/reference/`, from source revision `83c6d755654e860f2d7bde7e132b451ebf92812d`. Its `design-summary.md`, `product-shell.css`, `app-base.css`, `primitives.css`, `theme.css`, `glyphs.json` and `computed-reference.json` establish the toolbar appearance. This supersedes the earlier capsules for toolbar fidelity. These external files are provenance only; the application and checks require no runtime access to them.
 
@@ -82,7 +84,7 @@ Desktop labels remain in the flex layout during collapse so their 140ms opacity 
 
 All repositories and repository refresh remain above the scrolling repository list. With many enrolled repositories, expansion scrolls only that list to reveal the selected repository and its subviews; the overview and refresh labels stay visible. Selection scrolling does not move ancestor containers or transfer keyboard focus.
 
-## Avatar menu fidelity revision
+## Avatar menu fidelity revision (historical)
 
 Issue 65 follows the pinned UTG-TOKEN reference at `/Users/louis/issue-tracker/.runs/submissions/78401c97-7952-4b43-b14d-a92ee999c894/reference/design-summary.md`. The reference Menu, MenuLabel, MenuSeparator, MenuItem and neutral Avatar treatments are adapted to the shared UserMenu. These external files record provenance; the application has no runtime dependency on them.
 
