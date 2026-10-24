@@ -3,11 +3,23 @@
 Current profile: [code-only verification](code-only-verification.md) supersedes earlier browser-specific examples. Four code gates, named Node proofs, frozen inventory and independent reviews remain mandatory; browser obligations and execution are retired.
 Use the existing owner maintenance workflow for harness and acceptance-contract changes. Feature jobs still use the serial queue/controller. These commands add admission and recovery around that controller; they do not create another executor or change its roles, acceptance criteria, full verifier or final independent review.
 
+## Admit owner work before implementation
+
+Create the separately classified maintenance issue and enqueue it through the existing `POST /api/issues/:id/start` entry point before starting owner work. Retain the issue and job IDs with the original authorization. Ordinary workers exclude maintenance jobs, so enqueueing does not start a competing feature executor. Keep verified dependency evidence and all normal serial ownership guards.
+
+After full verification, independent exact-source approval and verified local integration, use the existing `scripts/record-maintenance.ts` command to record completion. It performs read-only queue eligibility before touching Git, acquiring an integration lock or opening evidence. The diagnostic identifies the requested issue/status, the missing queued job, unmet dependency IDs or the active job, and the appropriate next action. It does not enqueue, claim, restart or complete anything during this preflight. The eventual claim repeats the same eligibility rules in its existing transaction, so a preflight pass cannot authorize a later conflicting claim. All exact-source evidence and review checks remain mandatory.
+
+An issue with no execution history needs explicit enqueueing through the existing entry point. For prior blocked, failed, completed or closed work, inspect the retained outcome and use the applicable owner recovery or follow-up workflow; never restart terminal work just to satisfy the receipt command.
+
 ## Freeze before complete verification
 
 Inspect relevant source and select existing meaningful coverage. For a coverage gap, the tests role adds scoped checks, the owner captures actual named assertion reds, and an independent coverage reviewer approves before implementation. An accepted assertion revision belongs to a separate acceptance-contract issue with an equivalence review. Freeze the complete tests/acceptance inventory, including helpers.
 
+For a tool or fixture migration, inspect the affected fixtures for removed file references, obsolete startup commands, report paths and named check identities. Run only the affected fixture setup and known-good baseline checks; retain the commands and actual logs/reports in the existing tests summary and coverage feedback. Missing imports, missing files, setup failures and timeouts cannot substitute for a named behavior red. New requested behavior may remain intentionally red after setup succeeds. The existing coverage reviewer checks these focused results alongside owner assertion proofs before freezing. Keep corrections within the unapproved draft and avoid incidental fixed counts when exact case identities express the requirement. This adds no role, approval stage or full verification run.
+
 The independent coverage receipt contains `approved: true`, an empty `findings` array, `sourceHash`, `snapshot: { hash, files }`, and `acceptedChecks: [{ path, hash }]`. Both source hashes must match the SHA-256 of the serialized snapshot files. The accepted inventory must exactly match its reviewed snapshot and the current complete test inventory. Optional `checks` contains exact Node file/title obligations added to the existing contract. Node files use repository-relative paths. `browserChecks`, when present, must be empty. The authoring snapshot can precede implementation, but its accepted test bytes cannot change.
+
+During focused diagnostics as well as complete verification, await the running check and owned-process cleanup before changing the same source, tests, configuration or executing engine. A background or yielded process is still running. If an edit is necessary, cancel that owned check, wait for it to settle, then edit and explicitly run the related checks again. Inspect retained process receipts and logs after interruption; never treat an unresolved owned process as settled. Existing process ownership and source/input identity guards remain authoritative. Drift invalidates the proof and must not be sent into product repair as a demonstrated behavior defect or trigger an automatic retry.
 
 Finish implementation and related named diagnostics before submitting an absolute-path request:
 

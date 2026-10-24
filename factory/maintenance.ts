@@ -34,6 +34,7 @@ export function commitSnapshot(repository: string, commit: string) {
 export function recordMaintenance(store: IssueStore, input: { issueId: number; commit: string; verificationPath: string; reviewPath: string; evidenceRoot?: string }): Delivery {
   const issue = store.get(input.issueId);
   if (!issue?.work?.changeKind || issue.work.changeKind === 'feature') throw new Error('Only separately classified maintenance issues can use owner attestation.');
+  store.work.maintenanceAdmission(input.issueId);
   const repo = store.work.repo(issue.work.repoId)!;
   const targetBranch = issue.work.requirementId ? store.work.requirement(issue.work.requirementId)?.publication?.branch ?? repo.targetBranch : repo.targetBranch;
   const common = resolve(repo.path, git(repo.path, ['rev-parse', '--git-common-dir']).trim());
