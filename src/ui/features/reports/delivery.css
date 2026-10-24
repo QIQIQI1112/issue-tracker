@@ -1,0 +1,22 @@
+.delivery { max-width: 72ch; margin-top: var(--space-8xl); padding-top: var(--space-8xl); border-top: 1px solid var(--border); font-size: var(--font-size-14); line-height: var(--line-height-report); }
+.delivery > .report-heading { margin-bottom: var(--space-8xl); gap: var(--space-2xl) var(--space-6xl); }
+.delivery > .report-heading h3 { font-size: var(--font-size-21); line-height: var(--line-height-heading); letter-spacing: var(--tracking-report-heading); }
+.delivery > .report-heading .status-pill { font-size: var(--font-size-11); }
+.delivery-group { min-width: 0; padding-block: var(--space-8xl); border-top: 1px solid var(--border); }
+.delivery-overview { padding-top: 0; border-top: 0; }
+.delivery h4 { margin: var(--space-8xl) 0 var(--space-lg); font-size: var(--font-size-14); line-height: var(--line-height-section); }
+.delivery-group > h4:first-child, .delivery-result > h4, .delivery-limitations > h4 { margin-top: 0; }
+.delivery p { margin: 0 0 var(--space-2xl); }
+.delivery ul { margin: 0 0 var(--space-2xl); padding-left: var(--space-6xl); }
+.delivery li { margin-bottom: var(--space-2xl); }
+.delivery li > p { margin-top: var(--space-md); }
+.delivery-group > :last-child, .delivery-result > :last-child, .delivery-limitations > :last-child, .delivery li:last-child { margin-bottom: 0; }
+.delivery-result { margin-top: var(--space-8xl); padding: var(--space-4xl) var(--space-5xl); border-left: 3px solid var(--accent); border-radius: 0 var(--radius-6) var(--radius-6) 0; background: var(--surface-result); }
+.delivery-result > h4 { color: var(--text-result-heading); }
+.delivery-result > p { color: var(--text-primary); }
+.delivery-limitations { margin-top: var(--space-8xl); padding: var(--space-4xl) var(--space-5xl); border-left: 3px solid var(--border-warning); background: var(--surface-warning); border-radius: 0 var(--radius-6) var(--radius-6) 0; }
+.delivery-limitations > h4 { color: var(--text-refresh-error); }
+.delivery .delivery-evidence { margin-top: 0; border-top: 1px solid var(--border); }
+.delivery a { color: var(--text-link-hover); }
+.evidence-list li { display: flex; justify-content: space-between; gap: var(--space-2xl); }
+.evidence-list span { color: var(--muted); flex-shrink: 0; }

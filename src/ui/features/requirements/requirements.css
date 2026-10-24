@@ -1,0 +1,51 @@
+.requirement-card { padding: var(--space-3xl) 0; border-top: 1px solid var(--border); }
+.requirement-panel, .requirement-inspection { min-width: 0; overflow-wrap: anywhere; }
+.requirement-list { list-style: none; padding: 0; margin: 0; max-height: 540px; overflow-y: auto; }
+.requirement-row { display: grid; grid-template-columns: 125px minmax(0, 1fr) 80px 145px; gap: var(--space-2xl); align-items: center; padding: var(--space-3xl) var(--space-5xl); border-bottom: 1px solid var(--border); min-height: 72px; }
+.requirement-title { min-width: 0; text-align: left; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.requirement-title[aria-pressed="true"] { color: var(--text-selection); text-decoration: underline; }
+.requirement-row-status, .requirement-row-progress { font-size: var(--font-size-12); color: var(--muted); }
+.requirement-inspection { margin-block: var(--space-8xl) var(--space-13xl); padding: var(--space-8xl); border: 1px solid var(--border); border-radius: var(--radius-9); background: var(--surface); }
+.requirement-inspection h2, .requirement-inspection h3, .requirement-inspection p, .requirement-inspection dd { overflow-wrap: anywhere; }
+.requirement-inspection p, .requirement-inspection dd { white-space: pre-wrap; }
+.requirement-inspection > section { border-top: 1px solid var(--border); margin-top: var(--space-7xl); padding-top: var(--space-2xl); }
+.requirement-inspection dl { display: grid; grid-template-columns: minmax(0, 110px) minmax(0, 1fr); gap: var(--space-2xl); }
+.requirement-inspection dt { color: var(--muted); }
+.requirement-inspection dd { margin: 0; min-width: 0; }
+.requirement-observations { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2xl); margin-top: var(--space-8xl); }
+.requirement-observations section { min-width: 0; padding: var(--space-4xl); background: var(--surface-observation); border: 1px solid var(--border); border-radius: var(--radius-6); }
+.requirement-observations h3 { margin-top: 0; }
+.requirement-observations p { margin-bottom: 0; }
+.requirement-children { list-style: none; margin: 0; padding: 0; }
+.requirement-children li { padding: var(--space-3xl) 0; display: grid; gap: var(--space-xl); border-bottom: 1px solid var(--border); }
+.requirement-children .text-button { min-width: 0; max-width: 100%; text-align: left; white-space: normal; overflow-wrap: anywhere; justify-self: start; }
+.requirement-child-state { display: flex; flex-wrap: wrap; gap: var(--space-lg) var(--space-8xl); font-size: var(--font-size-12); }
+@media (max-width: 1100px) {
+  .requirement-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .requirement-title { grid-column: 1 / -1; grid-row: 2; }
+  .requirement-row-progress { grid-column: 1 / -1; }
+}
+@media (max-width: 600px) {
+  .requirement-row { padding: var(--space-2xl) var(--space-3xl); gap: var(--space-lg); }
+  .requirement-list { max-height: 420px; }
+  .requirement-title, .requirement-children .text-button { min-height: 44px; }
+  .requirement-inspection { padding: var(--space-4xl); }
+  .requirement-observations { grid-template-columns: minmax(0, 1fr); }
+  .requirement-inspection dl { grid-template-columns: minmax(0, 85px) minmax(0, 1fr); }
+}
+.execution-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2xl); margin: 0; }
+.execution-summary > div { padding: var(--space-3xl); border: 1px solid var(--border); border-radius: var(--radius-6); background: var(--surface-execution); }
+.execution-summary dt { color: var(--muted); font-size: var(--font-size-12); overflow-wrap: anywhere; }
+.execution-summary dd { margin: var(--space-md) 0 0; font-size: var(--font-size-24); font-variant-numeric: tabular-nums; }
+.requirement-progress { display: flex; flex-wrap: wrap; gap: var(--space-lg) var(--space-8xl); margin-block: var(--space-2xl); }
+.requirement-progress p { margin: 0; }
+.requirement-progress p:first-child { color: var(--text-selection); }
+.execution-list { padding-left: var(--space-6xl); }
+.execution-list > li { border-bottom: 1px solid var(--border); padding-block: var(--space-2xl); }
+.execution-list p { margin: var(--space-md-plus) 0; }
+.manual-requirement > summary { font-size: var(--font-size-16); font-weight: var(--font-weight-medium); }
+@media (max-width: 800px) { .execution-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) {
+  .execution-summary > div { padding: var(--space-xl); }
+  .execution-summary dd { font-size: var(--font-size-21); }
+}

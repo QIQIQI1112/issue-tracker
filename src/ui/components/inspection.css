@@ -1,0 +1,19 @@
+.workbench { padding-bottom: var(--space-11xl); }
+.work-card { padding: var(--space-7xl); margin-bottom: var(--space-5xl); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-9); }
+.work-card h2 { font-size: var(--font-size-18); margin: 0 0 var(--space-4xl); }
+.work-card h3, .detail-body h3 { font-size: var(--font-size-16); }
+.work-card p, .detail-body p { color: var(--text-secondary); overflow-wrap: anywhere; white-space: pre-wrap; }
+.work-card li, .detail-body li { margin-bottom: var(--space-lg); overflow-wrap: anywhere; }
+.work-form { display: grid; gap: var(--space-3xl); margin-top: var(--space-5xl); }
+.work-form label, .work-card > label, .detail-body > label { display: grid; gap: var(--space-md-plus); font-size: var(--font-size-12); }
+.work-form input, .work-form textarea, .work-form select, .work-card > label select, .detail-body > label select { width: 100%; min-width: 0; background: var(--surface-input); border: 1px solid var(--border-form); border-radius: var(--radius-6); padding: var(--space-xl); }
+.work-form textarea { resize: vertical; }
+.work-form .button { justify-self: start; }
+.report-heading { display: flex; gap: var(--space-2xl); align-items: center; justify-content: space-between; }
+.report-heading h3 { margin: 0; }
+.delivery code, .work-card code { overflow-wrap: anywhere; white-space: pre-wrap; }
+.delivery details, .execution-fields { margin-top: var(--space-5xl); }
+.work-fields { margin-top: var(--space-6xl); }
+.execution-fields label { margin-top: var(--space-3xl); }
+.form-hint { color: var(--muted); font-size: var(--font-size-11); margin: 0 0 var(--space-6xl); }
+.form-error { color: var(--text-error); background: var(--surface-error); border: 1px solid var(--border-error); border-radius: var(--radius-6); padding: var(--space-xl) var(--space-2xl); font-size: var(--font-size-12); margin: 0 0 var(--space-4xl); }
