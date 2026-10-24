@@ -1,0 +1,21 @@
+.workbench, .work-card, .selected-report, .requirement-card { min-width: 0; }
+.workbench h3, .detail-body h3, .work-card summary { overflow-wrap: anywhere; }
+.workbench .report-heading, .delivery .report-heading { flex-wrap: wrap; }
+.workbench .report-heading h3, .delivery .report-heading h3 { min-width: 0; flex: 1 1 180px; }
+.workbench .report-heading .status-pill { flex: 0 0 auto; }
+.workbench .text-button, .workbench .button, .detail-body .button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.work-form label, .work-card > label, .detail-body > label { min-width: 0; }
+.work-card > label select, .detail-body > label select { max-width: 100%; }
+@media (max-width: 600px) {
+  .work-card { padding: var(--space-4xl); }
+  .workbench .page-header p { max-width: none; }
+  .workbench summary { min-height: 44px; padding-block: var(--space-xl); }
+  .workbench .text-button { min-height: 44px; }
+  .work-form input, .work-form textarea, .work-form select { font-size: var(--font-size-16); }
+}
+.detail-body, .delivery, .diagnostic-section, .evidence-preview { min-width: 0; overflow-wrap: anywhere; }
+.diagnostic-selector { display: grid; gap: var(--space-lg); margin-block: var(--space-4xl); min-width: 0; }
+.diagnostic-selector select { display: block; width: 100%; max-width: 100%; min-width: 0; padding: var(--space-2xl); border: 1px solid var(--border-diagnostic-select); border-radius: var(--radius-6); background: var(--surface-input); }
+@media (max-width: 600px) {
+  .diagnostic-selector select { min-height: 44px; font-size: var(--font-size-13); }
+}

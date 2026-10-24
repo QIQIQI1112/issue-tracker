@@ -1,0 +1,18 @@
+.detail-body { padding: var(--space-panel-padding); font-size: var(--font-size-13); }
+.detail-body dl { display: grid; grid-template-columns: 110px 1fr; gap: var(--space-lg); }
+.detail-body dd { margin: 0; overflow-wrap: anywhere; }
+.detail-body dt { color: var(--muted); }
+.detail-body dl { grid-template-columns: minmax(0, 110px) minmax(0, 1fr); }
+.detail-body .report-heading { flex-wrap: wrap; }
+
+.diagnostics-modal { width: min(1000px, calc(100vw - 32px)); }
+.diagnostics-modal .modal-header { position: sticky; top: 0; z-index: 1; background: var(--surface-raised); }
+.detail-body > h3:first-child { margin-top: 0; font-size: var(--font-size-22); line-height: var(--line-height-section); }
+.issue-metadata { padding: var(--space-5xl); background: var(--surface-observation); border: 1px solid var(--border); border-radius: var(--radius-8); }
+.diagnostic-section { padding-block: var(--space-xl) var(--space-6xl); margin-block: var(--space-6xl); border-block: 1px solid var(--border); }
+.detail-body .execution-warning { color: var(--text-refresh-error); border-left: 3px solid var(--border-warning); padding-left: var(--space-2xl); }
+@media (max-width: 600px) {
+  .detail-body { padding: var(--space-5xl); }
+  .detail-body dl { grid-template-columns: minmax(0, 85px) minmax(0, 1fr); gap: var(--space-xl); }
+  .detail-body > h3:first-child { font-size: var(--font-size-19); }
+}
