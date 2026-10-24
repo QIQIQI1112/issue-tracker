@@ -2,7 +2,7 @@
 @media (max-width: 600px) {
   .evidence-list li { flex-wrap: wrap; gap: var(--space-sm) var(--space-2xl); }
 }
-.evidence-preview { margin-block: var(--space-5xl); padding: var(--space-4xl); border: 1px solid var(--border-label); border-radius: var(--radius-8); background: var(--surface-evidence); }
+.evidence-preview { margin-block: var(--space-5xl); padding: var(--space-4xl); border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface-evidence); }
 .evidence-preview h4 { margin-top: 0; }
 .evidence-preview pre { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; max-height: 480px; overflow-y: auto; padding: var(--space-2xl); background: var(--surface-evidence-code); border-radius: var(--radius-4); font-size: var(--font-size-12); line-height: var(--line-height-code); }
 .selected-run-meta { font-size: var(--font-size-12); color: var(--muted); }
@@ -10,6 +10,6 @@
 .delivery-efficiency .efficiency-metrics, .delivery-efficiency .efficiency-context { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: var(--space-2xl) var(--space-4xl); margin: 0 0 var(--space-4xl); }
 .delivery-efficiency dl > div { min-width: 0; }
 .delivery-efficiency dt { font-size: var(--font-size-12); line-height: var(--line-height-body); color: var(--muted); }
-.delivery-efficiency dd { margin: var(--space-sm) 0 0; font-size: var(--font-size-18); font-weight: var(--font-weight-semibold); line-height: var(--line-height-section); font-variant-numeric: tabular-nums; }
+.delivery-efficiency dd { margin: var(--space-sm) 0 0; font-size: var(--font-size-18); font-weight: var(--font-weight-medium); line-height: var(--line-height-section); font-variant-numeric: tabular-nums; }
 .delivery-efficiency .efficiency-stages dd, .delivery-efficiency .efficiency-context dd { font-size: var(--font-size-14); }
 .delivery-efficiency .efficiency-note { color: var(--muted); font-size: var(--font-size-12); }
