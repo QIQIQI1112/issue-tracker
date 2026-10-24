@@ -1,3 +1,4 @@
+import { Dropdown } from '../../components/Dropdown.tsx';
 import { Pagination } from '../../components/Pagination.tsx';
 import { EmptyState } from '../../components/EmptyState.tsx';
 import { Button } from '../../components/Button.tsx';
@@ -69,7 +70,7 @@ function RequirementInspection({ requirement, repo, data, issues, onIssue, headi
       <div className="requirement-child-state"><span data-testid="child-recorded-status">{issue.status}</span><span data-testid="child-merge-state">{mergedIssue(data, issue) ? 'Merged' : 'Not merged'}</span></div>
     </li>)}</ul> : <p>No child issues.</p>}</section>
     <section aria-label="Requirement stage history"><h3>Requirement stage history</h3><p>Historical reports describe their own attempt. They do not replace current progress or blockers.</p>
-      {stageRuns.length ? <><label className="diagnostic-selector">Run<select aria-label="Select execution run" value={runId} onChange={event => setSelectedRun(event.target.value)}><option value="">Select a stage run</option>{stageRuns.map(({ job, run }) => <option key={run.id} value={run.id}>{requirementStages[job.kind as keyof typeof requirementStages]} · {run.id} · {run.startedAt} · {run.status}</option>)}</select></label>{runId && <SelectedReport key={runId} runId={runId} />}</> : <p>No requirement-stage runs.</p>}
+      {stageRuns.length ? <><div className="diagnostic-selector">Run<Dropdown aria-label="Select execution run" value={runId} onChange={setSelectedRun}><option value="">Select a stage run</option>{stageRuns.map(({ job, run }) => <option key={run.id} value={run.id}>{requirementStages[job.kind as keyof typeof requirementStages]} · {run.id} · {run.startedAt} · {run.status}</option>)}</Dropdown></div>{runId && <SelectedReport key={runId} runId={runId} />}</> : <p>No requirement-stage runs.</p>}
     </section>
   </section>;
 }

@@ -4,9 +4,9 @@
 .search-field input { width: 100%; min-width: 0; padding: var(--space-lg-plus) var(--space-xl-plus) var(--space-lg-plus) 0; border: none; background: transparent; font-size: var(--font-size-control); }
 :root[data-focus-intent="keyboard"] .search-field:focus-within { border-color: var(--border-input-focus); }
 .toolbar-selects { display: flex; align-items: center; gap: var(--space-xl); margin-left: auto; min-width: 0; }
-.select-field { display: flex; gap: var(--space-lg); align-items: center; min-width: 0; border: 1px solid var(--border-input); background: var(--surface); border-radius: var(--radius-input); padding: var(--space-sm) var(--space-lg); }
+.select-field { display: flex; gap: var(--space-lg); align-items: center; min-width: 0; }
 .select-field > span { font-size: var(--font-size-12); color: var(--muted); }
-.select-field select { min-width: 0; min-height: 25px; padding: 0 var(--space-2xs); background: transparent; border: none; font-size: var(--font-size-control); max-width: 135px; }
+.select-field .dropdown { flex: 1; max-width: 170px; }
 .issue-list { list-style: none; padding: 0; margin: 0; max-height: min(620px, max(180px, calc(100dvh - 410px))); overflow-y: auto; overscroll-behavior-y: contain; scrollbar-gutter: stable; }
 :root[data-focus-intent="keyboard"] .issue-list:focus { outline-offset: -3px; }
 .issue-row { display: grid; grid-template-columns: 80px minmax(0, 1fr) 110px 80px 60px; align-items: center; gap: var(--space-3xl); min-height: 80px; padding: var(--space-2xl) var(--space-4xl) var(--space-2xl) var(--space-6xl); border-bottom: 1px solid var(--border-row); }
@@ -40,8 +40,9 @@
 @media (max-width: 600px) {
   .search-field input { padding-block: var(--space-2xl-plus); font-size: var(--font-size-13); }
   .toolbar-selects { gap: var(--space-md); width: 100%; }
-  .select-field { flex: 1 1 0; min-width: 0; padding: var(--space-md); }
-  .select-field select { min-height: 32px; width: 100%; min-width: 0; font-size: var(--font-size-12); }
+  .select-field { flex: 1 1 0; min-width: 0; }
+  .select-field .dropdown { width: 100%; max-width: 100%; }
+  .select-field .dropdown-trigger { font-size: var(--font-size-12); padding-inline: var(--space-md); }
   .select-field > span { display: none; }
   .issue-row { padding: var(--space-xl) var(--space-3xl); gap: var(--space-md) var(--space-lg-plus); min-height: 110px; }
   .issue-list { max-height: clamp(180px, 32dvh, 320px); }
