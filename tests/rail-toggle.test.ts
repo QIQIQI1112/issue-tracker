@@ -224,3 +224,191 @@ test('rail toggle preserves direction, control semantics, navigation padding and
     }
   }
 });
+
+type PaintEnvironment = Environment & { hovered?: Element };
+type PaintTarget = { element: Element; pseudo?: 'before' | 'after' };
+type PaintBox = { left: number; top: number; width: number; height: number };
+
+function paintCompoundMatches(selector: string, element: Element, environment: PaintEnvironment): boolean {
+  for (const match of selector.matchAll(/:not\(([^()]*)\)/g)) {
+    if (paintCompoundMatches(match[1], element, environment)) return false;
+  }
+  selector = selector.replace(/:not\([^()]*\)/g, '');
+  for (const match of selector.matchAll(/:(hover|disabled|root|focus-visible|focus|active)\b/g)) {
+    if (match[1] === 'hover') {
+      let hovered = environment.hovered;
+      while (hovered && hovered !== element) hovered = hovered.parent;
+      if (!hovered) return false;
+    } else if (match[1] === 'disabled') {
+      if (element.attributes.disabled === undefined) return false;
+    } else if (match[1] === 'root') {
+      if (element.parent) return false;
+    } else return false;
+  }
+  return compoundMatches(selector.replace(/:(hover|disabled|root|focus-visible|focus|active)\b/g, ''), element, environment);
+}
+
+function paintSelectorMatches(selector: string, target: PaintTarget, environment: PaintEnvironment) {
+  const pseudo = selector.match(/::(before|after)$/)?.[1];
+  if (pseudo !== target.pseudo) return false;
+  const parts = selector.replace(/::(before|after)$/, '').trim().split(/\s+/);
+  let current: Element | undefined = target.element;
+  if (!paintCompoundMatches(parts.pop() ?? '', current, environment)) return false;
+  while (parts.length) {
+    const part = parts.pop()!;
+    current = current.parent;
+    if (part === '>') {
+      if (!current || !paintCompoundMatches(parts.pop() ?? '', current, environment)) return false;
+    } else {
+      while (current && !paintCompoundMatches(part, current, environment)) current = current.parent;
+      if (!current) return false;
+    }
+  }
+  return true;
+}
+
+function paintDeclarations(declaration: Declaration): Declaration[] {
+  if (declaration.property === 'background') return [{ ...declaration, property: 'background-color' }];
+  if (declaration.property === 'inset') {
+    const [top, right = top, bottom = top, left = right] = declaration.value.split(/\s+/);
+    return ['top', 'right', 'bottom', 'left'].map((property, index) => ({ ...declaration, property, value: [top, right, bottom, left][index] }));
+  }
+  return expand(declaration);
+}
+
+function paintStyle(target: PaintTarget, environment: PaintEnvironment): Record<string, string> {
+  const cascade = new Map<string, { value: string; priority: number }>();
+  for (const rule of rules) {
+    if (!rule.media.every(media => mediaMatches(media, environment)) || !paintSelectorMatches(rule.selector, target, environment)) continue;
+    const selector = rule.selector.replace(/:not\(([^()]*)\)/g, '$1');
+    const specificity = [...selector.matchAll(/\.[\w-]+|\[[^\]]+\]|(?<!:):(?!:)[\w-]+/g)].length * 100
+      + [...selector.matchAll(/(?:^|[\s>])[a-z][\w-]*|::[\w-]+/g)].length;
+    for (const declaration of rule.declarations.flatMap(paintDeclarations)) {
+      const priority = specificity + (declaration.important ? 1000000 : 0);
+      if (priority >= (cascade.get(declaration.property)?.priority ?? -1)) cascade.set(declaration.property, { value: declaration.value, priority });
+    }
+  }
+  const parent = target.pseudo ? target.element : target.element.parent;
+  const inherited = parent ? paintStyle({ element: parent }, environment) : {};
+  const variables = { ...Object.fromEntries(Object.entries(inherited).filter(([property]) => property.startsWith('--'))), ...Object.fromEntries([...cascade].map(([property, declaration]) => [property, declaration.value])) };
+  function resolve(value: string, depth = 0): string {
+    assert.ok(depth < 20, 'Production paint variables must resolve without a cycle.');
+    return value.replace(/var\((--[\w-]+)(?:,\s*([^()]*))?\)/g, (_match, name: string, fallback: string | undefined) => {
+      assert.ok(variables[name] !== undefined || fallback !== undefined, `Production paint token ${name} must exist.`);
+      return resolve(variables[name] ?? fallback!, depth + 1);
+    });
+  }
+  return Object.fromEntries(Object.entries(variables).map(([property, value]) => [property, resolve(value === 'inherit' ? inherited[property] ?? 'initial' : value)]));
+}
+
+function paintLength(value: string | undefined, reference: number, label: string) {
+  if (value?.endsWith('%')) return pixels(`${Number.parseFloat(value) * reference / 100}px`, label);
+  return pixels(value, label);
+}
+
+function controlBox(element: Element, environment: PaintEnvironment, available: number, containerLeft: number): PaintBox {
+  const control = paintStyle({ element }, environment);
+  const slot = element.children.find(child => (child.attributes.class ?? '').split(/\s+/).includes('toolbar-icon-slot'));
+  assert.ok(slot, 'Production toolbar controls must contain their shared icon slot before computing their intrinsic box.');
+  const iconSlot = paintStyle({ element: slot }, environment);
+  const padding = (side: string) => pixels(control[`padding-${side}`] ?? '0', `Control ${side} padding`);
+  const border = (side: string) => pixels(control[`border-${side}-width`] ?? '0', `Control ${side} border`);
+  const intrinsicWidth = pixels(iconSlot.width, 'Control icon slot width') + padding('left') + padding('right') + border('left') + border('right');
+  const intrinsicHeight = pixels(iconSlot.height, 'Control icon slot height') + padding('top') + padding('bottom') + border('top') + border('bottom');
+  return {
+    left: containerLeft + pixels(control['margin-left'] ?? '0', 'Control left margin'), top: 0,
+    width: control.width === 'max-content' ? intrinsicWidth : paintLength(control.width, available, 'Control width'),
+    height: Math.max(pixels(control['min-height'] ?? '0', 'Control minimum height'), control.height ? paintLength(control.height, 32, 'Control height') : intrinsicHeight),
+  };
+}
+
+function paintTargets(element: Element): PaintTarget[] {
+  return [{ element }, { element, pseudo: 'before' }, { element, pseudo: 'after' }, ...element.children.flatMap(paintTargets)];
+}
+
+function visiblePaint(target: PaintTarget, environment: PaintEnvironment) {
+  const surface = paintStyle(target, environment);
+  if (target.pseudo && (!surface.content || ['none', 'normal'].includes(surface.content))) return false;
+  return surface.display !== 'none' && surface.visibility !== 'hidden' && surface.opacity !== '0'
+    && !['transparent', 'rgba(0, 0, 0, 0)'].includes(surface['background-color'] ?? 'transparent');
+}
+
+function paintBox(target: PaintTarget, environment: PaintEnvironment, toggle: Element, control: PaintBox): PaintBox {
+  if (target.element === toggle && !target.pseudo) return control;
+  const surface = paintStyle(target, environment);
+  const left = paintLength(surface.left ?? '0', control.width, 'Paint left offset');
+  const top = paintLength(surface.top ?? '0', control.height, 'Paint top offset');
+  return {
+    left: control.left + left, top: control.top + top,
+    width: surface.width && surface.width !== 'auto' ? paintLength(surface.width, control.width, 'Paint width') : control.width - left - paintLength(surface.right ?? '0', control.width, 'Paint right offset'),
+    height: surface.height && surface.height !== 'auto' ? paintLength(surface.height, control.height, 'Paint height') : control.height - top - paintLength(surface.bottom ?? '0', control.height, 'Paint bottom offset'),
+  };
+}
+
+test('rail toggle paints a 36px by 32px peer-aligned hover surface across sidebar states and responsive widths', () => {
+  const { shell, sidebar, toggle, navigation } = workspace();
+  for (const width of widths) for (const state of states) {
+    const environment: PaintEnvironment = { width, state, reducedMotion: false, hovered: toggle };
+    const container = paintStyle({ element: sidebar }, environment);
+    const railWidth = pixels(paintStyle({ element: shell }, environment)['grid-template-columns'].split(/\s+/)[0], 'Rail width');
+    const containerLeft = pixels(container['padding-left'], 'Rail left padding');
+    const available = railWidth - containerLeft - pixels(container['padding-right'], 'Rail right padding');
+    const control = controlBox(toggle, environment, available, containerLeft);
+    assert.deepEqual(control, { left: 12, top: 0, width: 42, height: 32 }, `${width}px ${state}: narrowing paint must preserve the complete 42px by 32px hit target.`);
+    const peerEnvironment = { ...environment, state: 'collapsed' as const, hovered: navigation };
+    const peerContainer = paintStyle({ element: sidebar }, peerEnvironment);
+    const peerLeft = pixels(peerContainer['padding-left'], 'Collapsed rail left padding');
+    const peerRailWidth = pixels(paintStyle({ element: shell }, peerEnvironment)['grid-template-columns'].split(/\s+/)[0], 'Collapsed rail width');
+    const peer = controlBox(navigation, peerEnvironment, peerRailWidth - peerLeft - pixels(peerContainer['padding-right'], 'Collapsed rail right padding'), peerLeft);
+    assert.deepEqual(peer, { left: 12, top: 0, width: 36, height: 32 }, `${width}px: the actual collapsed peer establishes the target surface geometry.`);
+    const surfaces = paintTargets(toggle).filter(target => visiblePaint(target, environment));
+    assert.ok(surfaces.length > 0, `${width}px ${state}: hovering the actual toggle must paint a surface.`);
+    for (const target of surfaces) {
+      assert.deepEqual(paintBox(target, environment, toggle, control), peer, `${width}px ${state}: every visible hover layer must match the 36px by 32px peer at the 12px left edge, without painting the full 42px hit target.`);
+      const radius = paintStyle(target, environment)['border-radius'];
+      assert.equal(radius, paintStyle({ element: navigation }, peerEnvironment)['border-radius'], `${width}px ${state}: hover corners match the navigation peer.`);
+      assert.equal(radius, '8px', `${width}px ${state}: the hover frame retains the established 8px radius.`);
+    }
+  }
+});
+
+function backgroundTransition(surface: Record<string, string>, label: string) {
+  const properties = splitList(surface['transition-property'] ?? 'all');
+  const index = properties.findLastIndex(property => ['all', 'background', 'background-color'].includes(property));
+  assert.ok(index >= 0, `${label}: the paint surface must transition its background.`);
+  const durations = splitList(surface['transition-duration'] ?? '0s');
+  const timing = splitList(surface['transition-timing-function'] ?? 'ease');
+  return { duration: durations[index % durations.length], timing: timing[index % timing.length] };
+}
+
+test('rail toggle hover paint preserves navigation hover and selection fills and reduced-motion treatment', () => {
+  const { toggle, navigation } = workspace();
+  const group = navigation.parent!;
+  const refresh = group.children.find(element => element.attributes['aria-label'] === 'Refresh repositories');
+  assert.ok(refresh, 'The actual SSR fixture must expose the unselected Refresh repositories peer.');
+  assert.equal(navigation.attributes['aria-pressed'], 'true', 'All repositories supplies an independently selected peer.');
+  assert.equal((refresh.attributes.class ?? '').split(/\s+/).includes('active'), false, 'Refresh repositories supplies an independently unselected peer.');
+  for (const width of widths) for (const state of states) {
+    const environment: PaintEnvironment = { width, state, reducedMotion: false };
+    const selected = paintStyle({ element: navigation }, environment);
+    const peerHover = paintStyle({ element: refresh }, { ...environment, hovered: refresh });
+    assert.equal(selected['background-color'], selected['--surface-active'], `${width}px ${state}: the selected peer retains the active fill.`);
+    assert.equal(paintStyle({ element: navigation }, { ...environment, hovered: navigation })['background-color'], selected['--surface-active'], `${width}px ${state}: selected navigation keeps its active fill while hovered.`);
+    assert.equal(peerHover['background-color'], peerHover['--surface-hover'], `${width}px ${state}: an unselected navigation peer uses the hover fill.`);
+    assert.notEqual(peerHover['background-color'], selected['background-color'], `${width}px ${state}: hover and selected states remain distinct.`);
+    assert.equal(paintStyle({ element: refresh }, environment)['background-color'], 'transparent', `${width}px ${state}: an unselected resting peer remains clear.`);
+    assert.deepEqual(backgroundTransition(peerHover, 'Navigation peer'), { duration: '140ms', timing: 'cubic-bezier(0.4, 0, 0.2, 1)' }, `${width}px ${state}: navigation hover retains its established transition.`);
+    assert.equal(paintTargets(toggle).some(target => visiblePaint(target, environment)), false, `${width}px ${state}: the resting toggle has no hover fill.`);
+    const hovered = { ...environment, hovered: toggle };
+    const surfaces = paintTargets(toggle).filter(target => visiblePaint(target, hovered));
+    assert.ok(surfaces.length > 0, `${width}px ${state}: hover produces observable toggle paint.`);
+    for (const target of surfaces) {
+      const surface = paintStyle(target, hovered);
+      assert.equal(surface['background-color'], peerHover['background-color'], `${width}px ${state}: the toggle paints the same hover fill as an unselected navigation peer.`);
+      assert.deepEqual(backgroundTransition(surface, 'Toggle paint'), backgroundTransition(peerHover, 'Navigation peer'), `${width}px ${state}: the actual paint surface retains the peer background timing and easing.`);
+      const reduced = paintStyle(target, { ...hovered, reducedMotion: true });
+      assert.equal(reduced['transition-duration'], '.001ms', `${width}px ${state}: reduced motion suppresses the actual hover paint transition, including generated surfaces.`);
+      assert.equal(reduced['animation-duration'], '.001ms', `${width}px ${state}: reduced motion suppresses animation on the actual hover paint surface.`);
+    }
+  }
+});
