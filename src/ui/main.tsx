@@ -1,8 +1,10 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App.tsx';
+import { initializeTheme } from './theme/preference.ts';
 import './styles.css';
 
+initializeTheme();
 const root = document.getElementById('root');
 if (!root) throw new Error('The application root is missing.');
 const application = createRoot(root);

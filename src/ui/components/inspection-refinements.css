@@ -15,7 +15,7 @@
 }
 .detail-body, .delivery, .diagnostic-section, .evidence-preview { min-width: 0; overflow-wrap: anywhere; }
 .diagnostic-selector { display: grid; gap: var(--space-lg); margin-block: var(--space-4xl); min-width: 0; }
-.diagnostic-selector select { display: block; width: 100%; max-width: 100%; min-width: 0; padding: var(--space-2xl); border: 1px solid var(--border-diagnostic-select); border-radius: var(--radius-6); background: var(--surface-input); }
+.diagnostic-selector select { display: block; width: 100%; max-width: 100%; min-width: 0; padding: var(--space-2xl); border: 1px solid var(--border-diagnostic-select); border-radius: var(--radius-input); background: var(--surface-input); }
 @media (max-width: 600px) {
   .diagnostic-selector select { min-height: 44px; font-size: var(--font-size-13); }
 }
