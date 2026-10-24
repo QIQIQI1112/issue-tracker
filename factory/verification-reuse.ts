@@ -7,14 +7,15 @@ import type { Requirement, WorkRun } from '../src/workflow.ts';
 import type { ControllerState, Verification } from './controller.ts';
 import { parsePlan, parseReview, parseTask } from './contracts.ts';
 import type { Review } from './contracts.ts';
-import { inspectBrowserReport, inspectNodeReport, parseVerificationContract, readJson, snapshot, writeJson } from './evidence.ts';
+import { inspectNodeReport, parseVerificationContract, readJson, snapshot, writeJson } from './evidence.ts';
 import { commitSnapshot } from './maintenance.ts';
 import { git, protectedPath } from './workspace.ts';
 
 type WholeGoal = { requirementId: number; goal: string };
 type Proof = { path: string; hash: string };
 type Certificate = {
-  schemaVersion: 1;
+  schemaVersion: 2;
+  profile: 'code-only';
   runId: string;
   taskId: string;
   branch: string;
@@ -22,7 +23,7 @@ type Certificate = {
   sourceHash: string;
   environment: string;
   wholeGoal?: WholeGoal;
-  verification: { summaryPath: string; nodePath: string; browserPath: string; contractPath: string; runId: string; startedAt: string; completedAt: string };
+  verification: { summaryPath: string; nodePath: string; contractPath: string; runId: string; startedAt: string; completedAt: string };
   reviewReceiptPath: string;
   proofs: Proof[];
   createdAt: string;
@@ -89,17 +90,14 @@ function inspect(directory: string, sourceHash: string, certificate?: Certificat
   const inputPath = evidencePath(directory, join(summary.runDirectory, 'verification-input.json'));
   const inputs = readJson(inputPath) as { schemaVersion: number; sourceHash: string; before: string; after: string; verificationRunId: string; summaryHash: string };
   if (inputs.schemaVersion !== 1 || inputs.sourceHash !== sourceHash || !/^[a-f0-9]{64}$/.test(inputs.before) || inputs.before !== inputs.after || inputs.verificationRunId !== summary.runId || inputs.summaryHash !== digest(readFileSync(summaryPath)) || certificate && inputs.before !== certificate.environment) throw new Error('Verification-time input identity stamp is missing or changed.');
-  const gates = ['lint', 'typecheck', 'test', 'build', 'test:e2e'];
-  if (summary.checks.length !== gates.length || !gates.every(name => summary.checks.filter(check => check.name === name && check.status === 'passed').length === 1)) throw new Error('Reusable verification lacks complete passed gates.');
+  const gates = ['lint', 'typecheck', 'test', 'build'];
+  if (summary.profile !== 'code-only' || summary.checks.length !== gates.length || !gates.every(name => summary.checks.filter(check => check.name === name && check.status === 'passed').length === 1)) throw new Error('Reusable verification lacks complete passed gates.');
   const contractPath = evidencePath(directory, summary.contractPath!);
   const contract = parseVerificationContract(readJson(contractPath));
   for (const check of plan.slices.flatMap(slice => slice.checks)) if (!contract.requiredNodeTests.some(item => item.file === check.file && item.title === check.title)) throw new Error('Reusable verification omitted a planned Node check.');
-  for (const check of plan.browserChecks) if (!contract.requiredBrowserTests.some(item => item.file.replace(/^acceptance\//, '') === check.file.replace(/^acceptance\//, '') && item.title === check.title)) throw new Error('Reusable verification omitted a planned browser check.');
   const nodePath = evidencePath(directory, join(summary.runDirectory, 'node-results.jsonl'));
-  const browserPath = evidencePath(directory, join(summary.runDirectory, 'browser-results.json'));
   const node = inspectNodeReport(nodePath, contract.requiredNodeTests);
-  const browser = inspectBrowserReport(browserPath, contract);
-  if (node.passed !== summary.node?.passed || browser.passed !== summary.browser?.passed) throw new Error('Reusable verification counts do not match actual reports.');
+  if (node.passed !== summary.node?.passed) throw new Error('Reusable verification counts do not match actual reports.');
   const receipt = state.reviewReceipts?.filter(item => ['integrated-code', 'integrated-code-and-whole-goal'].includes(item.purpose) && item.approved && item.sourceHash === sourceHash).at(-1);
   if (!receipt) throw new Error('Reusable verification has no independent integrated approval.');
   const reviewReceiptPath = evidencePath(directory, receipt.evidencePath);
@@ -107,10 +105,10 @@ function inspect(directory: string, sourceHash: string, certificate?: Certificat
   for (const field of ['purpose', 'planHash', 'sourceHash', 'criteriaHash', 'contractHash', 'approved', 'summary', 'evidencePath'] as const) if (bound[field] !== receipt[field]) throw new Error('Reusable review receipt does not match controller metadata.');
   const review = parseReview(bound.response, task);
   if (!review.approved || review.findings.length || JSON.stringify(review) !== JSON.stringify(state.integration.review) || receipt.planHash !== digest(JSON.stringify(plan)) || receipt.criteriaHash !== digest(JSON.stringify(task.acceptance)) || receipt.contractHash !== digest(JSON.stringify(contract))) throw new Error('Reusable review is not bound to the exact source, plan, criteria and contract.');
-  const paths = [summaryPath, inputPath, nodePath, browserPath, contractPath, reviewReceiptPath, join(directory, 'task.json'), join(directory, 'plan.json'), join(directory, 'integration.json')];
+  const paths = [summaryPath, inputPath, nodePath, contractPath, reviewReceiptPath, join(directory, 'task.json'), join(directory, 'plan.json'), join(directory, 'integration.json')];
   const proofs = [...new Set(paths)].map(path => ({ path: relative(directory, path), hash: digest(readFileSync(path)) }));
-  if (certificate && (JSON.stringify(proofs) !== JSON.stringify(certificate.proofs) || certificate.runId !== state.runId || certificate.taskId !== task.id || certificate.branch !== integration.branch || certificate.commit !== integration.commit || certificate.reviewReceiptPath !== relative(directory, reviewReceiptPath) || certificate.verification.summaryPath !== relative(directory, summaryPath) || certificate.verification.nodePath !== relative(directory, nodePath) || certificate.verification.browserPath !== relative(directory, browserPath) || certificate.verification.contractPath !== relative(directory, contractPath) || certificate.verification.runId !== summary.runId || certificate.verification.startedAt !== summary.startedAt || certificate.verification.completedAt !== summary.completedAt)) throw new Error('Reusable certificate artifacts changed.');
-  return { state, task, plan, integration, summary, inputs, contract, receipt, bound, review, proofs, summaryPath, nodePath, browserPath, contractPath, reviewReceiptPath };
+  if (certificate && (JSON.stringify(proofs) !== JSON.stringify(certificate.proofs) || certificate.runId !== state.runId || certificate.taskId !== task.id || certificate.branch !== integration.branch || certificate.commit !== integration.commit || certificate.reviewReceiptPath !== relative(directory, reviewReceiptPath) || certificate.verification.summaryPath !== relative(directory, summaryPath) || certificate.verification.nodePath !== relative(directory, nodePath) || certificate.verification.contractPath !== relative(directory, contractPath) || certificate.verification.runId !== summary.runId || certificate.verification.startedAt !== summary.startedAt || certificate.verification.completedAt !== summary.completedAt)) throw new Error('Reusable certificate artifacts changed.');
+  return { state, task, plan, integration, summary, inputs, contract, receipt, bound, review, proofs, summaryPath, nodePath, contractPath, reviewReceiptPath };
 }
 
 export function captureIntegratedVerification(input: { repository: string; runDirectory: string; branch: string; commit: string; wholeGoal?: WholeGoal }): Certificate {
@@ -120,7 +118,7 @@ export function captureIntegratedVerification(input: { repository: string; runDi
   if (value.integration.commit !== input.commit || value.integration.branch !== input.branch) throw new Error('Reusable certificate target differs from integration.');
   const currentEnvironment = environment(source, input.repository);
   if (value.inputs.before !== currentEnvironment) throw new Error('Integrated verification input identity changed before certificate capture.');
-  const certificate: Certificate = { schemaVersion: 1, runId: value.state.runId, taskId: value.task.id, branch: input.branch, commit: input.commit, sourceHash: source.hash, environment: currentEnvironment, ...(input.wholeGoal ? { wholeGoal: input.wholeGoal } : {}), verification: { summaryPath: relative(input.runDirectory, value.summaryPath), nodePath: relative(input.runDirectory, value.nodePath), browserPath: relative(input.runDirectory, value.browserPath), contractPath: relative(input.runDirectory, value.contractPath), runId: value.summary.runId!, startedAt: value.summary.startedAt!, completedAt: value.summary.completedAt! }, reviewReceiptPath: relative(input.runDirectory, value.reviewReceiptPath), proofs: value.proofs, createdAt: new Date().toISOString() };
+  const certificate: Certificate = { schemaVersion: 2, profile: 'code-only', runId: value.state.runId, taskId: value.task.id, branch: input.branch, commit: input.commit, sourceHash: source.hash, environment: currentEnvironment, ...(input.wholeGoal ? { wholeGoal: input.wholeGoal } : {}), verification: { summaryPath: relative(input.runDirectory, value.summaryPath), nodePath: relative(input.runDirectory, value.nodePath), contractPath: relative(input.runDirectory, value.contractPath), runId: value.summary.runId!, startedAt: value.summary.startedAt!, completedAt: value.summary.completedAt! }, reviewReceiptPath: relative(input.runDirectory, value.reviewReceiptPath), proofs: value.proofs, createdAt: new Date().toISOString() };
   writeJson(join(input.runDirectory, certificateName), certificate);
   return certificate;
 }
@@ -136,7 +134,7 @@ export function reusableRequirementVerification(input: { repository: string; cwd
     const certificate = readJson(path) as Certificate;
     const head = git(input.repository, ['rev-parse', `refs/heads/${input.branch}`]).trim();
     const source = snapshot(input.cwd);
-    if (certificate.schemaVersion !== 1 || certificate.runId !== run.id || certificate.taskId !== `issue-${run.issueId}` || certificate.branch !== input.branch || certificate.commit !== head || certificate.sourceHash !== source.hash || certificate.environment !== environment(source, input.cwd)) throw new Error('Certificate run, exact target, source, runtime, dependencies or engine identity changed.');
+    if (certificate.schemaVersion !== 2 || certificate.profile !== 'code-only' || certificate.runId !== run.id || certificate.taskId !== `issue-${run.issueId}` || certificate.branch !== input.branch || certificate.commit !== head || certificate.sourceHash !== source.hash || certificate.environment !== environment(source, input.cwd)) throw new Error('Certificate run, exact target, source, runtime, dependencies or engine identity changed.');
     const value = inspect(run.evidencePath, source.hash, certificate);
     const base = parseVerificationContract(readJson(join(input.cwd, 'factory/verification-contract.json')));
     if (base.requiredNodeTests.some(check => !value.contract.requiredNodeTests.some(item => item.file === check.file && item.title === check.title)) || base.requiredBrowserTests.some(check => !value.contract.requiredBrowserTests.some(item => item.file === check.file && item.title === check.title))) throw new Error('Current required verification identities are missing from the integrated proof.');

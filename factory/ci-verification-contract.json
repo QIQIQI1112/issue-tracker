@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "profile": "ci-critical",
   "nodeFiles": [
     "tests/domain.test.ts",
@@ -14,14 +14,13 @@
     "tests/github-remote.test.ts",
     "tests/github-approval-recovery.test.ts",
     "tests/github-integration-lock.test.ts",
-    "tests/inspection-contract.test.ts",
     "tests/workbench.test.ts",
     "tests/schema-version.test.ts",
     "tests/process.test.ts",
     "tests/github-publication.test.ts",
     "tests/ci-critical-contract.test.ts",
     "tests/ci-critical-runner.test.ts",
-    "tests/read-only-contract.test.ts"
+    "tests/code-only-verification.test.ts"
   ],
   "requiredNodeTests": [
     {
@@ -163,10 +162,6 @@
     {
       "file": "tests/github-integration-lock.test.ts",
       "title": "GitHub local target synchronization respects the existing integration lock"
-    },
-    {
-      "file": "tests/inspection-contract.test.ts",
-      "title": "inspection contract requires persistent API changes and rejects omitted real browser evidence"
     },
     {
       "file": "tests/workbench.test.ts",
@@ -313,34 +308,49 @@
       "title": "critical CI runner enforces contract-drift evidence"
     },
     {
-      "file": "tests/read-only-contract.test.ts",
-      "title": "agent-owned operation contract retains full and critical inspection evidence"
+      "file": "tests/code-only-verification.test.ts",
+      "title": "code-only verification enforces valid with four code gates and no browser dependency"
+    },
+    {
+      "file": "tests/code-only-verification.test.ts",
+      "title": "code-only verification enforces missing-report with four code gates and no browser dependency"
+    },
+    {
+      "file": "tests/code-only-verification.test.ts",
+      "title": "code-only verification enforces missing-case with four code gates and no browser dependency"
+    },
+    {
+      "file": "tests/code-only-verification.test.ts",
+      "title": "code-only verification enforces skipped with four code gates and no browser dependency"
+    },
+    {
+      "file": "tests/code-only-verification.test.ts",
+      "title": "code-only verification enforces failed with four code gates and no browser dependency"
+    },
+    {
+      "file": "tests/code-only-verification.test.ts",
+      "title": "code-only verification enforces lint with four code gates and no browser dependency"
+    },
+    {
+      "file": "tests/code-only-verification.test.ts",
+      "title": "code-only verification enforces typecheck with four code gates and no browser dependency"
+    },
+    {
+      "file": "tests/code-only-verification.test.ts",
+      "title": "code-only verification enforces build with four code gates and no browser dependency"
+    },
+    {
+      "file": "tests/code-only-verification.test.ts",
+      "title": "code-only contract requires named Node proofs and rejects browser or historical profiles"
+    },
+    {
+      "file": "tests/code-only-verification.test.ts",
+      "title": "version-1 plans map every acceptance item to Node checks and reject browser obligations"
+    },
+    {
+      "file": "tests/code-only-verification.test.ts",
+      "title": "version-2 plans map every acceptance item to Node checks and reject browser obligations"
     }
   ],
-  "requiredBrowserTests": [
-    {
-      "file": "ui.spec.ts",
-      "title": "API-created issues, API updates and deletions remain visible across reloads"
-    },
-    {
-      "file": "ui.spec.ts",
-      "title": "invalid API titles are rejected without changing the inspected collection"
-    },
-    {
-      "file": "persistence.spec.ts",
-      "title": "an API update remains inspectable after a full server process restart"
-    },
-    {
-      "file": "workbench.spec.ts",
-      "title": "a Codex conversation plan submitted through the CLI appears with provenance and completes in the existing queue"
-    },
-    {
-      "file": "github-publication.spec.ts",
-      "title": "issue diagnostics expose GitHub PR CI and final merge without treating local acceptance as delivery"
-    },
-    {
-      "file": "refresh-focus.spec.ts",
-      "title": "issue openers retain focus through background refresh success and failure"
-    }
-  ]
+  "requiredBrowserTests": []
 }

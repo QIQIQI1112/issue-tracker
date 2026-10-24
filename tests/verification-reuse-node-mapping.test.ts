@@ -10,20 +10,20 @@ import { captureIntegratedVerification, reusableRequirementVerification } from '
 import { git } from '../factory/workspace.ts';
 import { fixtureAgent, fixtureRepository } from './helpers/factory-fixture.ts';
 
-const browserCheck = { file: 'mapped-value.spec.ts', title: 'mapped ready value is externally observable', acceptanceIds: ['visible'] };
+const mappedCheck = { file: 'tests/mapped-value.test.ts', title: 'mapped ready value is externally observable' };
 
 async function mergedFixture() {
   mkdirSync(resolve('.runs'), { recursive: true });
-  const root = mkdtempSync(resolve('.runs/verification-reuse-browser-mapping-'));
+  const root = mkdtempSync(resolve('.runs/verification-reuse-Node-mapping-'));
   const repository = fixtureRepository(join(root, 'repo'));
-  writeFileSync(join(repository, 'acceptance', browserCheck.file), `import {test,expect} from ${JSON.stringify(resolve('node_modules/@playwright/test/index.mjs'))};\nimport {value} from '../src/value.ts';\ntest(${JSON.stringify(browserCheck.title)},()=>expect(value).toBe('ready'));\n`);
-  git(repository, ['add', 'acceptance']);
-  git(repository, ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@localhost', '-c', 'commit.gpgsign=false', 'commit', '-qm', 'Frozen mapped browser behavior']);
+  writeFileSync(join(repository, mappedCheck.file), `import {test} from 'node:test';\nimport assert from 'node:assert/strict';\nimport {value} from '../src/value.ts';\ntest(${JSON.stringify(mappedCheck.title)},()=>assert.equal(value,'ready'));\n`);
+  git(repository, ['add', 'tests']);
+  git(repository, ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@localhost', '-c', 'commit.gpgsign=false', 'commit', '-qm', 'Frozen mapped Node behavior']);
   const goal = 'Return ready and expose the same value for the original complete requirement.';
-  const task = { schemaVersion: 2, id: 'issue-3', title: 'Mapped ready value', goal, wholeGoal: { requirementId: 7, goal }, acceptance: [{ id: 'ready', description: 'The value is ready.' }, { id: 'visible', description: 'The ready value is externally observable.' }], scope: ['src/', 'tests/', 'acceptance/'], verificationCommand: 'npm run verify', budget: { maxAttempts: 1, workerTimeoutMs: 2000, totalTimeoutMs: 30000 }, notes: 'Real version-two browser acceptance mappings must retain exact-source verification reuse.' };
+  const task = { schemaVersion: 2, id: 'issue-3', title: 'Mapped ready value', goal, wholeGoal: { requirementId: 7, goal }, acceptance: [{ id: 'ready', description: 'The value is ready.' }, { id: 'visible', description: 'The ready value is externally observable.' }], scope: ['src/', 'tests/', 'acceptance/'], verificationCommand: 'npm run verify', budget: { maxAttempts: 1, workerTimeoutMs: 2000, totalTimeoutMs: 30000 }, notes: 'Real version-two Node acceptance mappings must retain exact-source verification reuse.' };
   const delegate = fixtureAgent();
   const state = await runController({ repository, task, mergeTarget: 'main', evidenceRoot: root, agent: { run: async input => {
-    if (input.phase === 'plan') return { schemaVersion: 2, taskId: input.task.id, coverage: { mode: 'reuse', reason: 'Frozen named Node and browser checks observe the complete ready-value behavior.' }, assumptions: [], slices: [{ id: 'ready', goal, acceptanceIds: ['ready', 'visible'], checks: [{ file: 'tests/value.test.ts', title: 'value is ready' }] }], browserChecks: [browserCheck] };
+    if (input.phase === 'plan') return { schemaVersion: 2, taskId: input.task.id, coverage: { mode: 'reuse', reason: 'Frozen named Node checks observe the complete ready-value behavior.' }, assumptions: [], slices: [{ id: 'ready', goal, acceptanceIds: ['ready', 'visible'], checks: [{ file: 'tests/value.test.ts', title: 'value is ready' }, mappedCheck] }], browserChecks: [] };
     return await delegate.run(input);
   } } });
   const stamp = state.completedAt!;
@@ -38,15 +38,14 @@ type Fixture = Awaited<ReturnType<typeof mergedFixture>>;
 
 function approvedEvidence(fixture: Fixture) {
   assert.equal(fixture.state.status, 'merged', fixture.state.reason ?? `Controller integration must pass before reuse is inspected: ${fixture.root}`);
-  assert.deepEqual(fixture.state.plan?.browserChecks, [browserCheck]);
+  assert.deepEqual(fixture.state.plan?.browserChecks, []);
   assert.equal(fixture.state.integration?.verification?.status, 'passed');
-  assert.equal(fixture.state.integration?.verification?.node?.passed, 1);
-  assert.equal(fixture.state.integration?.verification?.browser?.passed, 2);
+  assert.equal(fixture.state.integration?.verification?.node?.passed, 2);
   assert.equal(fixture.state.integration?.review?.approved, true);
   assert.ok(fixture.state.reviewReceipts?.some(item => item.purpose === 'integrated-code-and-whole-goal' && item.approved));
-  assert.equal(existsSync(fixture.certificatePath), true, `Real approved version-two browser evidence must acquire its owner certificate: ${fixture.state.runDirectory}`);
+  assert.equal(existsSync(fixture.certificatePath), true, `Real approved version-two Node evidence must acquire its owner certificate: ${fixture.state.runDirectory}`);
   const reused = reusableRequirementVerification(fixture.input);
-  assert.ok(reused, 'The unchanged mapped browser evidence must be eligible before reuse or tamper checks.');
+  assert.ok(reused, 'The unchanged mapped Node evidence must be eligible before reuse or tamper checks.');
   return reused;
 }
 
@@ -60,7 +59,7 @@ function withRestoredFiles(paths: string[], mutate: () => void, check: () => voi
   finally { for (const file of original) writeFileSync(file.path, file.bytes); }
 }
 
-test('version-two browser acceptance mappings preserve integrated certificates and original whole-goal evidence', { timeout: 30000 }, async () => {
+test('version-two Node acceptance mappings preserve integrated certificates and original whole-goal evidence', { timeout: 30000 }, async () => {
   const fixture = await mergedFixture();
   try {
     const reused = approvedEvidence(fixture);
@@ -79,7 +78,7 @@ test('version-two browser acceptance mappings preserve integrated certificates a
   } finally { cleanup(fixture); }
 });
 
-test('version-two browser certificate reuse rejects changed acceptance mappings required cases and actual reports', { timeout: 30000 }, async () => {
+test('version-two Node certificate reuse rejects changed acceptance mappings required cases and actual reports', { timeout: 30000 }, async () => {
   const fixture = await mergedFixture();
   try {
     const reused = approvedEvidence(fixture);
@@ -87,39 +86,32 @@ test('version-two browser certificate reuse rejects changed acceptance mappings 
     const statePath = join(fixture.state.runDirectory, 'state.json');
     withRestoredFiles([planPath, statePath], () => {
       const state = JSON.parse(readFileSync(statePath, 'utf8')) as ControllerState;
-      state.plan!.browserChecks[0].acceptanceIds = ['ready'];
+      state.plan!.slices[0].acceptanceIds = ['ready'];
       writeFileSync(planPath, JSON.stringify(state.plan));
       writeFileSync(statePath, JSON.stringify(state));
     }, () => {
       assert.equal(reusableRequirementVerification(fixture.input), undefined, 'Even a valid mutually consistent changed mapping needs a fresh source-bound plan approval.');
     });
-    const certificate = JSON.parse(readFileSync(fixture.certificatePath, 'utf8')) as { verification: { contractPath: string; browserPath: string } };
+    const certificate = JSON.parse(readFileSync(fixture.certificatePath, 'utf8')) as { verification: { contractPath: string; nodePath: string } };
     const contractPath = join(fixture.state.runDirectory, certificate.verification.contractPath);
     withRestoredFiles([contractPath], () => {
-      const contract = JSON.parse(readFileSync(contractPath, 'utf8')) as { requiredBrowserTests: { file: string; title: string }[] };
-      const check = contract.requiredBrowserTests.find(item => item.file === browserCheck.file);
-      assert.ok(check, 'The effective owner contract must include the planned browser case.');
-      check.title = 'an unexecuted replacement browser case';
+      const contract = JSON.parse(readFileSync(contractPath, 'utf8')) as { requiredNodeTests: { file: string; title: string }[] };
+      const check = contract.requiredNodeTests.find(item => item.file === mappedCheck.file);
+      assert.ok(check, 'The effective owner contract must include the planned Node case.');
+      check.title = 'an unexecuted replacement Node case';
       writeFileSync(contractPath, JSON.stringify(contract));
     }, () => {
       assert.equal(reusableRequirementVerification(fixture.input), undefined, 'A substituted required case cannot reuse reports for the original case.');
     });
-    const browserPath = join(fixture.state.runDirectory, certificate.verification.browserPath);
-    withRestoredFiles([browserPath], () => {
-      const report = JSON.parse(readFileSync(browserPath, 'utf8'));
-      type Suite = { specs?: { title: string }[]; suites?: Suite[] };
+    const nodePath = join(fixture.state.runDirectory, certificate.verification.nodePath);
+    withRestoredFiles([nodePath], () => {
+      const records = readFileSync(nodePath, 'utf8').trim().split('\n').map(line => JSON.parse(line));
       let changed = 0;
-      const replace = (suites: Suite[]) => {
-        for (const suite of suites) {
-          for (const spec of suite.specs ?? []) if (spec.title === browserCheck.title) { spec.title = 'a different passing browser case'; changed += 1; }
-          replace(suite.suites ?? []);
-        }
-      };
-      replace(report.suites);
-      assert.equal(changed, 1, 'Tamper probes must replace the real executed planned case while retaining valid JSON and passing totals.');
-      writeFileSync(browserPath, JSON.stringify(report));
+      for (const event of records) if (event.type === 'test:pass' && event.data.name === mappedCheck.title) { event.data.name = 'a different passing Node case'; changed += 1; }
+      assert.equal(changed, 1, 'Tamper probes must change the actual named passing event.');
+      writeFileSync(nodePath, records.map(event => JSON.stringify(event)).join('\n') + '\n');
     }, () => {
-      assert.equal(reusableRequirementVerification(fixture.input), undefined, 'Passing totals cannot replace the required actual browser evidence from the original certificate.');
+      assert.equal(reusableRequirementVerification(fixture.input), undefined, 'Passing totals cannot replace required actual Node evidence.');
     });
     assert.deepEqual(reusableRequirementVerification(fixture.input)?.verification, reused.verification, 'Only the exact restored approved evidence regains eligibility.');
   } finally { cleanup(fixture); }

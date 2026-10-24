@@ -5,7 +5,7 @@ import { dirname, join, resolve } from 'node:path';
 import type { Issue } from '../src/domain.ts';
 import type { IssueStore } from '../src/storage.ts';
 import { acquireDatabaseLock } from '../src/instance.ts';
-import { inspectBrowserReport, inspectNodeReport, parseVerificationContract, readJson, writeJson } from './evidence.ts';
+import { inspectNodeReport, parseVerificationContract, readJson, writeJson } from './evidence.ts';
 import { git } from './workspace.ts';
 import { saveDelivery } from './delivery.ts';
 import { controlPlanePath } from './policy.ts';
@@ -34,6 +34,7 @@ export function commitSnapshot(repository: string, commit: string) {
 export function recordMaintenance(store: IssueStore, input: { issueId: number; commit: string; verificationPath: string; reviewPath: string; evidenceRoot?: string }): Delivery {
   const issue = store.get(input.issueId);
   if (!issue?.work?.changeKind || issue.work.changeKind === 'feature') throw new Error('Only separately classified maintenance issues can use owner attestation.');
+  store.work.maintenanceAdmission(input.issueId);
   const repo = store.work.repo(issue.work.repoId)!;
   const targetBranch = issue.work.requirementId ? store.work.requirement(issue.work.requirementId)?.publication?.branch ?? repo.targetBranch : repo.targetBranch;
   const common = resolve(repo.path, git(repo.path, ['rev-parse', '--git-common-dir']).trim());
@@ -42,19 +43,18 @@ export function recordMaintenance(store: IssueStore, input: { issueId: number; c
   try {
     git(repo.path, ['merge-base', '--is-ancestor', input.commit, `refs/heads/${targetBranch}`]);
     const source = commitSnapshot(repo.path, input.commit);
-    const verification = readJson(input.verificationPath) as { status: string; snapshot: { hash: string }; checks: Delivery['checks']; node: { passed: number }; browser: { passed: number } };
+    const verification = readJson(input.verificationPath) as { profile: string; status: string; snapshot: { hash: string }; checks: Delivery['checks']; node: { passed: number } };
     const review = readJson(input.reviewPath) as { approved: boolean; sourceHash?: string; reviewedSourceHash?: string; findings: unknown[]; summary: string; coveredIssues?: { issueId: number; contractHash: string }[] };
-    if (verification.status !== 'passed' || verification.snapshot?.hash !== source.hash || !['lint', 'typecheck', 'test', 'build', 'test:e2e'].every(name => verification.checks.some(check => check.name === name && check.status === 'passed'))) throw new Error('Maintenance requires complete verification of the exact committed source.');
+    if (verification.profile !== 'code-only' || verification.status !== 'passed' || verification.checks.length !== 4 || verification.snapshot?.hash !== source.hash || !['lint', 'typecheck', 'test', 'build'].every(name => verification.checks.some(check => check.name === name && check.status === 'passed'))) throw new Error('Maintenance requires complete verification of the exact committed source.');
     if (review.approved !== true || !Array.isArray(review.findings) || review.findings.length || (review.sourceHash ?? review.reviewedSourceHash) !== source.hash) throw new Error('Maintenance requires independent approval of the exact source.');
     if (!review.coveredIssues?.some(item => item.issueId === issue.id && item.contractHash === maintenanceIdentity(issue))) throw new Error('Maintenance approval does not cover the exact issue and acceptance contract.');
     const contract = parseVerificationContract(JSON.parse(git(repo.path, ['show', `${input.commit}:factory/verification-contract.json`])));
     const directory = dirname(input.verificationPath);
     const node = inspectNodeReport(join(directory, 'node-results.jsonl'), contract.requiredNodeTests);
-    const browser = inspectBrowserReport(join(directory, 'browser-results.json'), contract);
-    if (node.passed !== verification.node.passed || browser.passed !== verification.browser.passed) throw new Error('Maintenance verification counts do not match the executed reports.');
+    if (node.passed !== verification.node.passed) throw new Error('Maintenance verification counts do not match the executed reports.');
     claim = store.work.claimMaintenance(input.issueId, resolve(input.evidenceRoot ?? join(dirname(store.path), 'evidence')));
     mkdirSync(claim.run.evidencePath, { recursive: true });
-    for (const [name, path] of [['verification.json', input.verificationPath], ['review.json', input.reviewPath], ['node-results.jsonl', join(directory, 'node-results.jsonl')], ['browser-results.json', join(directory, 'browser-results.json')]]) writeFileSync(join(claim.run.evidencePath, name), readFileSync(path));
+    for (const [name, path] of [['verification.json', input.verificationPath], ['review.json', input.reviewPath], ['node-results.jsonl', join(directory, 'node-results.jsonl')]]) writeFileSync(join(claim.run.evidencePath, name), readFileSync(path));
     writeJson(join(claim.run.evidencePath, 'maintenance.json'), { schemaVersion: 1, changeKind: issue.work.changeKind, issueId: issue.id, commit: input.commit, sourceHash: source.hash, verificationPath: resolve(input.verificationPath), reviewPath: resolve(input.reviewPath) });
     const baseline = git(repo.path, ['rev-parse', `${input.commit}^`]).trim();
     const paths = git(repo.path, ['diff', '--name-status', baseline, input.commit]).trim().split('\n').filter(Boolean).map(line => {
@@ -62,7 +62,7 @@ export function recordMaintenance(store: IssueStore, input: { issueId: number; c
       const category = /^(tests|acceptance)\//.test(path) ? 'tests' : /^(factory|scripts|tickets|\.agents)\//.test(path) || controlPlanePath(path) || path === 'AGENTS.md' ? 'harness' : /^docs\//.test(path) ? 'documentation' : 'application';
       return { path, status, category } as Delivery['changes'][number];
     });
-    const delivery = saveDelivery(claim.run.evidencePath, { schemaVersion: 1, runId: claim.run.id, taskId: `maintenance-issue-${issue.id}`, title: issue.title, goal: issue.description, summary: review.summary, status: 'merged', startedAt: claim.run.startedAt, completedAt: new Date().toISOString(), baseline, sourceHash: source.hash, defaults: [{ decision: 'Use the separate owner maintenance workflow.', reason: 'Change classification does not grant the feature executor permission to modify its controls.' }], changes: paths, checks: verification.checks, nodePassed: node.passed, browserPassed: browser.passed, attempts: 1, review: { approved: true, summary: review.summary }, integration: { branch: targetBranch, before: baseline, commit: input.commit }, limitations: [] });
+    const delivery = saveDelivery(claim.run.evidencePath, { schemaVersion: 1, runId: claim.run.id, taskId: `maintenance-issue-${issue.id}`, title: issue.title, goal: issue.description, summary: review.summary, status: 'merged', startedAt: claim.run.startedAt, completedAt: new Date().toISOString(), baseline, sourceHash: source.hash, defaults: [{ decision: 'Use the separate owner maintenance workflow.', reason: 'Change classification does not grant the feature executor permission to modify its controls.' }], changes: paths, checks: verification.checks, nodePassed: node.passed, browserPassed: 0, attempts: 1, review: { approved: true, summary: review.summary }, integration: { branch: targetBranch, before: baseline, commit: input.commit }, limitations: [] });
     store.work.finish(claim.run.id, 'merged');
     return delivery;
   } catch (error) {

@@ -12,7 +12,7 @@ function ownedDependencies(repository: string) {
   const dependencies = join(repository, 'node_modules');
   rmSync(dependencies);
   mkdirSync(dependencies);
-  for (const name of ['tsx', '@playwright']) symlinkSync(resolve('node_modules', name), join(dependencies, name), 'dir');
+  for (const name of ['tsx']) symlinkSync(resolve('node_modules', name), join(dependencies, name), 'dir');
   const ownedPackage = join(dependencies, 'owned-ready');
   mkdirSync(ownedPackage);
   writeFileSync(join(ownedPackage, 'package.json'), JSON.stringify({ name: 'owned-ready', type: 'module', exports: './index.js' }));

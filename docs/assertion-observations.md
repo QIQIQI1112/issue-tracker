@@ -1,45 +1,15 @@
-# Observe behavior at the right boundary
+# Deterministic observations and uniform standards
 
-Use the existing tests, regression-tests and acceptance-review phases. Before freezing a check, identify the user-visible result, its narrowest meaningful observation and a concrete incorrect result that the check must reject. This guidance changes neither the execution workflow nor its budgets, permissions, schemas, full verification gates or independent review requirements.
+The current [code-only verification profile](code-only-verification.md) uses Node assertions, API/storage integration and owned process outcomes. Playwright/browser execution is retired. Historical DOM observation revisions and their exact patches remain audit history rather than current test-authoring instructions.
 
-## Select observations
+Before checking equivalent functionality, inspect shared components and repository conventions. If two implementations use conflicting standards, select one reasonable uniform standard, record its rationale, and implement and check against it. Explicit naming, component structure, API and ownership conventions are valid requirements. Independent review must check consistency with the selected standard. Do not infer mandatory conventions solely from an incidental test implementation.
 
-Prefer accessible roles, names and labels for interactive or labelled content. Use a scoped stable test ID when the interface has no suitable semantic locator. Select an identity or state field independently of its expected value, then assert that value separately. Identity-shaped titles and historical text must not stand in for the actual field. A test ID identifies a region; it does not prove its contents are correct or visible. Check the actual rendered value and visibility as appropriate.
+Observe application-generated values separately from expected fixture data. Match exact record identifiers and current states so a title, another record or historical report cannot satisfy a missing field. Verified and Unverified, or Merged and Not merged, must remain distinguishable. Scoped containment remains appropriate for prose where exact equality is not the requirement.
 
-| Behavior | Observation |
-| --- | --- |
-| Identity | Locate the identity field, check the expected identifier and its visibility. Keep title coverage separate. |
-| Current state | Observe the dedicated current-state field and distinguish opposite states, including `Verified` versus `Unverified` and `Merged` versus `Not merged`. Historical reports and fixture text cannot substitute for this field. |
-| Prose | Scoped content checks remain appropriate for descriptions and reports. Exact equality is useful when the whole value is contractual; it is not required for every paragraph. |
-| Interaction | Observe the resulting selected records, input value, focus, expanded state or destination. Synchronize asynchronous checks to the relevant request or observable state, rather than fixed sleeps. |
-| Layout | Ordinary equivalent wrappers, classes and spacing should preserve a functional check. Measure layout only when readability, overflow or another visual property is part of the requirement. |
+Choose checks proportionate to changed behavior and concrete risk. Avoid redundant same-field negatives when an exact positive already excludes the opposite state. Use separate negative/boundary scenarios for real rejection, mutation, ownership or integrity risks. Tests must fail because the required behavior is missing, rather than imports, setup or timeout errors.
 
-Avoid aggregate row or container text as a substitute for one field. Adjacent elements can render with a clear CSS gap while their `textContent` has no separator. Conversely, a broad substring can accept a wrong state or unrelated historical text. `toContainText` and regular expressions remain valid when their scope and matching rule actually express the requirement. Do not replace every assertion mechanically.
+Do not mechanically replace browser assertions with JSX/class/string snapshots. Node SSR and production builds provide limited code evidence and do not prove live visual or interaction behavior. Retired checks remain available through Git and historical delivery evidence.
 
-Pure rule matrices belong primarily in Node or API checks. Browser checks establish rendering and interaction; they should not repeat every lower-layer combination. Check observable outcomes rather than CSS classes, nesting, internal functions or incidental control totals unless those properties are themselves required.
+Accepted tests remain frozen during ordinary feature work. A reviewed acceptance-contract revision records old/new identities and actual proofs; only owner maintenance may activate it. New reproducible uncovered defects enter the existing tests, red proof, independent coverage review, freeze and repair cycle.
 
-## Review both counterexamples
-
-Within the existing coverage review, inspect whether an incorrect or contradictory result could still pass, and whether correct behavior could fail only because equivalent presentation changed. Use the relevant counterexamples, not a new mandatory matrix for every assertion. Return all confirmed actionable coverage gaps together, with the observation, misleading result and expected behavior. Existing accepted checks remain frozen; this guidance cannot authorize their modification.
-
-Adapter regressions prove that these instructions reach the three existing roles with their original sandbox and response schema. They do not prove that every generated test is good. Owner behavior proofs, coverage review, complete verification and final independent source review remain necessary. Assess future effectiveness using false reports, rejected drafts and repair round trips rather than test count.
-
-## Keep checks proportional to risk
-
-One exact positive observation is sufficient when it already excludes the opposite value on the same visible current field. Add a separate negative scenario for a distinct business risk, not to repeat the positive assertion in reverse. Prefer existing semantic locators; stable IDs are useful where needed, rather than mandatory for every widget. Do not require an exhaustive DOM mutation matrix. Preserve strict identity, ownership, current-state and actual defect checks.
-
-Coverage review blocks confirmed actionable gaps with a concrete incorrect business outcome, the affected requirement and a reproducible counterexample. Put speculative presentation preferences in summary. Consolidate known related findings across positive and negative paths in one review. Do not turn general advice into new acceptance criteria after checks are frozen.
-
-Issue 51 removes same-field opposite-state checks already implied by anchored positive values in the nine requirement browser cases. All case identities and scenarios remain, including ownership exclusion, latest evidence, polling focus and historical local delivery. The complete current positive expectations continue to distinguish verification, publication and merge states.
-
-## Historical requirement revisions
-
-Issues 47, 49 and 50 introduced the identity, rendered-state and current-child observations used by the subsequently delivered requirement browser. Their exact-base patches and hash records remain audit artifacts in `tickets/012-requirement-identity-observations.*`, `tickets/014-requirement-state-observations.*` and `tickets/015-requirement-current-observations.*`. They are historical revisions, not instructions to reapply patches or reopen the original requirement. Current accepted checks remain protected during ordinary feature work.
-
-See [owner workflow](owner-workflow.md) for reviewed assertion maintenance, frozen complete verification and bounded native continuation.
-
-## Avatar menu destination ink
-
-Issue 66 records the independently confirmed transition observation defect in the retained Issue 65 candidate. The pinned menu uses a 140ms color transition. Before measuring icon paint after a theme action, observe actual drawing-segment strokes reaching the exact destination ink within the existing three-second bound. Keep all exact paint, geometry, visibility, opacity, typography and interaction assertions. Do not disable motion or loosen color tolerance.
-
-The exact-base inactive revision and original/revised SHA-256 identities are in `tickets/020-avatar-menu-ink-observation.json` and its patch. The original new test is retained in run `267ac443-86cb-4466-97c5-c65dd1fa38a3` under the enrolled evidence root. Recover its bytes from the immutable checkpoint patch (or the hash-checked retained copy at `.data/evidence/utg-avatar-menu-20261024/retained-avatar-menu-fidelity.spec.txt`), verify the base hash, then apply the four-line revision when authoring the new case in a fresh native test phase. Preserve its case identity and all other assertions. Reapprove coverage before freezing or implementation. This artifact does not activate a test, authorize checkpoint editing or establish product delivery.
+Historical observation records: `tickets/012-requirement-identity-observations.*`, `tickets/014-requirement-state-observations.*`, `tickets/015-requirement-current-observations.*`, and `tickets/020-avatar-menu-ink-observation.*`. Do not reactivate those browser-specific patches under the current profile.

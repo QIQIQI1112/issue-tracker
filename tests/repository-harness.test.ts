@@ -29,7 +29,7 @@ test('harness API reports committed verification commands required cases documen
   try {
     assert.equal((await getInProcess(f.app, '/api/repos')).status, 200, 'The in-process request fixture reaches the existing application API.');
     const response = await f.ready();
-    for (const value of [f.first.name, 'main', f.a.commit, 'ALPHA-lint --check', 'ALPHA-types', 'ALPHA-build', 'ALPHA-browser', 'ALPHA required Node case', 'ALPHA required browser case', 'ALPHA critical Node case', 'ALPHA critical browser case', 'ALPHA repository instructions', 'ALPHA verification documentation', 'ALPHA CI']) assert.ok(response.text.includes(value), `Harness must report selected committed configuration: ${value}.`);
+    for (const value of [f.first.name, 'main', f.a.commit, 'ALPHA-lint --check', 'ALPHA-types', 'ALPHA-build', 'ALPHA required Node case', 'ALPHA required browser case', 'ALPHA critical Node case', 'ALPHA critical browser case', 'ALPHA repository instructions', 'ALPHA verification documentation', 'ALPHA CI']) assert.ok(response.text.includes(value), `Harness must report selected committed configuration: ${value}.`);
     assert.ok(objects(response.body).some(item => item.id === f.first.id || item.repoId === f.first.id), 'Harness provenance must identify the enrolled repository ID.');
     for (const path of Object.keys(f.a.files)) sourceRecord(response.body, path);
     assert.match(response.text, /configur|not (?:run|executed)|execution.*(?:unknown|unavailable|not)/i, 'Configuration must not claim recorded execution success.');
@@ -128,7 +128,7 @@ test('harness API reports missing malformed unsupported and unreadable sources i
       response = await f.ready();
       sourceState(response.body, 'package.json', /invalid|malformed|unsupported/i);
     }
-    for (const manifest of [{ ...f.a.critical, schemaVersion: 2 }, { ...f.a.critical, nodeFiles: 'tests/value.test.ts' }, { ...f.a.critical, nodeFiles: ['../outside'] }, { ...f.a.critical, requiredBrowserTests: [f.a.critical.requiredBrowserTests[0], f.a.critical.requiredBrowserTests[0]] }]) {
+    for (const manifest of [{ ...f.a.critical, schemaVersion: 99 }, { ...f.a.critical, nodeFiles: 'tests/value.test.ts' }, { ...f.a.critical, nodeFiles: ['../outside'] }, { ...f.a.critical, requiredBrowserTests: [f.a.critical.requiredBrowserTests[0], f.a.critical.requiredBrowserTests[0]] }]) {
       commitFiles(f.a.path, { 'factory/ci-verification-contract.json': JSON.stringify(manifest) });
       response = await f.ready();
       sourceState(response.body, 'factory/ci-verification-contract.json', /invalid|malformed|unsupported/i);
@@ -188,7 +188,7 @@ test('harness API never executes repository configuration or follows symlinks su
     put(f.root, 'outside-secret', 'UNRELATED_EXTERNAL_SECRET');
     const command = `node -e ${JSON.stringify(`require('node:fs').writeFileSync(${JSON.stringify(sentinel)}, 'executed')`)}`;
     const executable = `import { writeFileSync } from 'node:fs'; writeFileSync(${JSON.stringify(sentinel)}, 'executed'); export default {};`;
-    commitFiles(f.a.path, { 'package.json': JSON.stringify({ scripts: { verify: command }, config: { path: outside } }), 'playwright.config.ts': executable, 'scripts/verify.mjs': executable, 'scripts/verify-ci.mjs': executable, 'scripts/test.mjs': executable, 'factory/verification-contract.json': JSON.stringify({ ...f.a.full, requiredNodeTests: [{ file: outside, title: 'Referenced secret' }] }), 'unlisted-secret.txt': 'UNLISTED_COMMITTED_SECRET', '.gitmodules': `[submodule "docs"]\npath = docs\nurl = file://${outside}\n` });
+    commitFiles(f.a.path, { 'package.json': JSON.stringify({ scripts: { verify: command }, config: { path: outside } }), 'scripts/verify.mjs': executable, 'scripts/verify-ci.mjs': executable, 'scripts/test.mjs': executable, 'factory/verification-contract.json': JSON.stringify({ ...f.a.full, requiredNodeTests: [{ file: outside, title: 'Referenced secret' }] }), 'unlisted-secret.txt': 'UNLISTED_COMMITTED_SECRET', '.gitmodules': `[submodule "docs"]\npath = docs\nurl = file://${outside}\n` });
     rmSync(join(f.a.path, 'AGENTS.md')); symlinkSync(outside, join(f.a.path, 'AGENTS.md'));
     gitAt(f.a.path, ['add', '--all']);
     gitAt(f.a.path, ['update-index', '--add', '--cacheinfo', `160000,${f.b.commit},README.md`]);
@@ -290,22 +290,58 @@ async function checkRejectedHarnessSources() {
 async function checkAggregateHarnessExhaustion() {
   const f = fixture();
   try {
+    const criticalIndex = fixedSources.indexOf('factory/ci-verification-contract.json');
+    const overflowIndex = Math.max(criticalIndex + 1, Math.ceil(aggregateLimit / sourceLimit));
+    const overflowPath = fixedSources[overflowIndex];
+    assert.ok(criticalIndex >= 0 && overflowPath, 'The aggregate fixture needs a known source after enough bounded predecessors.');
+    let remaining = aggregateLimit;
     const bulk = Object.fromEntries(fixedSources.map((path, index) => {
-      let text = index < 8 ? `AGGREGATE_ALLOWED_SOURCE_${index}` : '';
+      if (index >= overflowIndex) return [path, ''];
+      let text = `AGGREGATE_ALLOWED_SOURCE_${index}`;
       if (path === 'package.json') text = JSON.stringify({ scripts: { verify: 'AGGREGATE_ALLOWED_COMMAND' } });
       if (path === 'factory/verification-contract.json') text = JSON.stringify({ schemaVersion: 1, requiredNodeTests: [{ file: 'tests/value.test.ts', title: 'AGGREGATE_ALLOWED_CASE' }], requiredBrowserTests: [] });
-      return [path, index < 8 ? text + ' '.repeat(sourceLimit - Buffer.byteLength(text)) : text];
+      const bytes = Math.min(sourceLimit, remaining);
+      remaining -= bytes;
+      assert.ok(Buffer.byteLength(text) <= bytes, 'Each intended source must fit before the exact aggregate boundary.');
+      return [path, text + ' '.repeat(bytes - Buffer.byteLength(text))];
     }));
+    assert.equal(remaining, 0);
     assert.equal(Object.values(bulk).reduce((sum, value) => sum + Buffer.byteLength(value), 0), aggregateLimit);
     commitFiles(f.a.path, bulk);
     let response = await f.ready();
     for (const text of ['AGGREGATE_ALLOWED_COMMAND', 'AGGREGATE_ALLOWED_CASE', 'AGGREGATE_ALLOWED_SOURCE_5']) assert.ok(response.text.includes(text), 'Exactly 2 MiB must retain valid commands, named cases and source content.');
+    commitFiles(f.a.path, { [overflowPath]: 'x' });
+    response = await f.ready();
+    const oneByteOver = sourceState(response.body, overflowPath, /aggregate|limit|budget|oversiz|too.large/i);
+    assert.equal(oneByteOver.content, undefined, 'Exactly 2 MiB plus one byte must withhold the first overflowing source.');
+    assert.equal(oneByteOver.profile, undefined, 'A withheld source must contribute no accepted configuration profile.');
     const excess = 'AGGREGATE_WITHHELD_NODE_SENTINEL';
-    const excessManifest = JSON.stringify({ schemaVersion: 1, profile: 'ci-critical', nodeFiles: ['tests/value.test.ts'], requiredNodeTests: [{ file: 'tests/value.test.ts', title: excess }], requiredBrowserTests: [] });
-    commitFiles(f.a.path, { 'factory/ci-verification-contract.json': excessManifest });
+    commitFiles(f.a.path, { [overflowPath]: excess });
     response = await f.ready();
     assert.match(response.text, /aggregate|total.*(?:limit|large)|budget/i, 'Aggregate exhaustion needs an explicit diagnostic.');
-    assert.ok(!response.text.includes(excess), 'A source beyond the aggregate allowance must supply neither raw text nor parsed named cases.');
-    sourceState(response.body, 'factory/ci-verification-contract.json', /aggregate|limit|budget|oversiz|too.large/i);
+    assert.ok(!response.text.includes(excess), 'A source beyond the aggregate allowance must supply neither raw text nor parsed metadata.');
+    const withheld = sourceState(response.body, overflowPath, /aggregate|limit|budget|oversiz|too.large/i);
+    assert.equal(withheld.content, undefined);
+    assert.equal(withheld.profile, undefined);
   } finally { f.store.close(); }
 }
+
+test('harness API describes active code-only manifests without inventing browser execution evidence', async () => {
+  const f = fixture();
+  try {
+    const full = { schemaVersion: 2, profile: 'code-only', requiredNodeTests: f.a.full.requiredNodeTests, requiredBrowserTests: [] };
+    const critical = { schemaVersion: 2, profile: 'ci-critical', nodeFiles: f.a.critical.nodeFiles, requiredNodeTests: f.a.critical.requiredNodeTests, requiredBrowserTests: [] };
+    const commit = commitFiles(f.a.path, { 'factory/verification-contract.json': JSON.stringify(full), 'factory/ci-verification-contract.json': JSON.stringify(critical) });
+    const response = await f.ready();
+    assert.ok(response.text.includes(commit));
+    for (const path of ['factory/verification-contract.json', 'factory/ci-verification-contract.json']) {
+      const source = sourceState(response.body, path, /available/i);
+      assert.ok(source.profile && typeof source.profile === 'object');
+      const profile = source.profile as { requiredNodeTests: unknown[]; requiredBrowserTests: unknown[] };
+      assert.equal(profile.requiredNodeTests.length, 1);
+      assert.deepEqual(profile.requiredBrowserTests, []);
+    }
+    assert.ok(response.text.includes('ALPHA required Node case') && response.text.includes('ALPHA critical Node case'));
+    assert.doesNotMatch(response.text, /"(?:passed|success)"\s*:\s*true/);
+  } finally { f.store.close(); }
+});

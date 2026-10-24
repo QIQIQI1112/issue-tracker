@@ -53,7 +53,7 @@ test('whole-requirement reuse preserves original full report timestamps and exac
     assert.equal(reused.verification.status, 'passed');
     assert.equal(reused.verification.snapshot.hash, fixture.state.integration?.verification?.snapshot.hash);
     assert.equal(reused.verification.node?.passed, 1);
-    assert.equal(reused.verification.browser?.passed, 1);
+    assert.equal(reused.verification.browser, undefined);
     assert.equal(reused.review?.approved, true);
     assert.deepEqual(reused.review?.findings, []);
     assert.equal(reused.provenance.runId, fixture.state.runId);
@@ -80,7 +80,7 @@ test('verification reuse rejects changed source controls reports and source-boun
     const summaryPath = join(original.verification.runDirectory, 'summary.json');
     const receipt = fixture.state.reviewReceipts?.find(item => item.purpose === 'integrated-code-and-whole-goal');
     assert.ok(receipt, 'Combined review eligibility must be bound to an explicit whole-goal receipt.');
-    const paths = [summaryPath, join(original.verification.runDirectory, 'node-results.jsonl'), join(original.verification.runDirectory, 'browser-results.json'), join(fixture.state.runDirectory, receipt.evidencePath), fixture.certificatePath, join(fixture.input.repository, 'src/value.ts'), join(fixture.input.repository, 'factory/verification-contract.json')];
+    const paths = [summaryPath, join(original.verification.runDirectory, 'node-results.jsonl'), join(fixture.state.runDirectory, receipt.evidencePath), fixture.certificatePath, join(fixture.input.repository, 'src/value.ts'), join(fixture.input.repository, 'factory/verification-contract.json')];
     for (const path of paths) restore(path, () => { writeFileSync(path, Buffer.concat([readFileSync(path), Buffer.from('\nchanged outside owner verification\n')])); }, () => {
       assert.equal(fixture.reuse.reusableRequirementVerification(fixture.input), undefined, `Changed underlying artifact or identity must force fresh verification: ${path}`);
     });

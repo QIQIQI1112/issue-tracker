@@ -249,13 +249,27 @@ export class WorkflowStore {
       return this.claimJob(job, evidenceRoot);
     });
   }
+  maintenanceAdmission(issueId: number): Job {
+    const issue = this.issues.get(issueId);
+    if (!issue?.work?.changeKind || issue.work.changeKind === 'feature') throw new ConflictError(`Issue #${issueId} is not a classified maintenance issue. Use the normal feature workflow.`);
+    const state = `Maintenance issue #${issueId} (issue status: ${issue.status})`;
+    const jobs = this.jobs();
+    const running = jobs.find(job => job.status === 'running');
+    if (running) throw new ConflictError(`${state} cannot be recorded while job #${running.id} (status: running${running.issueId === null ? '' : `, issue #${running.issueId}`}) owns execution. Wait for it to settle or use its owner recovery workflow.`);
+    const job = jobs.find(job => job.status === 'queued' && job.kind === 'maintenance' && job.issueId === issueId);
+    if (!job) {
+      const previous = jobs.filter(job => job.issueId === issueId).sort((a, b) => b.id - a.id)[0];
+      const history = previous ? `; latest job #${previous.id}, status: ${previous.status}` : '; no job exists';
+      const action = previous || ['done', 'closed'].includes(issue.status) ? 'Inspect the existing issue/run outcome and use the owner recovery workflow or create a follow-up issue; do not restart terminal work.' : `Queue this maintenance issue through POST /api/issues/${issueId}/start before recording completion.`;
+      throw new ConflictError(`${state} has no queued maintenance job${history}. ${action}`);
+    }
+    const merged = new Set(this.runs().filter(run => run.status === 'merged').map(run => run.issueId));
+    const dependencies = issue.work.dependsOn.filter(id => !merged.has(id));
+    if (dependencies.length) throw new ConflictError(`${state}, job #${job.id} (status: queued), requires verified merge evidence for dependencies ${dependencies.map(id => `#${id}`).join(', ')}. Complete those dependencies before recording maintenance.`);
+    return job;
+  }
   claimMaintenance(issueId: number, evidenceRoot: string): { job: Job; run: WorkRun } {
-    return this.transaction(() => {
-      if (this.jobs().some(job => job.status === 'running')) throw new ConflictError('An execution is already running.');
-      const job = this.jobs().find(job => job.status === 'queued' && job.kind === 'maintenance' && job.issueId === issueId);
-      if (!job || !this.context(issueId)!.dependsOn.every(id => this.runs().some(run => run.issueId === id && run.status === 'merged'))) throw new ConflictError('Maintenance must be queued with verified dependencies.');
-      return this.claimJob(job, evidenceRoot);
-    });
+    return this.transaction(() => this.claimJob(this.maintenanceAdmission(issueId), evidenceRoot));
   }
   private claimJob(job: Job, evidenceRoot: string): { job: Job; run: WorkRun } {
       const id = randomUUID();

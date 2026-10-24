@@ -24,8 +24,7 @@ for (const merge of [false, true]) test(`review regression tests are red, indepe
     if (input.phase === 'regression-tests') {
       assert.match(input.feedback, /suffix/);
       writeFileSync(join(input.cwd, 'tests/suffix.test.ts'), "import {test} from 'node:test';\nimport assert from 'node:assert/strict';\nimport {suffix} from '../src/value.ts';\ntest('suffix survives delivery',()=>assert.equal(suffix,'!'));\n");
-      writeFileSync(join(input.cwd, 'acceptance/suffix.spec.ts'), `import {test,expect} from ${JSON.stringify(join(repository, 'node_modules/@playwright/test/index.mjs'))};\nimport {suffix} from '../src/value.ts';\ntest('suffix is observable',()=>expect(suffix).toBe('!'));\n`);
-      return { schemaVersion: 1, taskId: input.task.id, summary: 'Added missing suffix coverage.', blockers: [], checks: [{ file: 'tests/suffix.test.ts', title: 'suffix survives delivery' }], browserChecks: [{ file: 'suffix.spec.ts', title: 'suffix is observable' }] };
+      return { schemaVersion: 1, taskId: input.task.id, summary: 'Added missing suffix coverage.', blockers: [], checks: [{ file: 'tests/suffix.test.ts', title: 'suffix survives delivery' }], browserChecks: [] };
     }
     if (input.phase === 'implement') {
       writeFileSync(join(input.cwd, 'src/value.ts'), "export const value = 'ready';\nexport const suffix = '';\n");
@@ -33,7 +32,7 @@ for (const merge of [false, true]) test(`review regression tests are red, indepe
     }
     if (input.phase === 'acceptance-review' && JSON.parse(input.feedback).purpose === 'regression-coverage') {
       const context = JSON.parse(input.feedback);
-      assert.equal(context.redChecks.length, 2);
+      assert.equal(context.redChecks.length, 1);
       regressionApproved = true;
       assert.ok(context.redChecks.every((check: { status: string }) => check.status === 'expected_failure'));
       for (const proof of context.redChecks) assert.ok(readFileSync(proof.reportPath).length);
@@ -53,7 +52,6 @@ for (const merge of [false, true]) test(`review regression tests are red, indepe
     assert.equal(readFileSync(join(state.workspace, 'tests/value.test.ts'), 'utf8'), original);
     assert.ok(state.reviewReceipts?.some(receipt => receipt.purpose === 'regression-coverage' && receipt.approved));
     assert.equal(state.verification?.node?.passed, 2);
-    assert.equal(state.verification?.browser?.passed, 2);
     const checkpoint = JSON.parse(readFileSync(join(state.runDirectory, 'checkpoint.json'), 'utf8'));
     assert.equal(checkpoint.regressions.length, 1);
     assert.ok(checkpoint.proofs.some((proof: { path: string }) => proof.path.includes('regression') && proof.path.endsWith('.json')));

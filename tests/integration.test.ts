@@ -37,7 +37,7 @@ for (const mode of ['merge', 'advanced-target', 'integration-rejected', 'dirty',
     if (mode === 'merge' || mode === 'advanced-target') {
       assert.equal(state.status, 'merged', state.reason ?? 'Expected a verified merge.');
       assert.equal(delivery.nodePassed, 1);
-      assert.equal(delivery.browserPassed, 1);
+      assert.equal(delivery.browserPassed, 0);
       assert.equal(delivery.integration?.commit, git(repository, ['rev-parse', 'HEAD']).trim());
       assert.equal(readFileSync(join(repository, 'src/value.ts'), 'utf8'), "export const value = 'ready';\n");
       assert.ok(delivery.evidence.some(item => item.path.endsWith('summary.json')));

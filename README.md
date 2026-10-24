@@ -20,14 +20,13 @@ You can describe a business requirement directly in Codex. The repo's `$issue-tr
 
 | Command | Purpose |
 | --- | --- |
-| `npm run setup` | Install locked dependencies and Chromium for browser checks. |
+| `npm run setup` | Install locked npm dependencies. |
 | `npm run dev` | Start the API, Vite, and queue worker; Ctrl+C stops their owned processes. |
 | `npm run doctor` | Confirm API identity, database path, and package version. |
 | `npm run reset -- --confirm` | Replace the stopped local database with demo records. Refuses a locked database. |
 | `npm test` | Run domain, SQLite, API, and ownership tests. |
-| `npm run test:e2e` | Start separate test servers and exercise the browser. Run `npm run build` first for the restart acceptance check. |
 | `npm run verify:ci` | Run the fixed critical GitHub CI profile and write separate CI evidence. Full local acceptance still requires `npm run verify`. |
-| `npm run verify` | Lint, typecheck, tests, build, and browser checks; nonzero exit on failure. |
+| `npm run verify` | Lint, typecheck, all Node tests and build; nonzero exit on failure. |
 | `npm run factory -- tickets/001-labels.json --validate` | Validate the task contract without launching a worker. |
 | `npm run factory -- tickets/001-labels.json` | Run a bounded Codex task in an owned worktree; requires an authenticated Codex CLI. |
 | `npm run factory -- tickets/001-labels.json --merge main` | Independently verify/review and automatically integrate into a clean local target. |
@@ -37,7 +36,7 @@ You can describe a business requirement directly in Codex. The repo's `$issue-tr
 | `npm run submit-plan -- --status <submission-id>` | Read current execution state and report URLs. |
 | `npm run build && npm start` | Serve the built UI and API together at http://127.0.0.1:4310. |
 
-Verification writes `.runs/verify-*/summary.json`, Node and browser reports, logs, and traces for failed tests only. `.runs/latest.json` points to the latest summary. Success requires complete reports, all required browser cases, no skips, and unchanged source and contract snapshots. The summary records file hashes as well as the Git commit and dirty flag. Read [verification](docs/verification.md) for budgets and evidence rules.
+Verification writes `.runs/verify-*/summary.json`, Node reports, logs and owned process receipts. `.runs/latest.json` points to the latest summary. Success requires complete reports, all required named Node cases, no skips, and unchanged source and contract snapshots. The summary records file hashes as well as the Git commit and dirty flag. Read [verification](docs/verification.md) for budgets and evidence rules.
 
 Issues support normalized labels, combined label/status/search filters, and migration of existing databases. The defaults and acceptance checks are documented in [labels](docs/labels.md).
 
@@ -50,7 +49,7 @@ Issue lifecycle distinguishes Open, In progress, Blocked, Closed and Done. Faile
 - **Vite** for the frontend development server and production bundle. `/api` is proxied locally during development, so the browser uses one origin.
 - **Express** for a thin HTTP boundary. Request validation stays in `src/domain.ts`.
 - **SQLite via Node's built-in `node:sqlite`** for persistent local data without a database service, ORM, or native addon build.
-- **Node's test runner** for behavior, persistence, and HTTP checks. **Playwright** drives Chromium through actual user-facing controls and retains traces for failed tests.
+- **Node's test runner** for behavior, persistence, HTTP, process and controller checks. The current [code-only verification profile](docs/code-only-verification.md) intentionally excludes browser rendering and interaction checks.
 - **ESLint** for code checks and a few mechanically enforced import boundaries.
 
 SQLite access is synchronous. That is deliberate for this single-user learning app, not a design for a high-throughput multi-user service. Node 24+ is required for the built-in database API. TypeScript is pinned to a version compatible with the ESLint toolchain rather than blindly selecting the newest release.

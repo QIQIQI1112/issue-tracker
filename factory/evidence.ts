@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { lstatSync, readFileSync, readdirSync, readlinkSync, renameSync, writeFileSync } from 'node:fs';
-import { basename, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 
 export function writeJson(path: string, value: unknown): void {
   const temporary = `${path}.${process.pid}.tmp`;
@@ -32,59 +32,24 @@ export function snapshot(cwd: string): { hash: string; files: { path: string; ha
 }
 
 type RequiredCase = { file: string; title: string };
-export type VerificationContract = { schemaVersion: 1; requiredBrowserTests: RequiredCase[]; requiredNodeTests: RequiredCase[] };
+export type VerificationContract = { schemaVersion: 2; profile: 'code-only'; requiredBrowserTests: RequiredCase[]; requiredNodeTests: RequiredCase[] };
 
 export function parseVerificationContract(input: unknown): VerificationContract {
-  if (!input || typeof input !== 'object') throw new Error('Verification contract must be an object.');
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Verification contract must be an object.');
   const value = input as Record<string, unknown>;
-  if (value.schemaVersion !== 1 || !Array.isArray(value.requiredBrowserTests) || !value.requiredBrowserTests.length) throw new Error('Verification contract requires version 1 and browser cases.');
-  const keys = new Set<string>();
-  const requiredBrowserTests = value.requiredBrowserTests.map(item => {
-    if (!item || typeof item !== 'object' || typeof item.file !== 'string' || typeof item.title !== 'string' || !item.file || !item.title) throw new Error('Required browser cases need file and title.');
-    const key = `${item.file}#${item.title}`;
-    if (keys.has(key)) throw new Error('Duplicate required browser case.');
-    keys.add(key);
-    return { file: item.file, title: item.title };
-  });
-  const requiredNodeTests = (value.requiredNodeTests ?? []) as unknown[];
-  if (!Array.isArray(requiredNodeTests)) throw new Error('Required Node cases must be an array.');
-  const nodeKeys = new Set<string>();
-  const nodeCases = requiredNodeTests.map(input => {
+  if (value.schemaVersion !== 2 || value.profile !== 'code-only') throw new Error('Verification contract requires version 2 and the code-only profile.');
+  if (!Array.isArray(value.requiredBrowserTests) || value.requiredBrowserTests.length) throw new Error('Browser verification is retired; requiredBrowserTests must be empty.');
+  if (!Array.isArray(value.requiredNodeTests) || !value.requiredNodeTests.length) throw new Error('Code-only verification requires named Node cases.');
+  const seen = new Set<string>();
+  const requiredNodeTests = value.requiredNodeTests.map(input => {
     const item = input as RequiredCase;
-    if (!item || typeof item.file !== 'string' || typeof item.title !== 'string' || !item.file || !item.title) throw new Error('Required Node cases need file and title.');
+    if (!item || typeof item.file !== 'string' || !/^tests\/(?:[a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_-]+\.test\.ts$/.test(item.file) || typeof item.title !== 'string' || !item.title.trim() || item.title !== item.title.trim()) throw new Error('Required Node cases need a safe test path and a nonempty trimmed title.');
     const key = `${item.file}#${item.title}`;
-    if (nodeKeys.has(key)) throw new Error('Duplicate required Node case.');
-    nodeKeys.add(key);
+    if (seen.has(key)) throw new Error('Duplicate required Node case.');
+    seen.add(key);
     return { file: item.file, title: item.title };
   });
-  return { schemaVersion: 1, requiredBrowserTests, requiredNodeTests: nodeCases };
-}
-
-export function inspectBrowserReport(path: string, contract: VerificationContract): { passed: number; required: number } {
-  const report = readJson(path) as { stats?: Record<string, unknown>; suites?: unknown[]; errors?: unknown[] };
-  if (!report || !report.stats || !Array.isArray(report.suites) || !Array.isArray(report.errors)) throw new Error('Browser report is malformed.');
-  for (const name of ['skipped', 'unexpected', 'flaky']) if (report.stats[name] !== 0) throw new Error(`Browser report contains ${name} tests.`);
-  if (report.errors.length || !Number.isInteger(report.stats.expected) || Number(report.stats.expected) < 1) throw new Error('Browser report has errors or no passed tests.');
-  const cases = new Set<string>();
-  let passed = 0;
-  const visit = (suites: unknown[]) => {
-    for (const input of suites) {
-      const suite = input as { suites?: unknown[]; specs?: { file: string; title: string; ok: boolean; tests: { expectedStatus: string; results: { status: string }[] }[] }[] };
-      if (suite.suites) visit(suite.suites);
-      for (const spec of suite.specs ?? []) {
-        if (!spec.ok || !spec.tests.length) throw new Error('Browser report contains incomplete cases.');
-        for (const test of spec.tests) {
-          if (test.expectedStatus !== 'passed' || !test.results.length || test.results.some(result => result.status !== 'passed')) throw new Error('Browser case did not pass without retries or skips.');
-          passed += 1;
-        }
-        cases.add(`${basename(spec.file)}#${spec.title}`);
-      }
-    }
-  };
-  visit(report.suites);
-  if (passed !== report.stats.expected) throw new Error('Browser report count does not match its executed cases.');
-  for (const item of contract.requiredBrowserTests) if (!cases.has(`${basename(item.file)}#${item.title}`)) throw new Error(`Missing required browser case: ${item.file}#${item.title}`);
-  return { passed, required: contract.requiredBrowserTests.length };
+  return { schemaVersion: 2, profile: 'code-only', requiredBrowserTests: [], requiredNodeTests };
 }
 
 export function inspectNodeReport(path: string, required: RequiredCase[] = []): { passed: number; required: number } {

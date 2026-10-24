@@ -1,7 +1,7 @@
 import { parseVerificationContract } from './evidence.ts';
 import type { VerificationContract } from './evidence.ts';
 
-export type CiContract = VerificationContract & { profile: 'ci-critical'; nodeFiles: string[] };
+export type CiContract = Omit<VerificationContract, 'profile'> & { profile: 'ci-critical'; nodeFiles: string[] };
 
 export function parseCiContract(input: unknown): CiContract {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('CI contract must be an object.');
@@ -15,13 +15,12 @@ export function parseCiContract(input: unknown): CiContract {
     return file;
   });
   if (new Set(nodeFiles).size !== nodeFiles.length) throw new Error('Duplicate CI Node file.');
-  const contract = parseVerificationContract(input);
+  const contract = parseVerificationContract({ ...value, profile: 'code-only' });
   if (!contract.requiredNodeTests.length) throw new Error('CI contract requires named Node cases.');
-  for (const item of [...contract.requiredNodeTests, ...contract.requiredBrowserTests]) {
+  for (const item of contract.requiredNodeTests) {
     if (!item.title.trim() || item.title !== item.title.trim()) throw new Error('CI case titles must be nonempty and trimmed.');
   }
   for (const item of contract.requiredNodeTests) if (!nodeFiles.includes(item.file)) throw new Error('Required CI Node case has no selected file.');
   for (const file of nodeFiles) if (!contract.requiredNodeTests.some(item => item.file === file)) throw new Error('Selected CI Node file has no required cases.');
-  for (const item of contract.requiredBrowserTests) if (!/^[a-zA-Z0-9_-]+\.spec\.ts$/.test(item.file)) throw new Error('Invalid CI browser path.');
   return { ...contract, profile: 'ci-critical', nodeFiles };
 }

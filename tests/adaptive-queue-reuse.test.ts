@@ -48,7 +48,6 @@ test('adaptive serial queue completes an exact sole-child requirement using its 
     const summaryBytes = readFileSync(summaryPath);
     const original = JSON.parse(summaryBytes.toString('utf8'));
     const nodeBytes = readFileSync(join(childState.integration.verification.runDirectory, 'node-results.jsonl'));
-    const browserBytes = readFileSync(join(childState.integration.verification.runDirectory, 'browser-results.json'));
     assert.equal(await queue.processNext(), true);
     assert.equal(await queue.processNext(), false);
     assert.equal(store.work.requirement(requirement.id)?.status, 'done');
@@ -63,7 +62,7 @@ test('adaptive serial queue completes an exact sole-child requirement using its 
     const report = JSON.parse(readFileSync(join(final.evidencePath, 'delivery.json'), 'utf8'));
     assert.equal(report.goal, requirement.goal);
     assert.equal(report.nodePassed, 1);
-    assert.equal(report.browserPassed, 1);
+    assert.equal(report.browserPassed, 0);
     assert.equal(report.review.approved, true);
     assert.equal(report.efficiency.verificationExecutions, 0);
     assert.equal(report.efficiency.verificationReuses, 1);
@@ -81,6 +80,5 @@ test('adaptive serial queue completes an exact sole-child requirement using its 
     assert.equal(JSON.parse(readFileSync(join(final.evidencePath, 'verification/summary.json'), 'utf8')).completedAt, original.completedAt);
     assert.deepEqual(readFileSync(summaryPath), summaryBytes);
     assert.deepEqual(readFileSync(join(childState.integration.verification.runDirectory, 'node-results.jsonl')), nodeBytes);
-    assert.deepEqual(readFileSync(join(childState.integration.verification.runDirectory, 'browser-results.json')), browserBytes);
   } finally { store.close(); }
 });

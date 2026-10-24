@@ -209,7 +209,7 @@ export class SerialQueue {
         reusedReview = reused.review;
         verificationReuses += 1;
         mkdirSync(directory);
-        for (const name of ['summary.json', 'node-results.jsonl', 'browser-results.json']) copyFileSync(join(verification.runDirectory, name), join(directory, name));
+        for (const name of ['summary.json', 'node-results.jsonl']) copyFileSync(join(verification.runDirectory, name), join(directory, name));
         evidence += `\nRetained original verification and review provenance:\n${JSON.stringify(reused.provenance)}`;
       } else {
         const verifier = trustedVerifier(join(run.evidencePath, 'trusted'), parseVerificationContract(readJson(join(workspace.path, 'factory/verification-contract.json'))));

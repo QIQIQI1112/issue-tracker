@@ -57,7 +57,7 @@ test('accepted delivery-only retries restore dirty initial baseline and saved ad
     assert.equal(second.resume?.fromRunId, first.runId);
     assert.deepEqual(phases, ['repair', 'review']);
     assert.equal(second.verification?.status, 'passed');
-    assert.ok(second.verification?.checks.length === 5 && second.verification.checks.every(check => check.status === 'passed'));
+    assert.ok(second.verification?.checks.length === 4 && second.verification.checks.every(check => check.status === 'passed'));
     assert.equal(second.review?.approved, true);
     assert.notEqual(second.verification?.runDirectory, first.verification?.runDirectory);
     assert.equal(second.budget?.acceptanceAttempts, 1);

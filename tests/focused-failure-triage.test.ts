@@ -1,29 +1,29 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { basename, join, resolve } from 'node:path';
+import { basename, join } from 'node:path';
 import { runController } from '../factory/controller.ts';
 import type { AgentInput, ControllerState } from '../factory/controller.ts';
 import { parseTask } from '../factory/contracts.ts';
 import { digest, environmentIdentity, loadCheckpoint } from '../factory/checkpoint.ts';
-import { inspectBrowserReport, inspectNodeReport, parseVerificationContract, snapshot } from '../factory/evidence.ts';
+import { inspectNodeReport, snapshot } from '../factory/evidence.ts';
 import type { RedCheck } from '../factory/regression.ts';
 import { git } from '../factory/workspace.ts';
 import { fixtureAgent, fixtureRepository } from './helpers/factory-fixture.ts';
 import { evidenceDirectory } from './helpers/subprocess.ts';
 
 const nodeCheck = { file: 'tests/value.test.ts', title: 'value is ready' };
-const browserCheck = { file: 'incidental.spec.ts', title: 'ready value preserves initial incidental state' };
+const incidentalCheck = { file: 'tests/incidental.test.ts', title: 'ready value preserves initial incidental state' };
 const ownerFinding = 'The assertion requires incidental initial state; owner maintenance must review the test contract.';
 const task = () => parseTask({ schemaVersion: 2, id: 'focused-triage', title: 'Ready value', goal: 'Return the ready value regardless of incidental active state.', acceptance: [{ id: 'ready', description: 'The business value is ready.' }], scope: ['src/', 'tests/', 'acceptance/'], verificationCommand: 'npm run verify', budget: { maxAttempts: 3, workerTimeoutMs: 3000, totalTimeoutMs: 90000 }, notes: 'Disposable focused failure fixture.' });
 
-function setup(browser = false) {
+function setup(incidental = false) {
   const root = evidenceDirectory('focused-failure-triage');
   const repository = fixtureRepository(join(root, 'repo'));
-  if (browser) {
+  if (incidental) {
     writeFileSync(join(repository, 'src/active.ts'), "export const active = 'initial';\n");
-    writeFileSync(join(repository, 'acceptance/incidental.spec.ts'), `import {test,expect} from ${JSON.stringify(resolve('node_modules/@playwright/test/index.mjs'))};\nimport {value} from '../src/value.ts';\nimport {active} from '../src/active.ts';\ntest(${JSON.stringify(browserCheck.title)},()=>{expect(value).toBe('ready');expect(active).toBe('initial');});\n`);
-    git(repository, ['add', 'src/active.ts', 'acceptance/incidental.spec.ts']);
+    writeFileSync(join(repository, 'tests/incidental.test.ts'), `import {test} from 'node:test';\nimport assert from 'node:assert/strict';\nimport {value} from '../src/value.ts';\nimport {active} from '../src/active.ts';\ntest(${JSON.stringify(incidentalCheck.title)},()=>{assert.equal(value,'ready');assert.equal(active,'initial');});\n`);
+    git(repository, ['add', 'src/active.ts', 'tests/incidental.test.ts']);
     git(repository, ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@localhost', '-c', 'commit.gpgsign=false', 'commit', '-qm', 'Prepare incidental-state fixture']);
   }
   const before = git(repository, ['rev-parse', 'main']).trim();
@@ -31,11 +31,11 @@ function setup(browser = false) {
   return { root, repository, before, frozen, delegate: fixtureAgent() };
 }
 
-function plan(input: AgentInput, browser = false) {
-  return { schemaVersion: 2, taskId: input.task.id, coverage: { mode: 'reuse', reason: 'Existing named checks observe the business value.' }, assumptions: [], slices: [{ id: 'ready', goal: input.task.goal, acceptanceIds: ['ready'], checks: browser ? [] : [nodeCheck] }], browserChecks: browser ? [{ ...browserCheck, acceptanceIds: ['ready'] }] : [] };
+function plan(input: AgentInput, incidental = false) {
+  return { schemaVersion: 2, taskId: input.task.id, coverage: { mode: 'reuse', reason: 'Existing named checks observe the business value.' }, assumptions: [], slices: [{ id: 'ready', goal: input.task.goal, acceptanceIds: ['ready'], checks: incidental ? [incidentalCheck] : [nodeCheck] }], browserChecks: [] };
 }
 
-function assertFailure(input: AgentInput, expected: typeof nodeCheck, browser = false): RedCheck {
+function assertFailure(input: AgentInput, expected: typeof nodeCheck): RedCheck {
   const context = JSON.parse(input.feedback);
   assert.equal(context.purpose, 'focused-failure-triage');
   assert.equal(context.sourceHash, snapshot(input.cwd).hash, 'The independent disposition must bind the actual failed candidate.');
@@ -45,18 +45,9 @@ function assertFailure(input: AgentInput, expected: typeof nodeCheck, browser = 
   assert.equal(check.status, 'expected_failure');
   assert.ok(check.reportPath && existsSync(check.logPath));
   const raw = readFileSync(check.reportPath, 'utf8');
-  if (browser) {
-    const report = JSON.parse(raw);
-    assert.equal(report.stats.unexpected, 1);
-    const visit = (suites: { suites?: unknown[]; specs?: { file: string; title: string }[] }[]): { file: string; title: string }[] => suites.flatMap(suite => [...suite.specs ?? [], ...visit((suite.suites ?? []) as typeof suites)]);
-    assert.ok(visit(report.suites).some(spec => basename(spec.file) === expected.file && spec.title === expected.title));
-    assert.match(raw, /initial/);
-    assert.match(raw, /focused/);
-  } else {
-    const records = raw.trim().split('\n').map(line => JSON.parse(line));
-    assert.ok(records.some(event => event.type === 'test:fail' && event.data.name === expected.title));
-    assert.match(raw, /ERR_ASSERTION/);
-  }
+  const records = raw.trim().split('\n').map(line => JSON.parse(line));
+  assert.ok(records.some(event => event.type === 'test:fail' && event.data.name === expected.title));
+  assert.match(raw, /ERR_ASSERTION/);
   return check;
 }
 
@@ -69,7 +60,7 @@ function cleanup(fixture: ReturnType<typeof setup>, ...states: (ControllerState 
   for (const state of states) if (state && existsSync(join(state.workspace, '.git'))) git(fixture.repository, ['worktree', 'remove', '--force', state.workspace]);
 }
 
-test('focused browser overconstraint requires independent owner disposition before repair', { timeout: 90000 }, async () => {
+test('focused Node overconstraint requires independent owner disposition before repair', { timeout: 90000 }, async () => {
   const fixture = setup(true);
   let implementations = 0;
   let repairs = 0;
@@ -84,7 +75,7 @@ test('focused browser overconstraint requires independent owner disposition befo
     if (input.phase === 'repair') repairs++;
     if (input.phase === 'acceptance-review') {
       triages++;
-      assertFailure(input, browserCheck, true);
+      assertFailure(input, incidentalCheck);
       return { schemaVersion: 1, taskId: input.task.id, approved: false, summary: 'The business result is correct; the incidental-state assertion is overconstrained.', findings: [ownerFinding] };
     }
     return fixture.delegate.run(input);
@@ -106,7 +97,7 @@ test('focused browser overconstraint requires independent owner disposition befo
     assert.equal(checkpoint.accepted, true);
     const pending = checkpoint.pendingFailureTriage as { check: RedCheck; receipt: { purpose: string; sourceHash: string; planHash: string; criteriaHash: string; contractHash: string; evidencePath: string; approved: boolean } };
     assert.ok(pending);
-    assert.equal(pending.check.title, browserCheck.title);
+    assert.equal(pending.check.title, incidentalCheck.title);
     assert.equal(pending.receipt.purpose, 'focused-failure-triage');
     assert.equal(pending.receipt.approved, false);
     assert.equal(pending.receipt.sourceHash, snapshot(state.workspace).hash);
@@ -156,7 +147,6 @@ test('independently confirmed focused product defects use ordinary repair and fr
     assert.ok(state.integration?.commit);
     const verification = state.integration!.verification!;
     assert.equal(inspectNodeReport(join(verification.runDirectory, 'node-results.jsonl')).passed, 1);
-    assert.equal(inspectBrowserReport(join(verification.runDirectory, 'browser-results.json'), parseVerificationContract(JSON.parse(readFileSync(join(fixture.repository, 'factory/verification-contract.json'), 'utf8')))).passed, 1);
     assertFrozen(fixture, state);
     assert.equal(JSON.parse(readFileSync(join(state.runDirectory, 'checkpoint.json'), 'utf8')).pendingFailureTriage, undefined);
   } finally { cleanup(fixture, state); }

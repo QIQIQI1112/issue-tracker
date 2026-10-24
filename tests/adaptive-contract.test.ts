@@ -20,18 +20,15 @@ async function adaptiveTask() {
   return { module, task };
 }
 
-test('adaptive contracts accept Node-only, browser-only and mixed meaningful coverage', async () => {
+test('adaptive contracts accept meaningful named Node coverage for every criterion', async () => {
   const { module, task } = await adaptiveTask();
   for (const mode of ['reuse', 'extend']) {
     const plan = planInput(mode);
     assert.equal(module.parsePlan(plan, task).schemaVersion, 2);
-    const browserOnly = { ...plan, slices: [{ ...plan.slices[0], checks: [] }], browserChecks: [browserCheck] };
-    const parsedBrowser = module.parsePlan(browserOnly, task);
-    assert.equal(parsedBrowser.slices[0].checks.length, 0);
-    assert.equal(parsedBrowser.browserChecks[0].file, 'value.spec.ts');
-    const multiTask = module.parseTask({ ...taskInput(), acceptance: [...taskInput().acceptance, { id: 'visible', description: 'Ready is visible.' }] });
-    const mixed = { ...plan, slices: [...plan.slices, { id: 'visible', goal: 'Display ready.', acceptanceIds: ['visible'], checks: [] }], browserChecks: [{ ...browserCheck, acceptanceIds: ['visible'] }] };
-    assert.equal(module.parsePlan(mixed, multiTask).slices.length, 2);
+    const multiTask = module.parseTask({ ...taskInput(), acceptance: [...taskInput().acceptance, { id: 'visible', description: 'Ready is available.' }] });
+    const mapped = { ...plan, slices: [...plan.slices, { id: 'visible', goal: 'Expose ready.', acceptanceIds: ['visible'], checks: [{ file: 'tests/exposed.test.ts', title: 'ready is exposed' }] }] };
+    assert.equal(module.parsePlan(mapped, multiTask).slices.length, 2);
+    assert.throws(() => module.parsePlan({ ...mapped, slices: [mapped.slices[0], { ...mapped.slices[1], checks: [] }] }, multiTask));
   }
 });
 
@@ -67,9 +64,9 @@ test('adaptive task whole-goal identity is validated without weakening version-o
   assert.deepEqual((parsed as unknown as { wholeGoal?: unknown }).wholeGoal, wholeGoal);
   for (const invalid of [{ requirementId: 0, goal: wholeGoal.goal }, { requirementId: 7, goal: '' }, { requirementId: '7', goal: wholeGoal.goal }]) assert.throws(() => module.parseTask({ ...taskInput(), wholeGoal: invalid }));
   const legacy = module.parseTask(taskInput(1));
-  const legacyPlan = { ...planInput(), schemaVersion: 1, browserChecks: [{ file: browserCheck.file, title: browserCheck.title }] };
+  const legacyPlan = { ...planInput(), schemaVersion: 1, browserChecks: [] };
   assert.equal(module.parsePlan(legacyPlan, legacy).schemaVersion, 1);
-  assert.throws(() => module.parsePlan({ ...legacyPlan, browserChecks: [] }, legacy));
+  assert.throws(() => module.parsePlan({ ...legacyPlan, browserChecks: [browserCheck] }, legacy));
   assert.throws(() => module.parsePlan({ ...legacyPlan, slices: [{ ...legacyPlan.slices[0], checks: [] }] }, legacy));
   assert.throws(() => module.parsePlan(planInput(), legacy));
   assert.throws(() => module.parsePlan(legacyPlan, task));

@@ -113,16 +113,3 @@ test('dev cleans an exited owned leader group including surviving descendants', 
     await stopOwned(unrelated);
   }
 });
-
-test('repeated real e2e runs release their owned API database lock', { timeout: 200000 }, async () => {
-  const directory = evidenceDirectory('e2e-shutdown');
-  const env: NodeJS.ProcessEnv = { ...process.env, RUN_DIR: directory, TEST_API_PORT: await availablePort(), TEST_UI_PORT: await availablePort() };
-  delete env.UI_TEST_URL;
-  const first = await run('npm', ['run', 'test:e2e', '--', 'acceptance/ui.spec.ts', '--grep', 'workspace exposes labelled'], env, join(directory, 'first.log'));
-  const firstLock = existsSync(join(directory, 'acceptance.sqlite.lock'));
-  const second = await run('npm', ['run', 'test:e2e', '--', 'acceptance/ui.spec.ts', '--grep', 'workspace exposes labelled'], env, join(directory, 'second.log'));
-  assert.equal(first.code, 0, `First e2e failed (${directory}): ${first.output}`);
-  assert.equal(firstLock, false, `First real e2e left its database lock (${directory})`);
-  assert.equal(second.code, 0, `Second e2e failed (${directory}): ${second.output}`);
-  assert.equal(existsSync(join(directory, 'acceptance.sqlite.lock')), false, `Second real e2e left its database lock (${directory})`);
-});

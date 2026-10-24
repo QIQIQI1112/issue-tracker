@@ -1,12 +1,13 @@
 # Serial loop optimization
 
+Current profile: [code-only verification](code-only-verification.md) supersedes earlier browser-specific examples. Four code gates, named Node proofs, frozen inventory and independent reviews remain mandatory; browser obligations and execution are retired.
 The optimization has four parts: coverage-preserving consolidation, adaptive execution, source-bound handoffs and bounded recovery, and whole-requirement proof reuse with observable costs. The controller-owned `factory/execution-policy.json` enables `adaptive-v2` only after owner integration. Removing it restores legacy queue routing; explicit version-one tasks and their checkpoint semantics remain supported. Unknown policy fails closed. Submission format versions and task execution versions are separate contracts.
 
 ## Test content and new checks
 
-[Consolidation mapping](test-consolidation.md) records each removed duplicate or brittle assertion and its retained proof. Critical CI and the full required-case manifest remain intact. New feature checks belong with their feature issue; contract changes and harness changes retain separate maintenance ownership. Choose the cheapest layer that observes the behavior: pure validation in Node, persistence/API behavior in Node integration, browser interaction in Playwright. Add a check for a missing behavior or an uncovered reproducible defect, not because a code file changed. Harness changes still require targeted safety regressions.
+[Consolidation mapping](test-consolidation.md) records each removed duplicate or brittle assertion and its retained proof. Critical CI and the full required-case manifest remain intact. New feature checks belong with their feature issue; contract changes and harness changes retain separate maintenance ownership. Choose the cheapest layer that observes the behavior: pure validation in Node, persistence/API behavior in Node integration, UI code through appropriate Node/SSR checks and independent source review, with live interaction explicitly outside this profile. Add a check for a missing behavior or an uncovered reproducible defect, not because a code file changed. Harness changes still require targeted safety regressions.
 
-A small requirement normally has one issue. Version-two controller plans declare `coverage: { mode: "reuse" | "extend", reason }`. Each acceptance ID needs a named check, using Node, browser, or both. Browser entries include `acceptanceIds`; Node checks cover their slice's IDs. Reject empty coverage, unknown IDs, unsafe paths and duplicate identities.
+A small requirement normally has one issue. Version-two controller plans declare `coverage: { mode: "reuse" | "extend", reason }`. Each acceptance ID needs meaningful named Node coverage. `browserChecks` must be empty; Node checks cover their slice's IDs. Reject empty coverage, unknown IDs, unsafe paths and duplicate identities.
 
 ## Execution paths
 
@@ -39,4 +40,4 @@ For the sole immutable child, the final integrated reviewer can explicitly appro
 
 `delivery.json` and `delivery.md` expose `execution` and `efficiency`: route/reason, actual agent and authoring invocation counts, full verifier executions/retries/reuses, elapsed time and phase durations. Whole-requirement reuse reports count no new verifier execution and retain the original run separately. Failed attempts are evidence, never silently converted to success.
 
-Deterministic controller fixtures execute the real small Node/Playwright verifier and validate route, immutable inventory, one final full run, goal review, checkpoint recovery and tamper rejection. These prove orchestration. They do not measure model latency or promise a fixed end-to-end task duration. Compare future real runs using these owner-generated metrics before making further changes.
+Deterministic controller fixtures execute the real small Node verifier and validate route, immutable inventory, one final full run, goal review, checkpoint recovery and tamper rejection. These prove orchestration. They do not measure model latency or promise a fixed end-to-end task duration. Compare future real runs using these owner-generated metrics before making further changes.

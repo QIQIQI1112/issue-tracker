@@ -27,9 +27,7 @@
     "src",
     "factory",
     "tests",
-    "acceptance",
     "scripts/*.ts",
-    "vite.config.ts",
-    "playwright.config.ts"
+    "vite.config.ts"
   ]
 }

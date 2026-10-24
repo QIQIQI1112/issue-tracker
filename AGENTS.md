@@ -28,26 +28,26 @@ This is a local autonomous development workbench with a reproducible verifier, a
 - `src/api.ts` owns HTTP translation and error responses.
 - `src/server.ts` owns process startup, loopback binding, and database ownership.
 - `src/ui/` owns browser behavior. It may import domain types; it must not import the server or storage.
-- `acceptance/` owns externally observable behavior checks.
+- `tests/` owns deterministic Node, API, storage, process and controller checks. Browser acceptance is retired under the owner-authorized code-only contract.
 - `scripts/` owns repeatable operating procedures.
 - `factory/` owns task contracts, evidence validation, process budgets, and controller orchestration. Application code must not import it.
 
 ## Workflow
 
 1. Inspect the relevant code and documentation.
-2. Select meaningful existing coverage; add a failing behavior check only for a coverage gap. New checks need owner red proofs and independent coverage review before implementation. Harness changes retain targeted deterministic regression checks.
-3. Implement the smallest change and run related named checks. An adaptive integrated task runs one fresh complete verifier on the final integrated source; diagnostics alone cannot authorize delivery.
+2. Inspect equivalent implementations and shared components. If standards conflict, select one reasonable uniform repository standard and record its rationale before implementation and checks. Enforce that standard consistently through lint, types, relevant Node tests and independent review. Select meaningful existing coverage; add a failing behavior check only for a coverage gap. New checks need owner red proofs and independent coverage review before implementation. Tool migrations additionally inspect affected fixture paths, commands, reports and check identities, with focused setup/baseline execution and actual named assertion proofs before freezing; setup failure is not a behavior proof. Harness changes retain targeted deterministic regression checks.
+3. Implement the smallest change and run related named checks. Await each check and owned-process cleanup before editing the same source, tests, configuration or executing engine. To edit sooner, cancel the owned check and wait for it to settle. Source/input drift invalidates its proof and does not establish a product defect. An adaptive integrated task runs one fresh complete verifier on the final integrated source; diagnostics alone cannot authorize delivery.
 4. Run `npm run verify` on the final candidate or integrated tree. Reuse whole-requirement proof only through the exact-source owner certificate rules in `docs/adaptive-execution-contract.md`. Read `.runs/latest.json` and the referenced summary; do not claim success from prose or a screenshot alone.
 5. Inspect the diff and use independent review before committing.
 
-Do not weaken existing acceptance checks, disable verification steps, or alter required criteria to make a feature pass. Propose changes to the verification contract separately. Stop before publishing a repository, force-pushing, deploying, or operating on non-disposable data without authorization.
+The owner-authorized code-only revision retires browser acceptance. Ordinary tasks must not weaken the remaining checks, disable verification steps, or alter required criteria to make a feature pass. Propose changes to the verification contract separately. Stop before publishing a repository, force-pushing, deploying, or operating on non-disposable data without authorization.
 
 ## Autonomous execution
 
 - For new product behavior, use `.agents/skills/issue-tracker-submit/SKILL.md` to turn the authorized conversation into a complete submitted plan unless the user explicitly requests direct implementation. Harness/platform engineering and repository maintenance use the normal workflow above.
 - Persist one submission ID and the full original goal, source summary, acceptance conditions, defaults, and dependency graph before submitting. The platform independently reviews coverage before releasing implementation jobs. Do not run a second executor against submitted work.
 - Submission receipt and worker prose do not prove delivery. Read the platform's current run reports and whole-requirement outcome; HTTP replay must never restart blocked work.
-- Derive independently verifiable slices from the business goal. Prefer one issue for a small cohesive requirement. Map every acceptance ID to meaningful named Node or browser checks; do not require both layers mechanically.
+- Derive independently verifiable slices from the business goal. Prefer one issue for a small cohesive requirement. Map every acceptance ID to meaningful named Node checks. Browser checks are retired; `browserChecks` remains an empty compatibility field.
 - Choose reasonable defaults for ordinary implementation details, record each decision and reason, and continue without asking about every detail.
 - Ask only when an unresolved choice materially changes the business goal or exceeds the authorized scope.
 - Reuse equivalent frozen baseline coverage when sufficient. Invoke tests and independent acceptance coverage review only for new or revised unapproved checks. Include relevant negative cases and boundaries for actual risk; avoid duplicating established controller enforcement in feature tests. Confirm a new check fails because the requested behavior is missing, not because the environment is broken.
@@ -57,7 +57,7 @@ Do not weaken existing acceptance checks, disable verification steps, or alter r
 - Keep the controller-owned verification contract and existing required tests intact. New criteria become a separately reviewed contract revision.
 - Keep additive business checks with their feature issue and review them before implementation. Track acceptance-contract and harness changes as separate maintenance issues, with explicit dependencies and independent deliveries. Version-two plans may declare `changeKind`; declarations never grant scope or approval.
 - Ordinary executors cannot claim maintenance jobs or modify protected control-plane source. Use the owner maintenance workflow. Activate revised controls only after full verification, independent source-bound review, and local integration.
-- Record completed maintenance with the owner CLI and matching machine reports, source review, and target commit. Never mark an issue Done from labels, worker prose, or fabricated receipts.
+- Create and enqueue the authorized maintenance issue before starting owner work. Normal workers cannot claim maintenance jobs. Record completed maintenance with the owner CLI and matching machine reports, source review, and target commit. The completion entry point checks read-only admission before Git/evidence work and repeats it inside the transactional claim; never auto-enqueue or restart terminal work to complete attestation. Never mark an issue Done from labels, worker prose, or fabricated receipts.
 - Record assumptions, changes, run IDs, exact evidence paths, and unresolved blockers. Never reuse a passing report for changed code.
 - Write documentation, harness instructions, schemas, prompts, and reports in English.
 - Code comments and inline lint overrides are prohibited by the existing lint contract. Put design explanations in documentation.
@@ -71,7 +71,7 @@ Do not weaken existing acceptance checks, disable verification steps, or alter r
 - Repository enrollment, queue operation, reports, and recovery: `docs/workbench.md`.
 - Codex conversation intake and versioned plan format: `docs/conversation-intake.md`.
 
-Give every parallel worker its own worktree, ports, and database. Never drive the user's live browser profile for acceptance tests. Never kill processes by name. Keep evidence after cleanup.
+Give every parallel worker its own worktree, ports, and database. Do not install, launch or request Playwright/browser acceptance checks in the current code-only profile. Never kill processes by name. Keep evidence after cleanup.
 
 For review purpose, checkpoint reuse, cumulative budgets, and ownership recovery, follow `docs/harness-reliability.md`. Ordinary integration uses one final independent code review after full integrated verification; whole-requirement acceptance remains required. Tests are independently reviewed after owner red proofs and frozen before implementation. Every retry must retain ownership lineage and cannot reset its issue budget.
 
@@ -82,3 +82,5 @@ For explicitly GitHub-enrolled requirements, child integration targets the reser
 Adaptive execution is enabled only by controller-owned `factory/execution-policy.json`; missing policy and version-one tasks keep legacy behavior. Baseline reuse records real named proofs and a distinct owner receipt, always invokes implementation, and cannot change frozen tests. Keep a fresh complete integrated verifier and independent final source review. Same-requirement evidence reuse additionally binds exact target/source/runtime/engine/contract/reports; sole-child whole-goal review reuse requires an explicit exact-goal receipt. Only positively identified settled spawn resource faults permit one persistent budgeted verification retry. Read `docs/adaptive-execution-contract.md` and `docs/loop-optimization.md`.
 
 Owner harness maintenance uses `docs/owner-workflow.md`: freeze independently approved complete test inventory before implementation; finish focused diagnostics before one final frozen full verifier. Use the existing owner-resume command for an explicit idempotent budget grant and native selected-job continuation; never copy the controller loop or edit canonical task limits.
+
+The current complete verifier has four mandatory gates: lint, typecheck, all Node tests, and production build. CI has the same four gates with its approved critical Node selection. Final source, runtime, controls, reports and independent approval remain bound together. Browser appearance and interaction are not established by this profile; do not claim otherwise. See `docs/code-only-verification.md`.
