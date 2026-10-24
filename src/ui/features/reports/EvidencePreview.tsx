@@ -1,3 +1,4 @@
+import { Dropdown } from '../../components/Dropdown.tsx';
 import { Button } from '../../components/Button.tsx';
 import { useEffect, useState } from 'react';
 import type { Delivery } from '../../../workflow.ts';
@@ -71,7 +72,7 @@ export function EvidencePreview({ runId, evidence }: { runId: string; evidence: 
   const [selected, setSelected] = useState('');
   const artifact = evidence.find(item => item.path === selected);
   return <>
-    <label className="diagnostic-selector">Artifact<select aria-label="Select evidence artifact" value={artifact?.path ?? ''} onChange={event => setSelected(event.target.value)}><option value="">Select an artifact</option>{evidence.map(item => <option key={item.path} value={item.path}>{item.path} · {item.bytes.toLocaleString('en-US')} bytes</option>)}</select></label>
+    <div className="diagnostic-selector">Artifact<Dropdown aria-label="Select evidence artifact" value={artifact?.path ?? ''} onChange={setSelected}><option value="">Select an artifact</option>{evidence.map(item => <option key={item.path} value={item.path}>{item.path} · {item.bytes.toLocaleString('en-US')} bytes</option>)}</Dropdown></div>
     {artifact ? <ArtifactPreview key={runId + ':' + artifact.path + ':' + artifact.sha256} runId={runId} artifact={artifact} /> : <section aria-label="Evidence preview" className="evidence-preview"><h4>Evidence preview</h4><p>Select a manifest-listed artifact to read text inline. Previews are limited to 1 MiB; every artifact remains downloadable.</p></section>}
   </>;
 }

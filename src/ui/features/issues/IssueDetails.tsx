@@ -1,3 +1,4 @@
+import { Dropdown } from '../../components/Dropdown.tsx';
 import { Button } from '../../components/Button.tsx';
 import { useEffect, useState } from 'react';
 import type { Issue } from '../../../domain.ts';
@@ -123,15 +124,10 @@ export function IssueDetails({ id, workbench, issues = [], metadataError = '' }:
       {active && <p>{latestJob?.status === 'queued' ? latestJob.kind === 'maintenance' ? 'Awaiting owner maintenance verification.' : 'Queued for execution.' : 'Execution is in progress.'}</p>}
       {currentRun && <CurrentLimitations key={currentRun.id} runId={currentRun.id} />}
       {!issueRuns.length && <p>No executions yet.</p>}
-      {allRuns.length > 0 && <><label className="diagnostic-selector">Run<select aria-label="Select execution run" value={runId} onChange={event => setSelected(event.target.value)} onKeyDown={event => {
-        if (event.key !== 'Home' && event.key !== 'End') return;
-        const options = event.currentTarget.options;
-        const option = options.item(event.key === 'Home' ? 0 : options.length - 1);
-        if (option) { event.preventDefault(); setSelected(option.value); }
-      }}>
+      {allRuns.length > 0 && <><div className="diagnostic-selector">Run<Dropdown aria-label="Select execution run" value={runId ?? ''} onChange={setSelected}>
         {issueRuns.length > 0 && <optgroup label="Issue executions">{issueRuns.map(option)}</optgroup>}
         {requirementRuns.length > 0 && <optgroup label="Requirement audits">{requirementRuns.map(option)}</optgroup>}
-      </select></label>{runId && <SelectedReport key={runId} runId={runId} />}</>}
+      </Dropdown></div>{runId && <SelectedReport key={runId} runId={runId} />}</>}
     </> : !error && <p role="status">Loading issue…</p>}
   </div>;
 }

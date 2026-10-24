@@ -9,7 +9,7 @@
 .sidebar nav { display: flex; flex: 1; min-height: 0; overflow: hidden; }
 .sidebar [role="group"] { display: flex; flex-direction: column; min-height: 0; }
 .sidebar [role="group"] > .nav-button, .sidebar [role="group"] > .registry-message { flex: none; }
-.repository-list { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; }
+.repository-list { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
 .sidebar nav, .repository-entry, .repository-subviews, .sidebar [role="group"] { min-width: 0; width: 100%; }
 .nav-button, .rail-toggle { position: relative; width: 100%; display: flex; gap: 8px; align-items: center; padding: 0 12px 0 6px; border-radius: 8px; text-align: left; color: var(--text-primary); background: transparent; min-height: 32px; margin-bottom: 2px; font-size: 14px; line-height: 20px; font-weight: 400; transition: padding 220ms cubic-bezier(0.22, 1, 0.36, 1), color 140ms cubic-bezier(0.4, 0, 0.2, 1), background-color 140ms cubic-bezier(0.4, 0, 0.2, 1); }
 .toolbar-icon-slot { display: grid; place-items: center; width: 24px; height: 24px; flex: none; }
