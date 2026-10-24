@@ -3,11 +3,9 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { dirname, resolve } from 'node:path';
 import { runProcess } from '../factory/process.ts';
-import { inspectBrowserReport, inspectNodeReport, parseVerificationContract, snapshot, writeJson } from '../factory/evidence.ts';
+import { inspectNodeReport, parseVerificationContract, snapshot, writeJson } from '../factory/evidence.ts';
 
-if (process.env.UI_TEST_URL !== undefined) {
-  throw new Error('UI_TEST_URL is not supported during verification; Playwright must test its owned frontend.');
-}
+if (process.env.UI_TEST_URL !== undefined) throw new Error('UI_TEST_URL is not supported during code-only verification.');
 
 const startedAt = new Date().toISOString();
 const runId = `verify-${startedAt.replace(/[:.]/g, '-')}-${randomUUID().slice(0, 8)}`;
@@ -27,7 +25,7 @@ const diff = spawnSync('git', ['status', '--porcelain'], { encoding: 'utf8', tim
 const before = snapshot(process.cwd());
 const contractPath = resolve(process.env.VERIFY_CONTRACT_PATH ?? new URL('../factory/verification-contract.json', import.meta.url).pathname);
 const contractBytes = readFileSync(contractPath, 'utf8');
-const summary = { schemaVersion: 2, runId, taskId: process.env.FACTORY_TASK_ID ?? null, attemptId: process.env.FACTORY_ATTEMPT_ID ?? null, startedAt, runDirectory, commit: head.status === 0 ? head.stdout.trim() : null, dirty: diff.status !== 0 || Boolean(diff.stdout.trim()), snapshot: before, contractPath, status: 'running', checks: [] };
+const summary = { schemaVersion: 2, profile: 'code-only', runId, taskId: process.env.FACTORY_TASK_ID ?? null, attemptId: process.env.FACTORY_ATTEMPT_ID ?? null, startedAt, runDirectory, commit: head.status === 0 ? head.stdout.trim() : null, dirty: diff.status !== 0 || Boolean(diff.stdout.trim()), snapshot: before, contractPath, status: 'running', checks: [] };
 const deadline = Date.now() + totalTimeout;
 const abort = new AbortController();
 process.once('SIGINT', () => abort.abort());
@@ -35,11 +33,11 @@ process.once('SIGTERM', () => abort.abort());
 writeJson(resolve(runDirectory, 'summary.json'), summary);
 try {
   const contract = parseVerificationContract(JSON.parse(contractBytes));
-  for (const script of ['lint', 'typecheck', 'test', 'build', 'test:e2e']) {
+  for (const script of ['lint', 'typecheck', 'test', 'build']) {
     console.log(`\n[verify] ${script}`);
     const remaining = deadline - Date.now();
     if (remaining <= 0) throw new Error('Total verification timeout exceeded.');
-    const result = await runProcess({ command: 'npm', args: ['run', script], cwd: process.cwd(), logPath: resolve(runDirectory, `${script.replace(':', '-')}.log`), timeoutMs: Math.min(stepTimeout, remaining), graceMs: grace, signal: abort.signal, env: { ...process.env, RUN_DIR: runDirectory }, onOutput: text => process.stdout.write(text) });
+    const result = await runProcess({ command: 'npm', args: ['run', script], cwd: process.cwd(), logPath: resolve(runDirectory, `${script.replace(':', '-')}.log`), timeoutMs: Math.min(stepTimeout, remaining), graceMs: grace, signal: abort.signal, env: { ...process.env, NODE_TEST_CONTEXT: undefined, RUN_DIR: runDirectory }, onOutput: text => process.stdout.write(text) });
     summary.checks.push({ name: script, status: result.status, exitCode: result.exitCode ?? 1, signal: result.signal, durationMs: result.durationMs });
     writeJson(resolve(runDirectory, 'summary.json'), summary);
     if (result.spawnErrorCode && result.settled === true) summary.diagnostics = { phase: script, code: result.spawnErrorCode, origin: 'spawn', settled: true };
@@ -53,7 +51,6 @@ try {
     if (result.status !== 'passed') throw new Error(`${script}: ${result.status}${result.error ? `: ${result.error}` : ''}`);
     try {
       if (script === 'test') summary.node = inspectNodeReport(resolve(runDirectory, 'node-results.jsonl'), contract.requiredNodeTests);
-      if (script === 'test:e2e') summary.browser = inspectBrowserReport(resolve(runDirectory, 'browser-results.json'), contract);
     } catch (error) {
       if (result.settled === true && !result.error) summary.diagnostics = { kind: 'test-contract', phase: script, origin: 'report-validation', settled: true };
       throw error;

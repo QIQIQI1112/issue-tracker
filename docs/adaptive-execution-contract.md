@@ -1,10 +1,11 @@
 # Adaptive serial execution contract
 
+Current profile: [code-only verification](code-only-verification.md) supersedes earlier browser-specific examples. Four code gates, named Node proofs, frozen inventory and independent reviews remain mandatory; browser obligations and execution are retired.
 This separately reviewed acceptance-contract revision stages the authorized four-stage optimization. It becomes active only after the owner integrates the implementation and the protected `factory/execution-policy.json` opts the enrolled repository into `adaptive-v2`. Repositories without policy and version-one tasks retain the existing workflow. Unknown or malformed policy fails closed.
 
 ## Behavior coverage and roles
 
-Every acceptance ID maps to meaningful named Node or browser checks; either layer or both are allowed. Empty, unknown, duplicate and unsafe coverage is rejected. A small requirement normally has one independently verifiable issue. Split work for meaningful dependencies or separate control ownership, not to fill a fixed slice count.
+Every acceptance ID maps to meaningful named named Node checks under the code-only profile. Empty, unknown, duplicate and unsafe coverage is rejected. A small requirement normally has one independently verifiable issue. Split work for meaningful dependencies or separate control ownership, not to fill a fixed slice count.
 
 A version-two plan declares `coverage.mode` and its reason. `reuse` selects only existing baseline tests, including their frozen helper inventory. The controller runs actual named proofs and records a distinct baseline coverage receipt bound to the plan, criteria, source, controls and environment. This receipt is an owner admission record, never a fabricated independent acceptance review. Passing old checks do not prove a new feature: implementation still runs and final independent review assesses the goal and coverage relevance. A coverage gap discovered in review enters the existing independently approved regression workflow.
 
@@ -22,7 +23,7 @@ Failures distinguish product, test-contract, positively identified infrastructur
 
 Whole-requirement verification may reuse an actual merged child full run only when requirement membership, target commit, source, runtime, engine, dependency/control/contract identities, machine report hashes and required named cases still match, with approved integrated source review. Otherwise run fresh verification. Record original run IDs and timestamps explicitly. Never manufacture a fresh successful execution.
 
-Review receipts and certificate inspection hash the same parsed verification contract: schema version and required Node/browser file-title identities. Browser `acceptanceIds` remain bound by the complete plan hash rather than becoming inconsistent extra fields in the contract hash. Original contract artifact bytes remain in the certificate proofs. Changing a plan mapping, required case or machine report still invalidates reuse. `tests/verification-reuse-browser-mapping.test.ts` exercises actual version-two integration, certificate capture, original-report reuse and rejection of changed mappings and evidence.
+Review receipts and certificate inspection hash the same parsed verification contract: schema version and required Node file-title identities. `browserChecks` is an empty compatibility field; all acceptance mappings remain bound by the complete plan hash. Original contract artifact bytes remain in the certificate proofs. Changing a plan mapping, required case or machine report still invalidates reuse. `tests/verification-reuse-node-mapping.test.ts` exercises actual version-two integration, certificate capture, original-report reuse and rejection of changed mappings and evidence.
 
 A combined independent review may cover integrated code and the original whole goal only for the sole immutable child, binding the exact requirement ID, original goal and acceptance identity. Generic code review and multi-issue requirements do not satisfy this exception. GitHub publication still requires original-goal acceptance, exact-head CI, confirmed merge and local synchronization.
 

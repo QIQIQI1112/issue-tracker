@@ -16,12 +16,10 @@ function fixture(maxAttempts = 2, omitNode = false) {
   writeFileSync(join(repository, 'src/value.ts'), "export const value = 'broken';\n");
   writeFileSync(join(repository, 'tests/change.test.ts'), "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\nimport { value } from '../src/value.ts';\ntest('approved value behavior', () => assert.equal(value, 'ready'));\n");
   if (omitNode) writeFileSync(join(repository, 'tests/unrelated.test.ts'), "import {test} from 'node:test'; test('unrelated passing case',()=>{});\n");
-  writeFileSync(join(repository, 'acceptance/probe.spec.ts'), `import { test, expect } from ${JSON.stringify(resolve('node_modules/@playwright/test/index.mjs'))};\nimport { value } from '../src/value.ts';\ntest('approved browser condition', () => expect(value).toBe('ready'));\n`);
-  writeFileSync(join(repository, 'playwright.config.mjs'), `import { defineConfig } from ${JSON.stringify(resolve('node_modules/@playwright/test/index.mjs'))};\nexport default defineConfig({ testDir: './acceptance', workers: 1, reporter: [['json', { outputFile: process.env.RUN_DIR + '/browser-results.json' }]] });\n`);
   const noop = 'node -e "process.exit(0)"';
   const reporter = quote(resolve('factory/node-reporter.mjs'));
-  writeFileSync(join(repository, 'package.json'), JSON.stringify({ private: true, type: 'module', scripts: { lint: noop, typecheck: noop, build: noop, test: `node --test --test-reporter=spec --test-reporter=${reporter} --test-reporter-destination=stdout --test-reporter-destination="$RUN_DIR/node-results.jsonl" tests/${omitNode ? 'unrelated' : 'change'}.test.ts`, 'test:e2e': `node ${quote(resolve('node_modules/@playwright/test/cli.js'))} test --config playwright.config.mjs` } }));
-  writeFileSync(join(repository, 'factory/verification-contract.json'), JSON.stringify({ schemaVersion: 1, requiredBrowserTests: [{ file: 'probe.spec.ts', title: 'approved browser condition' }] }));
+  writeFileSync(join(repository, 'package.json'), JSON.stringify({ private: true, type: 'module', scripts: { lint: noop, typecheck: noop, build: noop, test: `node --test --test-reporter=spec --test-reporter=${reporter} --test-reporter-destination=stdout --test-reporter-destination="$RUN_DIR/node-results.jsonl" tests/${omitNode ? 'unrelated' : 'change'}.test.ts` } }));
+  writeFileSync(join(repository, 'factory/verification-contract.json'), JSON.stringify({ schemaVersion: 2, profile: 'code-only', requiredNodeTests: [{ file: 'tests/change.test.ts', title: 'approved value behavior' }], requiredBrowserTests: [] }));
   symlinkSync(resolve('node_modules'), join(repository, 'node_modules'), 'dir');
   const git = (args: string[]) => {
     const result = spawnSync('git', ['-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false', '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', ...args], { cwd: repository, encoding: 'utf8' });
@@ -60,7 +58,7 @@ type Input = { phase: string; cwd: string; attempt: number; signal: AbortSignal 
 function agent(taskId: string, mode: 'success' | 'staged' | 'reset-index' | 'append' | 'append-tamper' | 'omit-node' | 'repair' | 'exhausted' | 'tamper' | 'review-reject' | 'review-change' | 'timeout') {
   return { run: async (input: Input): Promise<unknown> => {
     if (mode === 'timeout' && input.phase === 'plan') return await new Promise(() => {});
-    if (input.phase === 'plan') return { schemaVersion: 1, taskId, assumptions: [{ decision: 'Keep the approved interface', reason: 'The task changes one value' }], slices: [{ id: 'value', goal: 'Return ready', acceptanceIds: ['ready'], checks: [{ file: 'tests/change.test.ts', title: 'approved value behavior' }, ...(mode.startsWith('append') ? [{ file: 'tests/change.test.ts', title: 'appended value behavior' }] : [])] }], browserChecks: [{ file: 'probe.spec.ts', title: 'approved browser condition' }] };
+    if (input.phase === 'plan') return { schemaVersion: 1, taskId, assumptions: [{ decision: 'Keep the approved interface', reason: 'The task changes one value' }], slices: [{ id: 'value', goal: 'Return ready', acceptanceIds: ['ready'], checks: [{ file: 'tests/change.test.ts', title: 'approved value behavior' }, ...(mode.startsWith('append') ? [{ file: 'tests/change.test.ts', title: 'appended value behavior' }] : [])] }], browserChecks: [] };
     if (input.phase === 'acceptance-review' || input.phase === 'review') {
       if (mode === 'review-change' && input.phase === 'review') writeFileSync(join(input.cwd, 'src/value.ts'), "export const value = 'changed after verification';\n");
       const approved = mode !== 'review-reject' || input.phase !== 'review';

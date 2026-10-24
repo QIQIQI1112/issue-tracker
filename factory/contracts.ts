@@ -104,19 +104,9 @@ export function parsePlan(input: unknown, task: Task): Plan {
     return { id: sliceId, goal: text(item.goal, 'Slice goal'), acceptanceIds, checks };
   });
   if (!slices.length || task.acceptance.some(item => !covered.has(item.id))) throw new Error('Plan must cover every acceptance item.');
-  const browserChecks = list(value.browserChecks, 'browserChecks').map(input => {
-    const check = object(input, 'Browser check');
-    const file = text(check.file, 'Browser file').replace(/^acceptance\//, '');
-    if (file.includes('/') || file.includes('\\') || !file.endsWith('.spec.ts') || !scoped(`acceptance/${file}`, task)) throw new Error('Browser checks must use scoped acceptance specs.');
-    const parsed = distinct(file, text(check.title, 'Browser title'));
-    if (!adaptive) return parsed;
-    const acceptanceIds = list(check.acceptanceIds, 'Browser acceptance IDs').map(input => id(input, 'Browser acceptance ID'));
-    if (!acceptanceIds.length || new Set(acceptanceIds).size !== acceptanceIds.length || acceptanceIds.some(id => !task.acceptance.some(item => item.id === id))) throw new Error('Browser checks need distinct known acceptance IDs.');
-    acceptanceIds.forEach(id => executable.add(id));
-    return { ...parsed, acceptanceIds };
-  });
-  if (!adaptive && !browserChecks.length) throw new Error('Plan needs externally observable browser acceptance.');
-  if (adaptive && task.acceptance.some(item => !executable.has(item.id))) throw new Error('Every acceptance item needs named executable coverage.');
+  if (list(value.browserChecks, 'browserChecks').length) throw new Error('Browser checks are retired; use named Node checks and browserChecks: [].');
+  const browserChecks: Check[] = [];
+  if (task.acceptance.some(item => !executable.has(item.id))) throw new Error('Every acceptance item needs named executable Node coverage.');
   return { schemaVersion: task.schemaVersion, ...(coverage ? { coverage: { mode: coverage.mode as 'reuse' | 'extend', reason: text(coverage.reason, 'Coverage reason') } } : {}), taskId: task.id, assumptions, slices, browserChecks };
 }
 
@@ -140,8 +130,8 @@ const string = { type: 'string' };
 const strings = { type: 'array', items: string };
 const recordSchema = (properties: Record<string, unknown>) => ({ type: 'object', additionalProperties: false, properties, required: Object.keys(properties) });
 const checkSchema = recordSchema({ file: string, title: string });
-export const planSchema = recordSchema({ schemaVersion: { type: 'integer', const: 1 }, taskId: string, assumptions: { type: 'array', items: recordSchema({ decision: string, reason: string }) }, slices: { type: 'array', items: recordSchema({ id: string, goal: string, acceptanceIds: strings, checks: { type: 'array', items: checkSchema } }) }, browserChecks: { type: 'array', items: checkSchema } });
-export const adaptivePlanSchema = recordSchema({ ...planSchema.properties, schemaVersion: { type: 'integer', const: 2 }, coverage: recordSchema({ mode: { type: 'string', enum: ['reuse', 'extend'] }, reason: string }), browserChecks: { type: 'array', items: recordSchema({ file: string, title: string, acceptanceIds: strings }) } });
+export const planSchema = recordSchema({ schemaVersion: { type: 'integer', const: 1 }, taskId: string, assumptions: { type: 'array', items: recordSchema({ decision: string, reason: string }) }, slices: { type: 'array', items: recordSchema({ id: string, goal: string, acceptanceIds: strings, checks: { type: 'array', items: checkSchema } }) }, browserChecks: { type: 'array', maxItems: 0, items: checkSchema } });
+export const adaptivePlanSchema = recordSchema({ ...planSchema.properties, schemaVersion: { type: 'integer', const: 2 }, coverage: recordSchema({ mode: { type: 'string', enum: ['reuse', 'extend'] }, reason: string }), browserChecks: { type: 'array', maxItems: 0, items: recordSchema({ file: string, title: string, acceptanceIds: strings }) } });
 export const workerSchema = recordSchema({ schemaVersion: { type: 'integer', const: 1 }, taskId: string, summary: string, blockers: strings });
 export const reviewSchema = recordSchema({ schemaVersion: { type: 'integer', const: 1 }, taskId: string, approved: { type: 'boolean' }, needsRegression: { type: 'boolean' }, summary: string, findings: strings });
 
@@ -156,9 +146,10 @@ export function parseRegressionReport(input: unknown, task: Task): RegressionRep
     return { file, title: text(check.title, 'Regression title') };
   });
   const checks = parseChecks(value.checks, false);
-  const browserChecks = parseChecks(value.browserChecks, true);
+  if (list(value.browserChecks, 'browserChecks').length) throw new Error('Browser regression checks are retired; use named Node checks.');
+  const browserChecks: Check[] = [];
   const keys = [...checks.map(check => `${check.file}#${check.title}`), ...browserChecks.map(check => `${check.file}#${check.title}`)];
   if (!keys.length || new Set(keys).size !== keys.length) throw new Error('Regression report requires distinct named checks.');
   return { ...report, checks, browserChecks };
 }
-export const regressionSchema = recordSchema({ ...workerSchema.properties, checks: { type: 'array', items: checkSchema }, browserChecks: { type: 'array', items: checkSchema } });
+export const regressionSchema = recordSchema({ ...workerSchema.properties, checks: { type: 'array', items: checkSchema }, browserChecks: { type: 'array', maxItems: 0, items: checkSchema } });

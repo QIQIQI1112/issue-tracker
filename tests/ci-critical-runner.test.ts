@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
-import { inspectBrowserReport, parseVerificationContract, snapshot } from '../factory/evidence.ts';
+import { inspectNodeReport, parseVerificationContract, snapshot } from '../factory/evidence.ts';
 import { processEnvironment } from '../factory/workspace.ts';
 import { fixtureRepository } from './helpers/factory-fixture.ts';
 import { evidenceDirectory, run } from './helpers/subprocess.ts';
@@ -22,16 +22,15 @@ for (const mode of modes) {
     }
     writeFileSync(join(root, 'src/value.ts'), `export const value = '${mode === 'failed' ? 'broken' : 'ready'}';\n`);
     writeFileSync(join(root, 'tests/unselected.test.ts'), "import {test} from 'node:test';test('unselected failure',()=>{throw new Error('unselected Node test executed');});\n");
-    writeFileSync(join(root, 'acceptance/unselected.spec.ts'), `import {test} from ${JSON.stringify(resolve('node_modules/@playwright/test/index.mjs'))};test('unselected browser failure',()=>{throw new Error('unselected browser executed');});\n`);
     const contract = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       profile: 'ci-critical',
       nodeFiles: ['tests/value.test.ts'],
       requiredNodeTests: [{ file: 'tests/value.test.ts', title: mode === 'missing' ? 'missing required case' : 'value is ready' }],
-      requiredBrowserTests: [{ file: 'value.spec.ts', title: 'ready is externally observable' }],
+      requiredBrowserTests: [],
     };
     writeFileSync(join(root, 'factory/ci-verification-contract.json'), JSON.stringify(contract));
-    const full = { schemaVersion: 1, requiredBrowserTests: [...contract.requiredBrowserTests, { file: 'unselected.spec.ts', title: 'unselected browser failure' }] };
+    const full = { schemaVersion: 2, profile: 'code-only', requiredNodeTests: [...contract.requiredNodeTests, { file: 'tests/unselected.test.ts', title: 'unselected failure' }], requiredBrowserTests: [] };
     writeFileSync(join(root, 'factory/verification-contract.json'), JSON.stringify(full));
     if (mode === 'skipped') writeFileSync(join(root, 'tests/value.test.ts'), "import {test} from 'node:test';test.skip('value is ready',()=>{});\n");
     if (mode === 'source-drift' || mode === 'contract-drift') {
@@ -57,9 +56,8 @@ for (const mode of modes) {
       assert.equal(result.code, 0, result.output);
       assert.equal(summary.status, 'passed');
       assert.equal(summary.node.passed, 1);
-      assert.equal(summary.browser.passed, 1);
-      assert.deepEqual(summary.checks.map((item: { name: string }) => item.name), ['lint', 'typecheck', 'test', 'build', 'test:e2e']);
-      assert.throws(() => inspectBrowserReport(join(directory, 'browser-results.json'), parseVerificationContract(full)), /Missing required browser case/);
+      assert.deepEqual(summary.checks.map((item: { name: string }) => item.name), ['lint', 'typecheck', 'test', 'build']);
+      assert.throws(() => inspectNodeReport(join(directory, 'node-results.jsonl'), parseVerificationContract(full).requiredNodeTests), /Missing required Node case/);
     } else {
       assert.equal(result.code, 1, result.output);
       assert.equal(summary.status, 'failed');

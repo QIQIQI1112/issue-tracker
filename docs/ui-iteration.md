@@ -1,5 +1,6 @@
 # UI ownership and visual iteration
 
+Current verification: [code-only profile](code-only-verification.md). Visual specifications below remain design/provenance records; their browser checks are retired. Select one documented shared component standard for equivalent functionality before implementation and enforce it through code review, types, lint and relevant Node checks.
 The application uses React and plain CSS. Start the existing development server with `npm run dev`. Open `/` for the application or `/__ui/components` on that same frontend origin for the component preview. The preview has static samples and local state; it does not mount application reads, polling, reports, evidence loaders or mutation paths. It works without a backend. Its dynamic modules and stylesheet are gated by `import.meta.env.DEV` in the browser entry and are excluded from production output.
 
 Both entries use only the existing light appearance. A static neutral **L** avatar remains in the right corner; there is no appearance action or avatar dropdown. The historical adaptation and revision sections below retain design provenance, including retired dark-mode and menu behavior. The current runtime behavior is described in **Light-only appearance**.

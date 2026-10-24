@@ -6,7 +6,7 @@ import { describeHarnessSource } from './harness.ts';
 
 const sourceLimit = 256 * 1024;
 const aggregateLimit = 2 * 1024 * 1024;
-const knownSources = ['package.json', 'AGENTS.md', 'README.md', 'scripts/verify.mjs', 'scripts/verify-ci.mjs', 'scripts/test.mjs', 'playwright.config.ts', 'factory/verification-contract.json', 'factory/ci-verification-contract.json', 'docs/architecture.md', 'docs/verification.md', 'docs/ci-critical.md', 'docs/workbench.md', 'docs/harness-reliability.md', 'docs/github-delivery.md'];
+const knownSources = ['package.json', 'AGENTS.md', 'README.md', 'scripts/verify.mjs', 'scripts/verify-ci.mjs', 'scripts/test.mjs', 'factory/verification-contract.json', 'factory/ci-verification-contract.json', 'docs/architecture.md', 'docs/verification.md', 'docs/ci-critical.md', 'docs/workbench.md', 'docs/harness-reliability.md', 'docs/github-delivery.md'];
 
 export async function readRepositoryHarness(repo: Repo): Promise<RepositoryHarness> {
   const result: RepositoryHarness = { repository: { id: repo.id, name: repo.name, targetBranch: repo.targetBranch }, status: 'unavailable', message: 'Repository or enrolled target branch unavailable. Retry after repository metadata is restored.', sources: [] };

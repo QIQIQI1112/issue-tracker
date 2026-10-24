@@ -40,7 +40,10 @@ export function describeHarnessSource(source: HarnessSource): HarnessSource {
       if (Object.values(scripts).some(command => typeof command !== 'string')) throw new Error('Malformed configuration: package script commands must be strings.');
       return { ...source, commands: Object.entries(scripts).map(([name, command]) => ({ name, command: command as string, category: Object.hasOwn(categories, name) ? categories[name] : 'Package script' })) };
     }
-    if (value.schemaVersion !== 1 || (isFull ? value.profile !== undefined && value.profile !== 'full' : value.profile !== 'ci-critical')) return { ...source, content: undefined, status: 'unsupported', message: 'Unsupported manifest schema or profile; no requirements have been inferred.' };
+    const legacy = value.schemaVersion === 1 && (isFull ? value.profile === undefined || value.profile === 'full' : value.profile === 'ci-critical');
+    const codeOnly = value.schemaVersion === 2 && value.profile === (isFull ? 'code-only' : 'ci-critical');
+    if (!legacy && !codeOnly) return { ...source, content: undefined, status: 'unsupported', message: 'Unsupported manifest schema or profile; no requirements have been inferred.' };
+    if (codeOnly && (!Array.isArray(value.requiredNodeTests) || !value.requiredNodeTests.length || !Array.isArray(value.requiredBrowserTests) || value.requiredBrowserTests.length)) throw new Error('Code-only manifests require named Node cases and no browser checks.');
     if (!Array.isArray(value.requiredBrowserTests) || (value.requiredNodeTests !== undefined && !Array.isArray(value.requiredNodeTests)) || (isCritical && !Array.isArray(value.requiredNodeTests))) throw new Error('Malformed configuration: required cases must be arrays.');
     const nodes = value.requiredNodeTests as unknown[] | undefined;
     if ((nodes?.length ?? 0) + value.requiredBrowserTests.length > 1000) return { ...source, content: undefined, status: 'oversized', message: 'Manifest exceeds the limit of 1000 combined named cases.' };
@@ -49,7 +52,7 @@ export function describeHarnessSource(source: HarnessSource): HarnessSource {
       if (!Array.isArray(value.nodeFiles) || value.nodeFiles.length > 1000 || !value.nodeFiles.every(file => relativePath(file, true)) || new Set(value.nodeFiles).size !== value.nodeFiles.length) throw new Error('Malformed configuration: invalid Node file selection.');
       nodeFiles = value.nodeFiles as string[];
     }
-    return { ...source, profile: { name: isFull ? 'full' : 'ci-critical', requiredNodeTests: cases(nodes ?? [], true), requiredBrowserTests: cases(value.requiredBrowserTests, false), ...(nodeFiles ? { nodeFiles } : {}), explanation: nodes === undefined ? 'No explicit named Node requirements are configured. Node test files may still be discovered by the runner; omitted names do not establish an absence of tests.' : 'These are configured named requirements, not recorded execution results. Runner source determines additional discovery and selection.' } };
+    return { ...source, profile: { name: isFull ? 'full' : 'ci-critical', requiredNodeTests: cases(nodes ?? [], true), requiredBrowserTests: cases(value.requiredBrowserTests, false), ...(nodeFiles ? { nodeFiles } : {}), explanation: codeOnly ? 'Code-only verification: lint, TypeScript, Node behavior checks and build. Browser rendering and interaction are outside this profile. Configured requirements are not recorded execution results.' : nodes === undefined ? 'No explicit named Node requirements are configured. Node test files may still be discovered by the runner; omitted names do not establish an absence of tests.' : 'These are configured named requirements, not recorded execution results. Runner source determines additional discovery and selection.' } };
   } catch {
     return { ...source, content: undefined, status: 'malformed', message: 'Malformed configuration: invalid JSON, field types or case identities. No commands or requirements were accepted from this source.' };
   }

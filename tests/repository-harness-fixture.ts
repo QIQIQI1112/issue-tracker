@@ -9,7 +9,7 @@ import type { createApp } from '../src/api.ts';
 
 export const sourceLimit = 256 * 1024;
 export const aggregateLimit = 2 * 1024 * 1024;
-export const fixedSources = ['package.json', 'AGENTS.md', 'README.md', 'scripts/verify.mjs', 'scripts/verify-ci.mjs', 'scripts/test.mjs', 'playwright.config.ts', 'factory/verification-contract.json', 'factory/ci-verification-contract.json', 'docs/architecture.md', 'docs/verification.md', 'docs/ci-critical.md', 'docs/workbench.md', 'docs/harness-reliability.md', 'docs/github-delivery.md', '.github/workflows/verify.yml'];
+export const fixedSources = ['package.json', 'AGENTS.md', 'README.md', 'scripts/verify.mjs', 'scripts/verify-ci.mjs', 'scripts/test.mjs', 'factory/verification-contract.json', 'factory/ci-verification-contract.json', 'docs/architecture.md', 'docs/verification.md', 'docs/ci-critical.md', 'docs/workbench.md', 'docs/harness-reliability.md', 'docs/github-delivery.md', '.github/workflows/verify.yml'];
 
 export function gitAt(path: string, args: string[], input?: string): string {
   return execFileSync('git', args, { cwd: path, encoding: 'utf8', input, timeout: 5000, stdio: ['pipe', 'pipe', 'pipe'] }).trim();
@@ -35,8 +35,8 @@ export function harnessRepository(path: string, marker: string) {
   const full = { schemaVersion: 1, requiredNodeTests: [{ file: 'tests/value.test.ts', title: `${marker} required Node case` }], requiredBrowserTests: [{ file: 'value.spec.ts', title: `${marker} required browser case` }] };
   const critical = { schemaVersion: 1, profile: 'ci-critical', nodeFiles: ['tests/value.test.ts'], requiredNodeTests: [{ file: 'tests/value.test.ts', title: `${marker} critical Node case` }], requiredBrowserTests: [{ file: 'value.spec.ts', title: `${marker} critical browser case` }] };
   const files: Record<string, string> = {
-    'package.json': JSON.stringify({ name: marker, scripts: { verify: 'node scripts/verify.mjs', 'verify:ci': 'node scripts/verify-ci.mjs', test: 'node scripts/test.mjs', lint: `${marker}-lint --check`, typecheck: `${marker}-types`, build: `${marker}-build`, 'test:e2e': `${marker}-browser` } }),
-    'scripts/verify.mjs': `const gates = ['lint', 'typecheck', 'test', 'build', 'test:e2e'];\nconsole.log('${marker} custom verifier source', gates);\n`,
+    'package.json': JSON.stringify({ name: marker, scripts: { verify: 'node scripts/verify.mjs', 'verify:ci': 'node scripts/verify-ci.mjs', test: 'node scripts/test.mjs', lint: `${marker}-lint --check`, typecheck: `${marker}-types`, build: `${marker}-build` } }),
+    'scripts/verify.mjs': `const gates = ['lint', 'typecheck', 'test', 'build'];\nconsole.log('${marker} custom verifier source', gates);\n`,
     'scripts/verify-ci.mjs': `console.log('${marker} ci-critical verifier source');\n`,
     'scripts/test.mjs': `console.log('${marker} discovers Node test files');\n`,
     'factory/verification-contract.json': JSON.stringify(full),
@@ -44,7 +44,6 @@ export function harnessRepository(path: string, marker: string) {
     'AGENTS.md': `${marker} repository instructions\n`,
     'README.md': `${marker} readme\n`,
     'docs/verification.md': `${marker} verification documentation\n`,
-    'playwright.config.ts': `export default { testDir: './acceptance', metadata: '${marker} browser configuration' };\n`,
     '.github/workflows/verify.yml': `name: ${marker} CI\non: push\njobs:\n  verify:\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm run verify:ci\n`,
   };
   const commit = commitFiles(path, files);

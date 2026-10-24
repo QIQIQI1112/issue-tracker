@@ -4,7 +4,6 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpath
 import { join, resolve } from 'node:path';
 import { createLogger, createServer } from 'vite';
 import type { ViteDevServer } from 'vite';
-import { chromium } from '@playwright/test';
 import { availablePort } from './helpers/subprocess.ts';
 
 test('owned Vite servers isolate optimized dependencies across shared installations and checkout ports', { timeout: 30000 }, async () => {
@@ -23,7 +22,6 @@ test('owned Vite servers isolate optimized dependencies across shared installati
     writeFileSync(join(root, 'entry.js'), 'import React from "react"; window.ReactVersion = React.version;');
   }
   const servers: ViteDevServer[] = [];
-  const browser = await chromium.launch({ headless: true });
   const logs: string[] = [];
   const result: Record<string, unknown> = { directory, roots, sharedDependencies: dependencies };
   const start = async (root: string) => {
@@ -41,42 +39,43 @@ test('owned Vite servers isolate optimized dependencies across shared installati
     servers.push(server);
     await server.listen();
     const baseURL = `http://127.0.0.1:${port}`;
-    const page = await browser.newPage();
-    let dependencyURL: string | undefined;
-    page.on('console', message => { logs.push(`${baseURL} browser: ${message.text()}`); });
-    page.on('response', response => {
-      const url = new URL(response.url());
-      if (url.pathname.endsWith('/react.js') && url.searchParams.has('v')) dependencyURL = response.url();
-    });
-    await page.goto(baseURL);
-    await page.waitForFunction('typeof window.ReactVersion === "string"');
-    assert.ok(dependencyURL, 'The actual browser must load an optimized React dependency before another server starts.');
+    const transformed = await server.transformRequest('/entry.js');
+    assert.ok(transformed, 'Vite must transform the real dependency import.');
+    const optimizer = server.environments.client.depsOptimizer;
+    assert.ok(optimizer);
+    await optimizer.scanProcessing;
+    const discovered = optimizer.metadata.discovered.react ?? optimizer.metadata.optimized.react;
+    assert.ok(discovered, 'Dependency transformation must discover React.');
+    optimizer.run();
+    await discovered.processing;
+    const optimized = optimizer.metadata.optimized.react;
+    assert.ok(optimized, 'The actual optimizer must produce the React dependency.');
+    const dependencyURL = `${baseURL}/@fs/${optimized.file}?v=${optimized.browserHash}`;
     const metadataPath = join(server.config.cacheDir, 'deps/_metadata.json');
     const metadata = readFileSync(metadataPath, 'utf8');
-    const dependencyStatus = (await page.request.get(dependencyURL)).status();
+    const dependencyStatus = (await fetch(dependencyURL)).status;
     assert.equal(dependencyStatus, 200, 'Each owned frontend must serve its original optimized dependency successfully before the collision probe.');
-    return { page, dependencyURL, metadataPath, metadata, cacheDir: server.config.cacheDir, physicalCacheDir: realpathSync(server.config.cacheDir), baseURL, dependencyStatus };
+    return { dependencyURL, metadataPath, metadata, cacheDir: server.config.cacheDir, physicalCacheDir: realpathSync(server.config.cacheDir), baseURL, dependencyStatus };
   };
   try {
     const first = await start(roots[0]);
     result.first = { cacheDir: first.cacheDir, physicalCacheDir: first.physicalCacheDir, dependencyURL: first.dependencyURL, dependencyStatus: first.dependencyStatus };
     const second = await start(roots[1]);
     result.second = { cacheDir: second.cacheDir, physicalCacheDir: second.physicalCacheDir, dependencyURL: second.dependencyURL, dependencyStatus: second.dependencyStatus };
-    const afterSecond = { metadataUnchanged: readFileSync(first.metadataPath, 'utf8') === first.metadata, dependencyStatus: (await first.page.request.get(first.dependencyURL)).status() };
+    const afterSecond = { metadataUnchanged: readFileSync(first.metadataPath, 'utf8') === first.metadata, dependencyStatus: (await fetch(first.dependencyURL)).status };
     result.afterSecond = afterSecond;
     const anotherPort = await start(roots[0]);
     result.anotherPort = { cacheDir: anotherPort.cacheDir, physicalCacheDir: anotherPort.physicalCacheDir, dependencyURL: anotherPort.dependencyURL, dependencyStatus: anotherPort.dependencyStatus };
-    const afterAnotherPort = { metadataUnchanged: readFileSync(first.metadataPath, 'utf8') === first.metadata, dependencyStatus: (await first.page.request.get(first.dependencyURL)).status() };
+    const afterAnotherPort = { metadataUnchanged: readFileSync(first.metadataPath, 'utf8') === first.metadata, dependencyStatus: (await fetch(first.dependencyURL)).status };
     result.afterAnotherPort = afterAnotherPort;
-    assert.equal(afterSecond.dependencyStatus, 200, `Starting another checkout must retain the first browser's optimized dependency: ${directory}`);
+    assert.equal(afterSecond.dependencyStatus, 200, `Starting another checkout must retain the first server's optimized dependency: ${directory}`);
     assert.equal(afterSecond.metadataUnchanged, true, 'Another checkout must not replace the first optimizer metadata.');
     assert.notEqual(first.physicalCacheDir, second.physicalCacheDir, 'Separate checkouts sharing installed packages require physically distinct generated caches.');
-    assert.equal(afterAnotherPort.dependencyStatus, 200, 'Another owned port in the same checkout must retain the first browser dependency.');
+    assert.equal(afterAnotherPort.dependencyStatus, 200, 'Another owned port in the same checkout must retain the first optimized dependency.');
     assert.equal(afterAnotherPort.metadataUnchanged, true, 'Another owned port must not replace the first optimizer metadata.');
     assert.notEqual(first.physicalCacheDir, anotherPort.physicalCacheDir, 'Different frontend ports in the same checkout require separate generated caches.');
     assert.equal(existsSync(join(dependencies, '.vite')), false, 'Owned frontends must keep generated optimizer caches outside their shared dependency installation.');
   } finally {
-    await browser.close();
     for (const server of servers.reverse()) await server.close();
     writeFileSync(join(directory, 'result.json'), `${JSON.stringify(result, null, 2)}\n`);
     writeFileSync(join(directory, 'vite.log'), `${logs.join('\n')}\n`);

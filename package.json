@@ -16,7 +16,6 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "node scripts/test.mjs",
-    "test:e2e": "playwright test",
     "verify": "node scripts/verify.mjs",
     "verify:ci": "node scripts/verify-ci.mjs",
     "doctor": "node scripts/doctor.mjs",
@@ -32,7 +31,6 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
-    "@playwright/test": "1.64.0",
     "@types/express": "5.0.6",
     "@types/node": "26.6.5",
     "@types/react": "19.3.0",

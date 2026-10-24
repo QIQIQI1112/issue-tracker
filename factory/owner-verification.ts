@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, realpathSync, symlinkSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 import { assertTestInventory, digest } from './checkpoint.ts';
-import { inspectBrowserReport, inspectNodeReport, parseVerificationContract, readJson, snapshot, writeJson } from './evidence.ts';
+import { inspectNodeReport, parseVerificationContract, readJson, snapshot, writeJson } from './evidence.ts';
 import { acquireExecutionLease } from './lease.ts';
 import { assertOwnedGroupsQuiescent } from './ownership.ts';
 import { runProcess } from './process.ts';
@@ -32,7 +32,8 @@ export async function verifyMaintenance(input: unknown, options: { signal?: Abor
   const candidate = snapshot(repository);
   assertTestInventory(candidate.files, coverage.acceptedChecks);
   const contract = parseVerificationContract(readJson(join(repository, 'factory/verification-contract.json')));
-  for (const [checks, target, prefix] of [[coverage.checks ?? [], contract.requiredNodeTests, ''], [coverage.browserChecks ?? [], contract.requiredBrowserTests, 'acceptance/']] as const) {
+  if (coverage.browserChecks?.length) throw new Error('Browser maintenance coverage is retired.');
+  for (const [checks, target, prefix] of [[coverage.checks ?? [], contract.requiredNodeTests, '']] as const) {
     if (!Array.isArray(checks)) throw new Error('Coverage named checks are invalid.');
     for (const check of checks) {
       if (!check || !coverage.acceptedChecks.some(file => file.path === `${prefix}${check.file}`)) throw new Error('Named coverage must refer to an approved test file.');
@@ -73,8 +74,7 @@ export async function verifyMaintenance(input: unknown, options: { signal?: Abor
     const summary = readJson(join(verificationDirectory, 'summary.json')) as Verification;
     if (result.status !== 'passed' || result.settled !== true || summary.status !== 'passed') throw new Error(`Maintenance verification failed: ${summary.error ?? result.error ?? result.status}`);
     const node = inspectNodeReport(join(verificationDirectory, 'node-results.jsonl'), effectiveContract.requiredNodeTests);
-    const browser = inspectBrowserReport(join(verificationDirectory, 'browser-results.json'), effectiveContract);
-    if (result.status !== 'passed' || result.settled !== true || summary.status !== 'passed' || summary.snapshot.hash !== candidate.hash || summary.checks.length !== 5 || !['lint', 'typecheck', 'test', 'build', 'test:e2e'].every(name => summary.checks.some(check => check.name === name && check.status === 'passed')) || node.passed !== summary.node?.passed || browser.passed !== summary.browser?.passed || snapshot(workspace).hash !== candidate.hash) throw new Error('Maintenance requires complete passing machine evidence on frozen source.');
+    if (result.status !== 'passed' || result.settled !== true || summary.status !== 'passed' || summary.snapshot.hash !== candidate.hash || summary.profile !== 'code-only' || summary.checks.length !== 4 || !['lint', 'typecheck', 'test', 'build'].every(name => summary.checks.some(check => check.name === name && check.status === 'passed')) || node.passed !== summary.node?.passed || snapshot(workspace).hash !== candidate.hash) throw new Error('Maintenance requires complete passing machine evidence on frozen source.');
     const status = snapshot(repository).hash === candidate.hash && digest(readFileSync(request.coveragePath)) === digest(coverageBytes) ? 'passed' : 'stale';
     const outcome = { schemaVersion: 1, status, sourceHash: candidate.hash, runDirectory: directory, summaryPath: join(verificationDirectory, 'summary.json'), coverageHash: digest(coverageBytes) };
     writeJson(join(directory, 'owner-verification.json'), outcome);

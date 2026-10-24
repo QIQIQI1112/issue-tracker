@@ -12,7 +12,7 @@ import { digest, environmentIdentity, loadCheckpoint, restoreCheckpoint, saveChe
 import { assertRunQuiescent, processIdentity } from './ownership.ts';
 import { executionBudget } from './budget.ts';
 import type { Delivery } from '../src/workflow.ts';
-import { enforceRegressionDraft, proveRegression, BehaviorProofError } from './regression.ts';
+import { enforceRegressionDraft, proveRegression } from './regression.ts';
 import type { PendingRegression, AcceptedRegression, RedCheck, ReviewReceipt } from './regression.ts';
 import { classifyVerificationFailure, writeRoleContext } from './optimization.ts';
 import { verifyWithRecovery } from './verification-retry.ts';
@@ -22,7 +22,7 @@ import { integrate } from './integration.ts';
 export type Phase = 'plan' | 'tests' | 'regression-tests' | 'acceptance-review' | 'implement' | 'repair' | 'review';
 export type AgentInput = { phase: Phase; task: Task; plan?: Plan; cwd: string; attempt: number; feedback: string; directory: string; timeoutMs: number; signal: AbortSignal; env: NodeJS.ProcessEnv; context?: { indexPath: string; path: string; bytes: number; sha256: string } };
 export type Agent = { run: (input: AgentInput) => Promise<unknown> };
-export type Verification = { diagnostics?: { phase: string; code?: string; origin: 'spawn' | 'node-report' | 'report-validation'; kind?: 'product' | 'test-contract'; settled: true }; status: string; snapshot: { hash: string }; runDirectory: string; checks: { name: string; status: string; durationMs?: number }[]; node?: { passed: number }; browser?: { passed: number }; error?: string };
+export type Verification = { diagnostics?: { phase: string; code?: string; origin: 'spawn' | 'node-report' | 'report-validation'; kind?: 'product' | 'test-contract'; settled: true }; profile?: 'code-only'; status: string; snapshot: { hash: string }; runDirectory: string; checks: { name: string; status: string; durationMs?: number }[]; node?: { passed: number }; browser?: { passed: number }; error?: string };
 class IntegrationRejected extends Error {}
 class FocusedFailureHold extends Error {}
 
@@ -82,8 +82,8 @@ export async function runController(options: { repository: string; task: unknown
     let timer: ReturnType<typeof setTimeout> | undefined;
     let finished = false;
     const verification = state.integration?.verification ?? state.verification;
-    const evidenceFiles = [...(options.resumeFrom ? ['state.json', 'delivery.json'].map(file => join(options.resumeFrom!, file)) : []), join(runDirectory, 'task.json'), join(runDirectory, 'plan.json'), ...state.redChecks.flatMap(check => [check.logPath, ...(check.reportPath ? [check.reportPath] : [])]), ...(state.browserRedChecks ?? []).flatMap(check => [check.logPath, ...(check.reportPath ? [check.reportPath] : [])]), ...(state.pendingFailureTriage ? [state.pendingFailureTriage.check.logPath, state.pendingFailureTriage.check.reportPath!] : []), ...(verification ? ['summary.json', 'node-results.jsonl', 'browser-results.json', 'test.log', 'test-e2e.log'].map(file => join(verification.runDirectory, file)) : [])].filter(existsSync);
-    const context = task.schemaVersion === 2 ? writeRoleContext({ directory, role: phase, goal: task.wholeGoal?.goal ?? task.goal, sourceHash: snapshot(cwd).hash, feedback, relevantPaths: [...new Set([...(state.plan?.slices.flatMap(slice => slice.checks.map(check => check.file)) ?? []), ...(state.plan?.browserChecks.map(check => `acceptance/${check.file}`) ?? []), ...snapshot(cwd).files.filter(file => file.path.startsWith('src/') && scoped(file.path, task)).map(file => file.path)])], decisions: state.plan?.assumptions ?? [], evidence: [...new Set(evidenceFiles)].map(path => ({ path, purpose: 'Retained controller task, plan or actual machine proof; inspect the file before making a delivery judgment.' })) }) : undefined;
+    const evidenceFiles = [...(options.resumeFrom ? ['state.json', 'delivery.json'].map(file => join(options.resumeFrom!, file)) : []), join(runDirectory, 'task.json'), join(runDirectory, 'plan.json'), ...state.redChecks.flatMap(check => [check.logPath, ...(check.reportPath ? [check.reportPath] : [])]), ...(state.browserRedChecks ?? []).flatMap(check => [check.logPath, ...(check.reportPath ? [check.reportPath] : [])]), ...(state.pendingFailureTriage ? [state.pendingFailureTriage.check.logPath, state.pendingFailureTriage.check.reportPath!] : []), ...(verification ? ['summary.json', 'node-results.jsonl', 'test.log'].map(file => join(verification.runDirectory, file)) : [])].filter(existsSync);
+    const context = task.schemaVersion === 2 ? writeRoleContext({ directory, role: phase, goal: task.wholeGoal?.goal ?? task.goal, sourceHash: snapshot(cwd).hash, feedback, relevantPaths: [...new Set([...(state.plan?.slices.flatMap(slice => slice.checks.map(check => check.file)) ?? []), ...snapshot(cwd).files.filter(file => file.path.startsWith('src/') && scoped(file.path, task)).map(file => file.path)])], decisions: state.plan?.assumptions ?? [], evidence: [...new Set(evidenceFiles)].map(path => ({ path, purpose: 'Retained controller task, plan or actual machine proof; inspect the file before making a delivery judgment.' })) }) : undefined;
     const work = options.agent.run({ phase, task, plan: state.plan, cwd, attempt, feedback, context, directory, timeoutMs, signal: abort.signal, env: { ...env, RUN_DIR: join(cwd, '.runs', 'worker-checks', `phase-${counter}`) } }).finally(() => { finished = true; });
     work.catch(() => {});
     try {
@@ -197,11 +197,9 @@ export async function runController(options: { repository: string; task: unknown
     }
     writeJson(join(trustedRoot, 'package.json'), { type: 'module' });
     const contract = parseVerificationContract(readJson(join(options.mergeTarget ? state.workspace : repository, 'factory/verification-contract.json')));
-    for (const check of state.plan.browserChecks) if (!contract.requiredBrowserTests.some(item => item.file === check.file && item.title === check.title)) contract.requiredBrowserTests.push(check);
     for (const check of state.plan.slices.flatMap(slice => slice.checks)) if (!contract.requiredNodeTests.some(item => item.file === check.file && item.title === check.title)) contract.requiredNodeTests.push(check);
     for (const regression of state.regressions ?? []) {
       contract.requiredNodeTests.push(...regression.checks);
-      contract.requiredBrowserTests.push(...regression.browserChecks);
     }
     const contractPath = join(trustedRoot, 'factory/verification-contract.json');
     writeJson(contractPath, contract);
@@ -311,17 +309,17 @@ export async function runController(options: { repository: string; task: unknown
         enforceRegressionDraft(before, enforce(), report);
         state.phase = 'regression-red-checks'; save();
         const redChecks = [];
-        for (const [browser, checks] of [[false, report.checks], [true, report.browserChecks]] as const) for (const check of checks) {
-          const timeoutMs = Math.min(browser ? 90000 : 30000, remaining());
+        for (const check of report.checks) {
+          const timeoutMs = Math.min(30000, remaining());
           budget!.phase(timeoutMs);
-          redChecks.push(await proveRegression({ check, browser, cwd: state.workspace, prefix: join(runDirectory, `regression-red-${generation}-${redChecks.length}`), env, reporter: join(trustedRoot, 'factory/node-reporter.mjs'), timeoutMs, signal: cancelled.signal }));
+          redChecks.push(await proveRegression({ check, browser: false, cwd: state.workspace, prefix: join(runDirectory, `regression-red-${generation}-${redChecks.length}`), env, reporter: join(trustedRoot, 'factory/node-reporter.mjs'), timeoutMs, signal: cancelled.signal }));
           enforceRegressionDraft(before, enforce(), report);
         }
         const response = await reviewCandidate('acceptance-review', 'regression-coverage', generation, { baselineTree: state.baselineTree, review: pending.review, checks: report.checks, browserChecks: report.browserChecks, acceptedChecks: snapshot(state.workspace).files.filter(file => /^(tests|acceptance)\//.test(file.path)), redChecks, evidenceDirectory: runDirectory, acceptance: task.acceptance }, state.workspace, { ...contract, requiredNodeTests: [...contract.requiredNodeTests, ...report.checks], requiredBrowserTests: [...contract.requiredBrowserTests, ...report.browserChecks] });
         if (!response.approved) { feedback = JSON.stringify({ review: pending.review, rejection: response, checks: report, redChecks }); continue; }
         const receipt = state.reviewReceipts!.at(-1)!;
         (state.regressions ??= []).push({ checks: report.checks, browserChecks: report.browserChecks, redChecks, receipt });
-        contract.requiredNodeTests.push(...report.checks); contract.requiredBrowserTests.push(...report.browserChecks);
+        contract.requiredNodeTests.push(...report.checks);
         writeJson(contractPath, contract);
         for (const file of snapshot(state.workspace).files.filter(file => /^(tests|acceptance)\//.test(file.path))) protectedFiles.set(file.path, file.hash);
         writeJson(join(runDirectory, 'accepted-checks.json'), [...protectedFiles].map(([path, hash]) => ({ path, hash })));
@@ -368,32 +366,6 @@ export async function runController(options: { repository: string; task: unknown
           else throw new Error(`Red check did not establish a named behavior assertion: ${check.file}#${check.title}`);
           save();
         }
-        let browserFailure = '';
-        const current = enforce(true);
-        for (const check of state.plan.browserChecks) {
-          const path = `acceptance/${check.file}`;
-          const original = baseline.files.find(file => file.path === path);
-          if (!reuse && original && original.hash === current.files.find(file => file.path === path)?.hash) continue;
-          const prefix = join(runDirectory, `browser-red-${number}-${state.browserRedChecks.length}`);
-          const timeoutMs = Math.min(90000, remaining());
-          budget.phase(timeoutMs);
-          try {
-            state.browserRedChecks.push(await proveRegression({ check, browser: true, cwd: state.workspace, prefix, env, reporter: join(trustedRoot, 'factory/node-reporter.mjs'), timeoutMs, signal: cancelled.signal, allowAlreadyPassed: true }));
-          } catch (error) {
-            enforce(true);
-            if (!(error instanceof BehaviorProofError)) throw error;
-            browserFailure = `Controller browser proof rejected ${check.file}#${check.title}: ${error.message}. Read ${prefix}.log and ${prefix}.json. Repair only unapproved scoped checks; preserve the plan, original test bytes, criteria and implementation.`;
-            writeJson(`${prefix}-error.json`, { check, reason: browserFailure });
-            break;
-          }
-          enforce(true); save();
-        }
-        if (browserFailure) {
-          if (reuse) throw new Error(browserFailure);
-          state.phases!.at(-1)!.status = 'failed';
-          if (number === task.budget.maxAttempts) throw new Error(`Acceptance proof attempt budget exhausted. ${browserFailure}`);
-          acceptanceFeedback = browserFailure; continue;
-        }
         if (reuse) {
           const receipt = { purpose: 'baseline-coverage-reuse', planHash: digest(JSON.stringify(state.plan)), sourceHash: baseline.hash, criteriaHash: digest(JSON.stringify(task.acceptance)), contractHash: digest(JSON.stringify(parseVerificationContract(contract))), approved: true, summary: 'Controller proved named baseline coverage and froze the complete existing test inventory. Independent final goal review remains required.', evidencePath: 'baseline-coverage-reuse.json' };
           writeJson(join(runDirectory, receipt.evidencePath), { ...receipt, owner: { environment, baselineTree: state.baselineTree }, feedback: { redChecks: state.redChecks, browserRedChecks: state.browserRedChecks, acceptedChecks: baseline.files.filter(file => /^(tests|acceptance)\//.test(file.path)) } });
@@ -434,16 +406,12 @@ export async function runController(options: { repository: string; task: unknown
         attempt.focused = [];
         let failedCheck: RedCheck | undefined;
         const checks = [...state.plan.slices.flatMap(slice => slice.checks), ...(state.regressions ?? []).flatMap(item => item.checks)];
-        const browserChecks = [...state.plan.browserChecks, ...(state.regressions ?? []).flatMap(item => item.browserChecks)];
-        for (const [browser, items] of [[false, checks], [true, browserChecks]] as const) {
-          for (const check of items) {
-            const timeoutMs = Math.min(browser ? 90000 : 30000, remaining()); budget.phase(timeoutMs);
-            const proof = await proveRegression({ check, browser, cwd: state.workspace, prefix: join(runDirectory, `focused-${number}-${attempt.focused.length}`), env, reporter: join(trustedRoot, 'factory/node-reporter.mjs'), timeoutMs, signal: cancelled.signal, allowAlreadyPassed: true });
+        for (const check of checks) {
+            const timeoutMs = Math.min(30000, remaining()); budget.phase(timeoutMs);
+            const proof = await proveRegression({ check, browser: false, cwd: state.workspace, prefix: join(runDirectory, `focused-${number}-${attempt.focused.length}`), env, reporter: join(trustedRoot, 'factory/node-reporter.mjs'), timeoutMs, signal: cancelled.signal, allowAlreadyPassed: true });
             enforce();
             attempt.focused.push(proof);
             if (proof.status !== 'already_passed') { failedCheck = proof; break; }
-          }
-          if (failedCheck) break;
         }
         writeJson(join(runDirectory, `focused-${number}.json`), { purpose: 'development-diagnostics', sourceHash: snapshot(state.workspace).hash, checks: attempt.focused });
         if (failedCheck) {
@@ -483,7 +451,6 @@ export async function runController(options: { repository: string; task: unknown
         state.phase = 'integration-verify';
         state.integration = { branch: options.mergeTarget!, before }; save();
         const latestContract = parseVerificationContract(readJson(join(cwd, 'factory/verification-contract.json')));
-        for (const check of contract.requiredBrowserTests) if (!latestContract.requiredBrowserTests.some(item => item.file === check.file && item.title === check.title)) latestContract.requiredBrowserTests.push(check);
         for (const check of contract.requiredNodeTests) if (!latestContract.requiredNodeTests.some(item => item.file === check.file && item.title === check.title)) latestContract.requiredNodeTests.push(check);
         const integrationContract = join(trustedRoot, `integration-contract-${attempt}.json`); writeJson(integrationContract, latestContract);
         const directory = join(runDirectory, `integration-verification-${number}-${attempt}`);

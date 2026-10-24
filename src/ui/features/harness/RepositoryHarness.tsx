@@ -11,7 +11,7 @@ function sourceLabel(source: HarnessSource) {
   if (source.path === 'factory/verification-contract.json') return 'Full verification profile';
   if (source.path === 'factory/ci-verification-contract.json') return 'CI profile · ci-critical';
   if (source.path.startsWith('.github/workflows/')) return 'CI workflow';
-  if (source.path.startsWith('scripts/') || source.path === 'playwright.config.ts') return 'Runner configuration and source';
+  if (source.path.startsWith('scripts/')) return 'Runner configuration and source';
   return 'Repository documentation';
 }
 

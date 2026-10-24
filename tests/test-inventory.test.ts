@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { runController } from '../factory/controller.ts';
 import { captureInterruptedDraft, saveCheckpoint, digest } from '../factory/checkpoint.ts';
 import { parseTask } from '../factory/contracts.ts';
@@ -22,9 +22,8 @@ for (const phase of ['implement', 'repair']) for (const file of ['tests/late.tes
   const state = await runController({ repository, task: task(), evidenceRoot: root, mergeTarget: 'main', agent: { run: async input => {
     if (input.phase === 'implement' && phase === 'repair') return worker(input.task.id);
     if (input.phase === phase) {
-      const source = file.startsWith('tests/')
-        ? "import {test} from 'node:test';\nimport assert from 'node:assert/strict';\ntest('unapproved late case',()=>assert.equal(1,1));\n"
-        : `import {test,expect} from ${JSON.stringify(join(repository, 'node_modules/@playwright/test/index.mjs'))};\ntest('unapproved late case',()=>expect(1).toBe(1));\n`;
+      const source = "import {test} from 'node:test';\nimport assert from 'node:assert/strict';\ntest('unapproved late case',()=>assert.equal(1,1));\n";
+      mkdirSync(dirname(join(input.cwd, file)), { recursive: true });
       writeFileSync(join(input.cwd, file), source);
       injected = true;
     }
@@ -59,6 +58,7 @@ for (const operation of ['checkpoint', 'interrupted-capture']) test(`${operation
     const checkpoint = JSON.parse(originalManifest);
     assert.equal(checkpoint.accepted, true);
     for (const file of ['tests/late-helper.ts', 'acceptance/late-helper.ts']) {
+      mkdirSync(dirname(join(state.workspace, file)), { recursive: true });
       writeFileSync(join(state.workspace, file), "export const unapproved = true;\n");
       const capture = () => operation === 'checkpoint' ? saveCheckpoint(state, spec, checkpoint.environment, true) : captureInterruptedDraft(state.runDirectory);
       assert.throws(capture, /Protected test inventory/);
@@ -70,7 +70,7 @@ for (const operation of ['checkpoint', 'interrupted-capture']) test(`${operation
   } finally { git(repository, ['worktree', 'remove', '--force', state.workspace]); }
 });
 
-test('reviewed initial Node and browser additions remain frozen and survive checkpoint retry', async () => {
+test('reviewed initial Node additions remain frozen and survive checkpoint retry', async () => {
   const root = evidenceDirectory('inventory-approved');
   const repository = fixtureRepository(join(root, 'repo'));
   const delegate = fixtureAgent();
@@ -79,16 +79,17 @@ test('reviewed initial Node and browser additions remain frozen and survive chec
     if (input.phase === 'plan') {
       const plan = await delegate.run(input) as { slices: { checks: { file: string; title: string }[] }[]; browserChecks: { file: string; title: string }[] };
       plan.slices[0].checks.push({ file: 'tests/approved.test.ts', title: 'approved value is ready' });
-      plan.browserChecks.push({ file: 'approved.spec.ts', title: 'approved readiness is observable' });
       return plan;
     }
     if (input.phase === 'tests') {
       writeFileSync(join(input.cwd, 'tests/approved.test.ts'), "import {test} from 'node:test';\nimport assert from 'node:assert/strict';\nimport {value} from '../src/value.ts';\ntest('approved value is ready',()=>assert.equal(value,'ready'));\n");
-      writeFileSync(join(input.cwd, 'acceptance/approved.spec.ts'), `import {test,expect} from ${JSON.stringify(join(repository, 'node_modules/@playwright/test/index.mjs'))};\nimport {value} from '../src/value.ts';\ntest('approved readiness is observable',()=>expect(value).toBe('ready'));\n`);
     }
     if (input.phase === 'acceptance-review') {
       const feedback = JSON.parse(input.feedback);
-      assert.equal(feedback.redChecks.length, 2);
+      assert.deepEqual(feedback.redChecks.map((check: { file: string; title: string }) => ({ file: check.file, title: check.title })), [
+        { file: 'tests/value.test.ts', title: 'value is ready' },
+        { file: 'tests/approved.test.ts', title: 'approved value is ready' },
+      ]);
       assert.ok(feedback.redChecks.every((check: { status: string }) => check.status === 'expected_failure'));
       coverageReviewed = true;
     }
@@ -102,7 +103,7 @@ test('reviewed initial Node and browser additions remain frozen and survive chec
   try {
     assert.equal(first.status, 'blocked');
     const hashes = JSON.parse(readFileSync(join(first.runDirectory, 'checkpoint.json'), 'utf8')).acceptedChecks;
-    for (const file of ['tests/approved.test.ts', 'acceptance/approved.spec.ts']) assert.ok(hashes.some((check: { path: string }) => check.path === file));
+    for (const file of ['tests/approved.test.ts']) assert.ok(hashes.some((check: { path: string }) => check.path === file));
     second = await runController({ repository, task: task(), evidenceRoot: root, resumeFrom: first.runDirectory, agent: { run: async input => {
       assert.ok(!['plan', 'tests', 'acceptance-review'].includes(input.phase), 'A valid retry must reuse approved coverage.');
       return delegate.run(input);
@@ -110,7 +111,6 @@ test('reviewed initial Node and browser additions remain frozen and survive chec
     assert.equal(second.status, 'ready', second.reason ?? 'No failure reason');
     assert.equal(second.resume?.reused, true);
     assert.equal(second.verification?.node?.passed, 2);
-    assert.equal(second.verification?.browser?.passed, 2);
     assert.equal(second.budget?.acceptanceAttempts, 1);
     assert.equal(second.budget?.implementationAttempts, 2);
   } finally {

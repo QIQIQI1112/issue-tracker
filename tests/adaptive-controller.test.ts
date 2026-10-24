@@ -21,7 +21,7 @@ async function setup() {
   assert.ok(task);
   const root = evidenceDirectory('adaptive-controller');
   const repository = fixtures.fixtureRepository(join(root, 'repo'));
-  const baseline = new Map(['tests/value.test.ts', 'acceptance/value.spec.ts'].map(path => [path, readFileSync(join(repository, path), 'utf8')]));
+  const baseline = new Map(['tests/value.test.ts'].map(path => [path, readFileSync(join(repository, path), 'utf8')]));
   const before = workspace.git(repository, ['rev-parse', 'main']).trim();
   const delegate = fixtures.fixtureAgent();
   return { controller, workspace, root, repository, task, baseline, before, delegate };
@@ -51,7 +51,7 @@ test('adaptive reuse freezes baseline tests and performs one fresh integrated ve
       assert.equal(context.integratedCandidate, true);
       assert.equal(context.verification.status, 'passed');
       assert.equal(context.verification.node.passed, 1);
-      assert.equal(context.verification.browser.passed, 1);
+      assert.equal(context.verification.browser, undefined);
       assert.ok(JSON.stringify(context).includes(goal), 'The final reviewer must explicitly receive the original whole goal.');
       assert.match(JSON.stringify(context), /"requirementId":7/, 'The combined review must bind the exact requirement identity.');
     }
@@ -72,7 +72,7 @@ test('adaptive reuse freezes baseline tests and performs one fresh integrated ve
     const summary = JSON.parse(readFileSync(join(state.runDirectory, verifierDirectories[0], 'summary.json'), 'utf8'));
     assert.equal(summary.status, 'passed');
     assert.equal(summary.snapshot.hash, state.integration?.verification?.snapshot.hash);
-    assert.equal(summary.checks.length, 5);
+    assert.equal(summary.checks.length, 4);
     assert.ok(summary.checks.every((item: { status: string }) => item.status === 'passed'));
     assert.equal(state.integration?.review?.approved, true);
     assert.ok(state.reviewReceipts?.some(receipt => receipt.purpose === 'baseline-coverage-reuse'), 'Baseline reuse requires a distinct source-bound controller receipt.');
