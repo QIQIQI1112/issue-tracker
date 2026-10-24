@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "recordType": "owner-maintenance",
+  "id": "avatar-menu-destination-ink-observation",
+  "issueId": 66,
+  "changeKind": "acceptance_contract",
+  "stage": "inactive",
+  "goal": "Correct the independently confirmed Issue65 accepted observation defect: the frozen new icon check samples color during the required 140ms transition. Deliver a separately reviewed exact-base inactive revision polling actual painted stroke segments to the exact destination ink within the existing 3-second bound. Preserve every original assertion, geometry tolerance, case identity, interaction, production transition, task limits and cumulative history. Prove correct transitioning paint is accepted and wrong final ink, geometry, opacity and selection are rejected. Independently freeze complete baseline inventory, complete frozen verification and exact-source review before owner integration and attestation. Fresh native feature coverage approval activates the revised new file; do not rewrite its historical checkpoint.",
+  "baseFile": "acceptance/avatar-menu-fidelity.spec.ts",
+  "baseSha256": "6d94f0eef11d4a6198a38ee9bae07a61842214ce0a02ac946969f69cdeb772a8",
+  "revisedSha256": "a513c04879ab10bf859afbe450a8dae461940db1856fe0b2e5e1304f518c9345",
+  "patch": "tickets/020-avatar-menu-ink-observation.patch",
+  "retainedRunId": "267ac443-86cb-4466-97c5-c65dd1fa38a3",
+  "activation": "Fresh native feature planning and independent coverage approval must recover the retained new case and apply only this exact-base revision before freezing. Historical checkpoint and accepted inventory remain immutable. Preserve cumulative usage; no checkpoint reuse across revised protected controls."
+}

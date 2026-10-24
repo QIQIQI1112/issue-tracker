@@ -35,9 +35,9 @@ export function UserMenu() {
         setOpen(true);
         root.current?.querySelector<HTMLButtonElement>('[role="menuitemcheckbox"]')?.focus();
       }
-    }}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="8" r="3" /><path d="M5 20v-2a7 7 0 0 1 14 0v2" /></svg></Button>
+    }}><span aria-hidden="true">L</span></Button>
     {open && <div className="user-menu-popup" id={id} role="menu" aria-label="User menu" onKeyDown={event => {
       if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) event.preventDefault();
-    }}><ThemeSwitch role="menuitemcheckbox" /></div>}
+    }}><div className="user-menu-caption">Local workspace</div><div className="user-menu-separator" role="separator" /><ThemeSwitch role="menuitemcheckbox" presentation="menu" /></div>}
   </div>;
 }
