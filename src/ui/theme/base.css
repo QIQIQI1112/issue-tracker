@@ -8,7 +8,7 @@ a { color: inherit; }
 :focus { outline: none; }
 :root[data-focus-intent="keyboard"] :focus:not(.modal) { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
 :root[data-focus-intent="keyboard"] input:focus, :root[data-focus-intent="keyboard"] textarea:focus, :root[data-focus-intent="keyboard"] select:focus { outline-offset: 1px; }
-h1 { font-size: var(--font-size-22); line-height: var(--line-height-title); letter-spacing: var(--tracking-title); font-weight: var(--font-weight-semibold); margin: 0; }
+h1 { font-size: var(--font-size-22); line-height: var(--line-height-title); letter-spacing: var(--tracking-title); font-weight: var(--font-weight-medium); margin: 0; }
 h2, h3, h4 { font-weight: var(--font-weight-medium); line-height: var(--line-height-section); }
 h2 { font-size: var(--font-size-18); }
 h3 { font-size: var(--font-size-15); }

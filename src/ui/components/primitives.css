@@ -1,6 +1,6 @@
 .icon { width: 18px; height: 18px; flex: 0 0 auto; }
 .nav-label, .eyebrow { display: block; color: var(--muted); font-size: var(--font-size-12); font-weight: var(--font-weight-medium); letter-spacing: var(--tracking-eyebrow); margin: 0 var(--space-2xl) var(--space-2xl); }
-.button { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-control-gap); padding: var(--space-sm) var(--space-2xl); min-height: 32px; border: 1px solid var(--border-action); border-radius: var(--radius-control); background: var(--surface-action); white-space: nowrap; font-size: var(--font-size-control); font-weight: var(--font-weight-medium); }
+.button { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-control-gap); padding: var(--space-sm) var(--space-2xl); min-height: 32px; border: 1px solid var(--border-action); border-radius: var(--radius-control); background: var(--surface-action); white-space: nowrap; font-size: var(--font-size-control); font-weight: 400; }
 .button:hover:not(:disabled) { background: var(--surface-action-hover); }
 .button.primary { background: var(--action-primary); color: var(--text-on-action); border-color: var(--action-primary-border); box-shadow: 0 1px 2px var(--shadow-action); }
 .button.primary:hover:not(:disabled) { background: var(--action-primary-hover); }
@@ -56,3 +56,10 @@
 .theme-switch[aria-checked="true"] .theme-switch-track { background: var(--action-primary); border-color: var(--action-primary); }
 .theme-switch[aria-checked="true"] .theme-switch-track > span { transform: translateX(10px); background: var(--text-on-action); }
 .theme-switch-state { min-width: 18px; color: var(--text-secondary); text-align: left; }
+
+.user-menu { position: relative; flex: none; }
+.user-menu-trigger { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border-radius: 50%; background: var(--surface-active); color: var(--text-primary); font-size: 14px; font-weight: 400; line-height: 20px; }
+.user-menu-trigger svg { width: 20px; height: 20px; }
+.user-menu-popup { position: absolute; z-index: 50; right: 0; top: calc(100% + 8px); width: 232px; max-width: calc(100vw - 24px); padding: 8px; border-radius: 14px; background: var(--surface); box-shadow: var(--shadow-menu); }
+.user-menu-popup .theme-switch { width: 100%; margin: 0; border: 0; box-shadow: none; justify-content: space-between; background: transparent; }
+.user-menu-popup .theme-switch:hover { background: var(--surface-hover); }
