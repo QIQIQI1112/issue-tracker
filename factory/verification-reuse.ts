@@ -128,12 +128,20 @@ export function reusableRequirementVerification(input: { repository: string; cwd
     if (!input.children.length || input.children.some(child => child.work?.requirementId !== input.requirement.id || child.work.repoId !== input.requirement.repoId)) throw new Error('Requirement child membership or repository does not match.');
     const latest = input.children.map(child => input.runs.filter(run => run.repoId === input.requirement.repoId && run.requirementId === input.requirement.id && run.issueId === child.id).sort((a, b) => b.jobId - a.jobId)[0]);
     if (latest.some(run => !run || run.status !== 'merged')) throw new Error('Every current child needs its latest merged run.');
-    const run = latest.sort((a, b) => b.jobId - a.jobId)[0];
-    const path = join(run.evidencePath, certificateName);
-    if (!existsSync(path)) throw new Error('The latest merged child has no integrated verification certificate.');
-    const certificate = readJson(path) as Certificate;
     const head = git(input.repository, ['rev-parse', `refs/heads/${input.branch}`]).trim();
     const source = snapshot(input.cwd);
+    let candidate: { run: WorkRun; path: string; certificate: Certificate } | undefined;
+    for (const run of latest) {
+      const path = join(run.evidencePath, certificateName);
+      if (!existsSync(path)) continue;
+      const certificate = readJson(path) as Certificate;
+      if (certificate.branch === input.branch && certificate.commit === head && certificate.sourceHash === source.hash) {
+        candidate = { run, path, certificate };
+        break;
+      }
+    }
+    if (!candidate) throw new Error('No current merged child has an integrated verification certificate for the exact target source.');
+    const { run, path, certificate } = candidate;
     if (certificate.schemaVersion !== 2 || certificate.profile !== 'code-only' || certificate.runId !== run.id || certificate.taskId !== `issue-${run.issueId}` || certificate.branch !== input.branch || certificate.commit !== head || certificate.sourceHash !== source.hash || certificate.environment !== environment(source, input.cwd)) throw new Error('Certificate run, exact target, source, runtime, dependencies or engine identity changed.');
     const value = inspect(run.evidencePath, source.hash, certificate);
     const base = parseVerificationContract(readJson(join(input.cwd, 'factory/verification-contract.json')));

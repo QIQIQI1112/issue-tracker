@@ -89,7 +89,7 @@ function verifiedPublication(store: IssueStore, requirement: Requirement): { pub
 }
 
 function pullIdentity(pull: Pull, publication: Publication): void {
-  if (!Number.isSafeInteger(pull.number) || pull.number < 1 || pull.html_url !== `https://github.com/${publication.repository}/pull/${pull.number}` || pull.head.sha !== publication.headCommit || pull.head.ref !== publication.branch || pull.base.ref !== publication.baseBranch || pull.head.repo.full_name.toLowerCase() !== publication.repository.toLowerCase() || pull.base.repo.full_name.toLowerCase() !== publication.repository.toLowerCase() || pull.draft) throw new Error('GitHub PR head, base, repository or identity changed.');
+  if (!Number.isSafeInteger(pull.number) || pull.number < 1 || pull.html_url !== `https://github.com/${pull.base.repo.full_name}/pull/${pull.number}` || pull.head.sha !== publication.headCommit || pull.head.ref !== publication.branch || pull.base.ref !== publication.baseBranch || pull.head.repo.full_name.toLowerCase() !== publication.repository.toLowerCase() || pull.base.repo.full_name.toLowerCase() !== publication.repository.toLowerCase() || pull.draft) throw new Error('GitHub PR head, base, repository or identity changed.');
 }
 
 async function ciProof(host: GitHubHost, publication: Publication, pull: Pull, directory: string, observed: (run: WorkflowRun) => void): Promise<WorkflowRun | undefined> {
