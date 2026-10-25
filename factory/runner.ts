@@ -8,7 +8,7 @@ import { completeVerification, parseVerification, parseVerificationContract, rea
 import { trustedVerifier } from './verifier.ts';
 import { runProcess } from './process.ts';
 import { allocatePorts, git, prepareWorkspace, processEnvironment } from './workspace.ts';
-import { controllerDelivery } from './delivery.ts';
+import { finishRunRecord } from './run-record.ts';
 import { digest, environmentIdentity, loadCheckpoint, restoreCheckpoint, saveCheckpoint } from './checkpoint.ts';
 import { assertRunQuiescent, processIdentity } from './ownership.ts';
 import { executionBudget } from './budget.ts';
@@ -438,20 +438,11 @@ export async function runController(options: { repository: string; task: unknown
     try { checkpoint?.(); } catch (checkpointError) { writeJson(join(runDirectory, 'checkpoint-error.json'), { reason: String(checkpointError) }); }
     state.status = 'blocked'; state.reason = error instanceof Error ? error.message : String(error);
     state.failureKind = error instanceof FocusedFailureHold ? 'review' : /protected|scope|identity changed|changed during|changed after|read.only/i.test(state.reason) ? 'integrity' : /cancelled/i.test(state.reason) ? 'cancelled' : /timeout|timed out/i.test(state.reason) ? 'timeout' : /budget.*exhausted/i.test(state.reason) ? 'budget' : /owner|process group|locked/i.test(state.reason) ? 'ownership' : /infrastructure.*retry/i.test(state.reason) ? 'infrastructure' : /verification/i.test(state.reason) ? 'verification' : /review/i.test(state.reason) ? 'review' : 'worker';
-    stages.block(state.failureKind, state.reason);
   } finally {
     process.removeListener('SIGINT', cancel); process.removeListener('SIGTERM', cancel);
     options.signal?.removeEventListener('abort', cancel);
     if (budget) { state.budget = budget.report(); budget.close(); }
-    if (state.status === 'ready' || state.status === 'merged') stages.complete(state.status, (state.integration?.verification ?? state.verification)!.snapshot.hash);
-    state.completedAt = new Date().toISOString(); save();
-    if (state.efficiency) {
-      state.efficiency.elapsedMs = Date.parse(state.completedAt) - Date.parse(state.startedAt);
-      const sum = (...names: string[]) => state.phases!.filter(phase => names.includes(phase.name)).reduce((total, phase) => total + phase.durationMs, 0);
-      state.efficiency.durations = { planningMs: sum('plan'), testAuthoringMs: sum('tests', 'regression-tests'), acceptanceReviewMs: sum('acceptance-review'), implementationMs: sum('implement', 'repair'), verificationMs: sum('verify', 'integration-verify', 'focused-checks'), codeReviewMs: sum('review') };
-      save();
-    }
-    controllerDelivery(state, task);
+    finishRunRecord(state, task, state.status === 'ready' || state.status === 'merged' ? { status: state.status, sourceHash: (state.integration?.verification ?? state.verification)!.snapshot.hash } : { status: 'blocked', reason: state.reason! }, stages);
   }
   return state;
 }

@@ -11,6 +11,7 @@ The application remains a local React, Express and SQLite workbench. One serial 
 | `factory/controller.ts` | Compatibility exports for existing callers. |
 | `factory/runner.ts` | The single task orchestration path, including coverage reuse, extension, repair and integration. |
 | `factory/stages.ts` | Version-two discriminated state, legal stage transitions, source-bound proof admission and structured failures. |
+| `factory/run-record.ts` | Shared terminal transition owner for typed progress, detailed state and standard delivery; the queue indexes the returned outcome and reason transactionally. |
 | `factory/agent-session.ts` | Existing role invocation, context, deadlines, cancellation and settlement. |
 | `factory/scope-guard.ts` | Authoring, frozen and regression scope modes and complete accepted inventory enforcement. |
 | `factory/profiles.ts` | Explicit maintenance authority validation and immutable pre-change supervisor capture. |
@@ -28,6 +29,8 @@ Admission leads to planning, check preparation, coverage review, implementation,
 Entering implementation, diagnostics, verification or integration requires an unchanged approved test inventory. Source review requires an actual complete passing verifier summary and raw named report on the same source. Completion requires unchanged same-source verification and approving independent review artifacts; merged completion additionally requires the actual integration receipt. Every proof reference records its path, SHA-256 and source hash. Integration retries explicitly re-enter integration for the latest target candidate.
 
 Failures retain their kind, originating stage and actionable message. A rejected source review is never an approving progression proof. Recovery reconciles an actual committed integration and matching typed proof bytes; it cannot infer success from prose or repeat integration blindly. Unsupported or damaged evidence blocks reuse.
+
+Normal finalization, queue blocking and quiescent interrupted recovery use the same terminal-record owner. It reconciles typed progress before writing detailed state and regenerating the delivery manifest, including when delivery already exists. Recorded failure context and completed timing survive reconciliation; an active interval closes once at the established terminal instant or the actual reconciliation time. Proof identities, attempts and cumulative budgets remain intact. Legacy runs without typed progress remain readable without synthesizing modern evidence. Application reads remain projections and never repair persisted execution state.
 
 ## Authority profiles
 

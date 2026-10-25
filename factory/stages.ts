@@ -22,7 +22,26 @@ export function parseRunState(input: unknown): RunState {
   return value;
 }
 
-export function recoverRunState(directory: string, sourceHash: string): void {
+function terminal(value: Pick<RunState, 'transitions'>, stage: 'blocked' | 'completed', completedAt: string): void {
+  const phase = value.transitions.at(-1)!;
+  if (!phase.completedAt) {
+    phase.completedAt = completedAt;
+    phase.durationMs = Date.parse(completedAt) - Date.parse(phase.startedAt);
+  }
+  if (phase.stage !== stage) value.transitions.push({ stage, startedAt: completedAt, completedAt, durationMs: 0 });
+}
+
+export function blockRunState(directory: string, kind: string, message: string, completedAt: string): RunState {
+  const value = parseRunState(readJson(join(directory, 'run-state.json')));
+  if (value.status === 'blocked') return value;
+  const failure = { kind, message, stage: value.stage };
+  terminal(value, 'blocked', completedAt);
+  const blocked = parseRunState({ ...value, status: 'blocked', stage: 'blocked', failure });
+  writeJson(join(directory, 'run-state.json'), blocked);
+  return blocked;
+}
+
+export function recoverRunState(directory: string, sourceHash: string, completedAt: string): void {
   const value = parseRunState(readJson(join(directory, 'run-state.json')));
   for (const key of ['verification', 'review'] as const) {
     const proof = value.proofs[key];
@@ -30,11 +49,7 @@ export function recoverRunState(directory: string, sourceHash: string): void {
   }
   if (value.status === 'merged') return;
   const base = { ...value, failure: undefined };
-  const completedAt = new Date().toISOString();
-  const phase = base.transitions.at(-1)!;
-  phase.completedAt ??= completedAt;
-  phase.durationMs = Date.parse(phase.completedAt) - Date.parse(phase.startedAt);
-  base.transitions.push({ stage: 'completed', startedAt: completedAt, completedAt, durationMs: 0 });
+  terminal(base, 'completed', completedAt);
   writeJson(join(directory, 'run-state.json'), parseRunState({ ...base, status: 'merged', stage: 'completed', sourceHash }));
 }
 
@@ -74,7 +89,7 @@ export class StageRunner {
       assertTestInventory(source.files, readJson(join(this.directory, this.value.proofs.acceptedChecks!.path)) as { path: string; hash: string }[]);
     }
     if (stage === 'source_review') this.checkProof(this.value.proofs.verification, source.hash);
-    if (operation === 'implement' || operation === 'repair') this.pendingFailure = undefined;
+    if (this.pendingFailure?.stage !== stage) this.pendingFailure = undefined;
     this.move(stage);
     this.value = { ...this.value, stage, sourceHash: source.hash };
     this.save();
@@ -108,22 +123,23 @@ export class StageRunner {
     this.value.proofs.review = this.proof(path, sourceHash);
     this.save();
   }
-  complete(status: 'ready' | 'merged', sourceHash: string): void {
+  complete(status: 'ready' | 'merged', sourceHash: string, completedAt: string): void {
     if (this.value.status !== 'running') throw new Error('A terminal run cannot complete again.');
     this.checkProof(this.value.proofs.verification, sourceHash); this.checkProof(this.value.proofs.review, sourceHash);
     if (status === 'merged') {
       const receipt = readJson(join(this.directory, 'integration.json')) as { commit: string };
       if (!/^[a-f0-9]{40,64}$/.test(receipt.commit)) throw new Error('Merged completion requires actual integration evidence.');
     }
-    this.move('completed');
+    terminal(this.value, 'completed', completedAt);
     this.value = { ...this.value, stage: 'completed', status, sourceHash };
     this.save();
   }
-  block(kind: string, message: string): void {
-    if (this.value.status !== 'running') return;
+  block(kind: string, message: string, completedAt: string): RunState {
+    if (this.value.status !== 'running') return this.value;
     const failure = this.pendingFailure ?? { kind, message, stage: this.value.stage };
-    this.move('blocked');
+    terminal(this.value, 'blocked', completedAt);
     this.value = { ...this.value, status: 'blocked', stage: 'blocked', failure };
     this.save();
+    return this.value;
   }
 }
