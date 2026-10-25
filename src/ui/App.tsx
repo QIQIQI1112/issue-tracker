@@ -22,7 +22,7 @@ export function App() {
   const [detail, setDetail] = useState<Issue | null>(null);
   const [repoFilter, setRepoFilter] = useState('');
   const [subview, setSubview] = useState<Subview>('requirements');
-  const selectedRepo = !registryLoading && !workbenchError ? workbench.repos.find(repo => String(repo.id) === repoFilter) : undefined;
+  const selectedRepo = workbench.repos.find(repo => String(repo.id) === repoFilter);
   useEffect(() => {
     if (repoFilter && !selectedRepo) { setRepoFilter(''); setSubview('requirements'); setDetail(null); }
   }, [repoFilter, selectedRepo]);

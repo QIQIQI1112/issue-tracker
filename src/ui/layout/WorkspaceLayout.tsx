@@ -27,6 +27,7 @@ export function WorkspaceLayout({ repos, repoFilter, selectedRepo, subview, regi
     <main id="main-content" className="main" tabIndex={-1}><div className="workspace-content">
       {repoFilter && selectedRepo ? <>
         <nav className="repository-toolbar" aria-label="Repository views"><div className="repository-context"><strong>{selectedRepo.name}</strong><span>Repository #{selectedRepo.id} · {selectedRepo.path}</span></div>{(['requirements', 'harness', 'unassigned'] as const).map(view => <Button key={view} type="button" className="button" aria-current={subview === view ? 'page' : undefined} onClick={() => setSubview(view)}>{view === 'requirements' ? 'Requirements' : view === 'harness' ? 'Repo harness' : 'Unassigned'}</Button>)}</nav>
+        {workbenchError && <p className="form-error" role="alert">Repository metadata unavailable: {workbenchError}. Showing previously loaded metadata. Retrying automatically.</p>}
         {children}
       </> : <>
         <header className="page-header"><div><h1>Repositories</h1></div><Button loading={registryLoading} onClick={refreshRepositories}><ToolbarIcon name="arrow" />{workbenchError ? 'Retry repositories' : 'Refresh repositories'}</Button></header>
