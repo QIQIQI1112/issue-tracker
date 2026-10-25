@@ -6,11 +6,7 @@
 .brand strong { font-size: var(--font-size-19); font-weight: var(--font-weight-medium); letter-spacing: var(--tracking-brand); }
 .brand-description { color: var(--muted); font-size: var(--font-size-12); }
 .sidebar { background: var(--frame); min-width: 0; min-height: 0; padding: 8px 12px 12px; display: flex; flex-direction: column; gap: 8px; font-family: var(--font-family-body); font-size: 14px; line-height: 20px; font-weight: 400; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-.sidebar nav { display: flex; flex: 1; min-height: 0; overflow: hidden; }
-.sidebar [role="group"] { display: flex; flex-direction: column; min-height: 0; }
-.sidebar [role="group"] > .nav-button, .sidebar [role="group"] > .registry-message { flex: none; }
-.repository-list { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
-.sidebar nav, .repository-entry, .repository-subviews, .sidebar [role="group"] { min-width: 0; width: 100%; }
+.sidebar nav { display: flex; align-items: flex-start; flex: 1; min-height: 0; min-width: 0; width: 100%; overflow: hidden; }
 .nav-button, .rail-toggle { position: relative; width: 100%; display: flex; gap: 8px; align-items: center; padding: 0 12px 0 6px; border-radius: 8px; text-align: left; color: var(--text-primary); background: transparent; min-height: 32px; margin-bottom: 2px; font-size: 14px; line-height: 20px; font-weight: 400; transition: padding 220ms cubic-bezier(0.22, 1, 0.36, 1), color 140ms cubic-bezier(0.4, 0, 0.2, 1), background-color 140ms cubic-bezier(0.4, 0, 0.2, 1); }
 .toolbar-icon-slot { display: grid; place-items: center; width: 24px; height: 24px; flex: none; }
 .nav-button .icon, .rail-toggle .icon { width: 20px; height: 20px; flex: none; }
@@ -19,11 +15,6 @@
 .nav-text { min-width: 0; overflow-wrap: anywhere; opacity: 1; transition: opacity 140ms cubic-bezier(0.4, 0, 0.2, 1); }
 .workspace[data-sidebar="collapsed"] .nav-text { max-height: 20px; white-space: nowrap; opacity: 0; }
 .workspace[data-sidebar="expanded"] .nav-button { padding: 0 12px; }
-.workspace[data-sidebar="expanded"] .repository-subviews { padding-left: 12px; }
-.registry-message { display: flex; align-items: center; gap: 8px; margin: 2px 0; padding: 6px 8px; font-size: var(--font-size-12); overflow-wrap: anywhere; color: var(--muted); }
-.registry-message .icon { width: 20px; height: 20px; flex: none; }
-.workspace[data-sidebar="collapsed"] .registry-description { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-.workspace[data-sidebar="collapsed"] .registry-message { font-size: 0; }
 .rail-toggle { flex: none; width: max-content; align-self: flex-start; margin: auto 0 0; }
 .rail-toggle::before { content: ''; position: absolute; top: 0; left: 0; width: 36px; height: 32px; border-radius: inherit; background: transparent; pointer-events: none; transition: background-color 140ms cubic-bezier(0.4, 0, 0.2, 1); }
 .rail-toggle:hover::before { background: var(--surface-hover); }
@@ -48,10 +39,7 @@
   .workspace[data-sidebar="expanded"] { grid-template-columns: 60px minmax(0, 1fr); }
   .workspace .nav-text { position: absolute; width: 0; max-height: 20px; overflow: hidden; white-space: nowrap; opacity: 0; }
   .workspace[data-sidebar="expanded"] .nav-button { padding: 0 12px 0 6px; }
-  .workspace[data-sidebar="expanded"] .repository-subviews { padding-left: 0; }
   .workspace-content { padding: 16px; }
-  .registry-message { font-size: 0; }
-  .registry-description { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 }
 @media (max-width: 600px) {
   .brand-description, .breadcrumb-workspace { display: none; }
@@ -68,5 +56,12 @@
   .workspace-content > .issue-panel > .state-panel { flex: 1; min-height: 160px; }
 }
 
-.repository-toolbar { display: flex; flex-wrap: wrap; gap: var(--space-lg); flex: none; margin-bottom: var(--space-2xl); }
+.repository-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-lg); flex: none; margin-bottom: var(--space-2xl); }
 .repository-toolbar [aria-current="page"] { background: var(--surface-active); color: var(--text-selection); }
+.repository-context { display: grid; gap: var(--space-md); min-width: 0; overflow-wrap: anywhere; }
+.repository-context > span { color: var(--muted); font-size: var(--font-size-12); }
+.repository-toolbar .repository-context { flex: 1 1 100%; margin-bottom: var(--space-lg); }
+.repository-directory { list-style: none; padding: 0; margin: 0; }
+.repository-directory li { display: flex; align-items: center; gap: var(--space-2xl); padding: var(--space-3xl); border-bottom: 1px solid var(--border); }
+.repository-directory li:last-child { border-bottom: 0; }
+.repository-directory .text-button { min-height: 44px; }
