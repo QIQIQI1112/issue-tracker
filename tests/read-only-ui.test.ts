@@ -4,12 +4,16 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { App } from '../src/ui/App.tsx';
 import { IssueRow } from '../src/ui/IssueRow.tsx';
+import { IssueFixture } from './dropdown-fixture.ts';
 
 test('inspection workspace initial render omits creation controls and mutation forms', () => {
-  const html = renderToStaticMarkup(createElement(App));
+  const workspace = renderToStaticMarkup(createElement(App));
+  const html = renderToStaticMarkup(createElement(IssueFixture));
   assert.match(html, /<h1\b[^>]*>[\s\S]*?\bIssues\b[\s\S]*?<\/h1>/, 'The issue inspection workspace renders before checking absent operations.');
-  assert.doesNotMatch(html, /New issue|Create issue|Create your first issue|id="new-issue"/i, 'Inspection must omit creation controls, including disabled initial controls.');
-  assert.doesNotMatch(html, /<form\b|<textarea\b|contenteditable="true"/i, 'Inspection must not render mutation forms or editable issue content.');
+  for (const surface of [workspace, html]) {
+    assert.doesNotMatch(surface, /New issue|Create issue|Create your first issue|id="new-issue"/i, 'Inspection must omit creation controls, including disabled initial controls.');
+    assert.doesNotMatch(surface, /<form\b|<textarea\b|contenteditable="true"/i, 'Inspection must not render mutation forms or editable issue content.');
+  }
 });
 
 test('inspection issue rows expose only title and identifier openers', () => {

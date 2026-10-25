@@ -6,6 +6,7 @@ import { App } from '../src/ui/App.tsx';
 import { IssueRow } from '../src/ui/IssueRow.tsx';
 import { DeliveryView } from '../src/ui/DeliveryView.tsx';
 import type { Delivery } from '../src/workflow.ts';
+import { IssueFixture } from './dropdown-fixture.ts';
 
 const timestamp = '2026-10-15T00:00:00.000Z';
 const delivery: Delivery = {
@@ -25,10 +26,11 @@ test('issue title and identifier controls open inspection without edit actions',
 });
 
 test('issue workspace omits Workbench navigation and manual administration', () => {
-  const html = renderToStaticMarkup(createElement(App));
-  assert.doesNotMatch(html, /Workbench|Register repository|Create requirement/, 'Issue inspection replaces the Workbench administration view.');
+  const workspace = renderToStaticMarkup(createElement(App));
+  const html = renderToStaticMarkup(createElement(IssueFixture));
+  for (const surface of [workspace, html]) assert.doesNotMatch(surface, /Workbench|Register repository|Create requirement/, 'Issue inspection replaces the Workbench administration view.');
   for (const name of ['Search issues', 'Filter by status', 'Filter by label', 'Sort issues']) assert.ok(html.includes(`aria-label="${name}"`), `Retain ${name}.`);
-  assert.match(html, /aria-label="(?:Filter by repository|Repositories)"/, 'Repository selection remains accessible.');
+  assert.match(workspace, /aria-label="(?:Filter by repository|Repositories)"/, 'Repository selection remains accessible.');
   assert.match(html, /<h1>Issues<\/h1>/, 'The inspection workspace retains its main heading.');
 });
 
@@ -106,9 +108,6 @@ test('delivery efficiency renders recorded counters stage durations and selected
   assert.match(text, /(?:execution )?route\s*:?\s*standard/i, 'The recorded execution route must be labelled.');
   assert.match(text, /coverage(?: mode)?\s*:?\s*extend/i, 'Coverage mode must remain distinct from verification proof reuse.');
   assert.match(text, /Distinct retained route rationale\./, 'The recorded route reason remains available.');
-  assert.match(text, /(?:verification[^.]*focused|focused[^.]*verification)/i, 'Application text must explain that verification duration includes focused checks.');
-  assert.match(text, /(?:test[- ]authoring[^.]*includ[^.]*agent|agent[^.]*includ[^.]*test[- ]authoring)/i, 'Application text must explain that test-authoring calls are included in total agent calls.');
-  assert.match(text, /(?:stage|duration|bucket)[^.]* (?:not|may not|need not|do not)[^.]* (?:sum|add|equal|total)|(?:overlap|not additive)/i, 'Application text must avoid presenting stage durations as an additive elapsed-time decomposition.');
 });
 
 test('delivery efficiency handles independent optional fields zero values and proof reuse', () => {

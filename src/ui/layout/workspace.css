@@ -67,3 +67,6 @@
   .workspace-content > .issue-panel > :not(.issue-list) { flex: none; }
   .workspace-content > .issue-panel > .state-panel { flex: 1; min-height: 160px; }
 }
+
+.repository-toolbar { display: flex; flex-wrap: wrap; gap: var(--space-lg); flex: none; margin-bottom: var(--space-2xl); }
+.repository-toolbar [aria-current="page"] { background: var(--surface-active); color: var(--text-selection); }

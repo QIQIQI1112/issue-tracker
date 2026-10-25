@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { WorkspaceLayout } from '../src/ui/layout/WorkspaceLayout.tsx';
-import { Fixture } from './dropdown-fixture.ts';
+import { Fixture, repo } from './dropdown-fixture.ts';
 import { assertRailDesign } from './ui-design-contract.ts';
 
 function designSources() {
@@ -26,7 +26,7 @@ test('rail toggle retains real button semantics and changes the actual workspace
   } });
   try {
     await fixture.mount(createElement(WorkspaceLayout, {
-      repos: [], repoFilter: '', selectedRepo: undefined, subview: 'issues', registryLoading: false, workbenchError: '',
+      repos: [repo], repoFilter: String(repo.id), selectedRepo: repo, subview: 'requirements', registryLoading: false, workbenchError: '',
       chooseRepository: id => actions.push(`repository:${id}`), setSubview: view => actions.push(`view:${view}`), refreshRepositories: () => actions.push('refresh'),
       children: createElement('p', null, 'Current content'),
     }));
@@ -40,7 +40,7 @@ test('rail toggle retains real button semantics and changes the actual workspace
     assert.equal(toggle.querySelector('.toolbar-icon-slot')?.getAttribute('aria-hidden'), 'true');
     assert.equal(toggle.querySelector('svg')?.getAttribute('focusable'), 'false');
     assert.equal(toggle.querySelector('path')?.getAttribute('d'), 'm11 17-5-5 5-5m7 10-5-5 5-5');
-    const selected = fixture.named('All repositories');
+    const selected = fixture.named(repo.name);
     const unselected = fixture.named('Refresh repositories');
     assert.ok(selected && unselected);
     assert.equal(selected.getAttribute('aria-pressed'), 'true');
