@@ -12,7 +12,8 @@ import { codexPlanner, parseDecomposition } from './planner.ts';
 import type { Planner } from './planner.ts';
 import { allocatePorts, git, prepareWorkspace, processEnvironment } from './workspace.ts';
 import { completeVerification, parseVerificationContract, readJson, snapshot, writeJson } from './evidence.ts';
-import { controllerDelivery, saveDelivery } from './delivery.ts';
+import { saveDelivery } from './delivery.ts';
+import { finishRunRecord } from './run-record.ts';
 import { runProcess } from './process.ts';
 import type { Verification } from './controller.ts';
 import { trustedVerifier } from './verifier.ts';
@@ -85,8 +86,8 @@ export class SerialQueue {
       const reason = error instanceof Error ? error.message : String(error);
       const { run, job } = claimed;
       if (recoverMerge(this.store.work.repo(job.repoId)!.path, run.evidencePath)) { this.store.work.finish(run.id, 'merged'); return true; }
-      this.blockedDelivery(job, run, reason);
-      this.store.work.finish(run.id, 'blocked', reason);
+      const blocked = this.blockedDelivery(job, run, reason);
+      this.store.work.finish(run.id, blocked.status, blocked.reason);
       return true;
     } finally {
       if (claimed) {
@@ -105,29 +106,28 @@ export class SerialQueue {
     }
   }
 
-  private blockedDelivery(job: Job, run: WorkRun, reason: string): void {
-    if (existsSync(join(run.evidencePath, 'delivery.json'))) {
-      const delivery = readJson(join(run.evidencePath, 'delivery.json')) as Delivery;
-      if (delivery.status !== 'blocked') {
-        writeJson(join(run.evidencePath, 'admission-error.json'), { reason });
-        saveDelivery(run.evidencePath, { ...delivery, summary: `Controller blocked delivery: ${reason}`, status: 'blocked', completedAt: new Date().toISOString(), limitations: [...delivery.limitations, reason] });
-      }
-      return;
-    }
+  private blockedDelivery(job: Job, run: WorkRun, reason: string): { status: 'blocked'; reason: string } {
     mkdirSync(run.evidencePath, { recursive: true });
-    writeJson(join(run.evidencePath, 'failure.json'), { reason });
     if (existsSync(join(run.evidencePath, 'state.json')) && existsSync(join(run.evidencePath, 'task.json'))) {
       const state = readJson(join(run.evidencePath, 'state.json')) as ControllerState;
-      state.status = 'blocked'; state.failedPhase ??= state.phase; state.reason = reason; state.completedAt = new Date().toISOString();
-      writeJson(join(run.evidencePath, 'state.json'), state);
+      if (state.runId !== run.id) throw new Error('Queue recovery state does not match its native run.');
       const authority = existsSync(join(run.evidencePath, 'owner-authorization.json')) ? readJson(join(run.evidencePath, 'owner-authorization.json')) as OwnerAuthorization : undefined;
-      controllerDelivery(state, parseTask(readJson(join(run.evidencePath, 'task.json')), authority?.scope));
+      finishRunRecord(state, parseTask(readJson(join(run.evidencePath, 'task.json')), authority?.scope), { status: 'blocked', reason });
+      return { status: 'blocked', reason: state.reason! };
+    } else if (existsSync(join(run.evidencePath, 'delivery.json'))) {
+      const delivery = readJson(join(run.evidencePath, 'delivery.json')) as Delivery;
+      const retainedReason = delivery.status === 'blocked' ? delivery.limitations[0] : undefined;
+      reason = retainedReason ?? reason;
+      writeJson(join(run.evidencePath, 'admission-error.json'), { reason });
+      saveDelivery(run.evidencePath, { ...delivery, summary: `Controller blocked delivery: ${reason}`, status: 'blocked', completedAt: delivery.status === 'blocked' ? delivery.completedAt : new Date().toISOString(), limitations: [...new Set([...delivery.limitations, reason])] });
     } else {
+      writeJson(join(run.evidencePath, 'failure.json'), { reason });
       const payload = JSON.parse(job.payload) as { title: string; goal?: string; description?: string };
       const review = existsSync(join(run.evidencePath, 'review.json')) ? readJson(join(run.evidencePath, 'review.json')) as { approved: boolean; summary: string } : null;
       const defaults = existsSync(join(run.evidencePath, 'decomposition.json')) ? parseDecomposition(readJson(join(run.evidencePath, 'decomposition.json')), 2).assumptions : [];
       saveDelivery(run.evidencePath, { schemaVersion: 1, runId: run.id, taskId: job.issueId ? `issue-${job.issueId}` : `requirement-${job.requirementId}`, title: payload.title, goal: payload.goal ?? payload.description ?? payload.title, status: 'blocked', startedAt: run.startedAt, completedAt: new Date().toISOString(), baseline: null, sourceHash: null, defaults, changes: [], checks: [], nodePassed: 0, browserPassed: 0, attempts: 0, review, integration: null, limitations: [reason] });
     }
+    return { status: 'blocked', reason };
   }
 
   recover(): void {
@@ -145,8 +145,11 @@ export class SerialQueue {
       if (!merged) {
         try { captureInterruptedDraft(run.evidencePath); } catch (error) { writeJson(join(run.evidencePath, 'draft-recovery-error.json'), { reason: String(error) }); }
       }
-      if (!merged) this.blockedDelivery(this.store.work.jobs().find(job => job.id === run.jobId)!, run, reason);
-      this.store.work.finish(run.id, merged ? 'merged' : 'blocked', merged ? null : reason);
+      if (merged) this.store.work.finish(run.id, 'merged');
+      else {
+        const blocked = this.blockedDelivery(job, run, reason);
+        this.store.work.finish(run.id, blocked.status, blocked.reason);
+      }
     }
   }
 

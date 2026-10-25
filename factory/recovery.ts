@@ -3,10 +3,9 @@ import { join } from 'node:path';
 import type { ControllerState } from './controller.ts';
 import { readJson, writeJson } from './evidence.ts';
 import { git } from './workspace.ts';
-import { controllerDelivery } from './delivery.ts';
+import { finishRunRecord } from './run-record.ts';
 import { parseTask } from './contracts.ts';
 import type { IntegrationReceipt } from './integration.ts';
-import { recoverRunState } from './stages.ts';
 import { commitSnapshot } from './maintenance.ts';
 
 export function recoverMerge(repository: string, root: string): boolean {
@@ -19,12 +18,10 @@ export function recoverMerge(repository: string, root: string): boolean {
     if (receipt.before !== state.integration.before || receipt.branch !== state.integration.branch || !/^[a-f0-9]{40,64}$/.test(receipt.commit) || git(repository, ['rev-parse', `${receipt.commit}^{tree}`]).trim() !== receipt.tree) continue;
     try { git(repository, ['merge-base', '--is-ancestor', receipt.commit, `refs/heads/${receipt.branch}`]); }
     catch { continue; }
-    if (existsSync(join(root, 'run-state.json'))) recoverRunState(root, commitSnapshot(repository, receipt.commit).hash);
-    state.status = 'merged'; state.phase = 'merged'; state.integration.commit = receipt.commit; state.completedAt ??= new Date().toISOString(); delete state.reason;
-    writeJson(join(root, 'state.json'), state);
+    state.integration.commit = receipt.commit;
     writeJson(join(root, 'integration.json'), receipt);
     const authority = existsSync(join(root, 'owner-authorization.json')) ? readJson(join(root, 'owner-authorization.json')) as { scope: string[] } : undefined;
-    controllerDelivery(state, parseTask(readJson(join(root, 'task.json')), authority?.scope));
+    finishRunRecord(state, parseTask(readJson(join(root, 'task.json')), authority?.scope), { status: 'merged', sourceHash: commitSnapshot(repository, receipt.commit).hash });
     return true;
   }
   return false;

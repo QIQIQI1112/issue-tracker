@@ -13,6 +13,10 @@ Ordinary dispatch leaves maintenance awaiting explicit owner authority. An owner
 
 ## Review the right evidence at each stage
 
+`factory/run-record.ts` owns terminal persistence for the runner and external blocking or merge recovery. `StageRunner` retains proof admission authority. Interrupted native recovery first establishes quiescence and attempts verified-merge reconciliation, then blocks through the shared owner if no merge is proven. Existing delivery does not bypass typed or detailed reconciliation. The native outcome index receives the reconciled status and originating reason only after evidence is saved. Repeated reconciliation preserves terminal timestamps, completed phase timing and failure context; it neither resets budgets nor invents legacy proof identities. Multi-file evidence writes are replayable rather than a cross-file transaction, while native indexing retains the existing SQLite transaction.
+
+The native recovery regressions use real SQLite claims and retained execution records. Existing disposable factory fixtures retain no-op lint, typecheck and build commands for orchestration checks; they do not establish candidate source quality. The controller's real four-gate verifier and independent source review remain required.
+
 The owner policy `factory/execution-policy.json` selects `{ "schemaVersion": 1, "mode": "adaptive-v2" }` for newly dispatched queue tasks. A missing policy retains `legacy-v1`; malformed policy blocks instead of silently changing execution. Conversation schema version two describes issue classification and does not itself authorize an execution profile.
 
 Adaptive version-two integrated execution follows this order:

@@ -27,6 +27,7 @@ export function saveDelivery(root: string, delivery: Omit<Delivery, 'evidence'>)
 }
 
 export function controllerDelivery(state: ControllerState, task: Task): Delivery {
+  const previous = existsSync(join(state.runDirectory, 'delivery.json')) ? JSON.parse(readFileSync(join(state.runDirectory, 'delivery.json'), 'utf8')) as Delivery : undefined;
   const verification = state.integration?.verification ?? state.verification;
   const review = state.integration?.review ?? state.review;
   const changes = state.changes ?? [];
@@ -39,6 +40,7 @@ export function controllerDelivery(state: ControllerState, task: Task): Delivery
       : state.status === 'ready' ? 'The controller completed full verification and independent review. The delivery-only patch is ready for separate integration.'
         : 'Controller execution is in progress; no final delivery outcome has been recorded.';
   return saveDelivery(state.runDirectory, {
+    lifecycle: previous?.lifecycle, publication: previous?.publication,
     schemaVersion: 1, ...(state.execution ? { execution: state.execution, efficiency: state.efficiency } : {}), phases: state.phases, reviewReceipts: state.reviewReceipts, resume: state.resume, budget: state.budget, failedPhase: state.failedPhase, failureKind: state.failureKind, runId: state.runId, taskId: task.id, title: task.title, goal: task.goal, summary, workerObservations, status: state.status, startedAt: state.startedAt, completedAt: state.completedAt!, baseline: state.baseCommit ?? null, sourceHash: verification?.snapshot.hash ?? null,
     behaviorChecks: state.plan ? [...state.plan.slices.flatMap(slice => slice.checks), ...state.plan.browserChecks.map(check => ({ ...check, file: `acceptance/${check.file}` })), ...(state.regressions ?? []).flatMap(regression => [...regression.checks, ...regression.browserChecks.map(check => ({ ...check, file: `acceptance/${check.file}` }))])] : [],
     defaults: state.plan?.assumptions ?? [], changes: changes.map(file => ({ ...file, category: /^(tests|acceptance)\//.test(file.path) ? 'tests' : /^(factory|scripts)\//.test(file.path) ? 'harness' : /^docs\//.test(file.path) ? 'documentation' : 'application' })),
