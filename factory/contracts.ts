@@ -49,7 +49,7 @@ function path(input: unknown, name: string): string {
   return value;
 }
 
-export function parseTask(input: unknown): Task {
+export function parseTask(input: unknown, authorizedScope: readonly string[] = []): Task {
   const value = object(input, 'Task');
   if (value.schemaVersion !== 1 && value.schemaVersion !== 2) throw new Error('Unsupported task schema version.');
   if (value.verificationCommand !== 'npm run verify') throw new Error('Task verification must use the controller-owned verification command.');
@@ -58,7 +58,7 @@ export function parseTask(input: unknown): Task {
     return { id: id(item.id, 'Acceptance ID'), description: text(item.description, 'Acceptance description') };
   });
   if (!acceptance.length || new Set(acceptance.map(item => item.id)).size !== acceptance.length) throw new Error('Tasks require distinct acceptance items.');
-  const scope = list(value.scope, 'scope').map(item => path(item, 'Scope'));
+  const scope = list(value.scope, 'scope').map(item => authorizedScope.includes(String(item)) ? text(item, 'Scope') : path(item, 'Scope'));
   if (!scope.length) throw new Error('Tasks need an explicit scope.');
   const budget = object(value.budget, 'Budget');
   const parsedBudget = { maxAttempts: integer(budget.maxAttempts, 'maxAttempts', 1, 5), workerTimeoutMs: integer(budget.workerTimeoutMs, 'workerTimeoutMs', 1000, 600000), totalTimeoutMs: integer(budget.totalTimeoutMs, 'totalTimeoutMs', 1000, 3600000) };

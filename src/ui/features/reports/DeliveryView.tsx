@@ -10,9 +10,10 @@ function duration(milliseconds: number): string {
   return [hours ? `${hours} h` : '', minutes ? `${minutes} m` : '', seconds ? `${seconds} s` : ''].filter(Boolean).join(' ');
 }
 
-function ExecutionEfficiency({ delivery: { efficiency, execution } }: { delivery: Delivery }) {
+function ExecutionEfficiency({ delivery: { efficiency, execution, lifecycle } }: { delivery: Delivery }) {
   return <div className="delivery-group delivery-efficiency">
     {(efficiency || execution) && <h4>Execution efficiency</h4>}
+    {lifecycle && <dl className="efficiency-metrics"><div><dt>Queue wait</dt><dd>{duration(lifecycle.queueWaitMs)}</dd></div><div><dt>Claim to completion</dt><dd>{duration(lifecycle.wallMs)}</dd></div><div><dt>Authority profile</dt><dd>{lifecycle.profile}</dd></div></dl>}
     {efficiency ? <>
       <p>Recorded cost of the selected run, separate from cumulative budget usage and whole requirement delivery.</p>
       <dl className="efficiency-metrics">

@@ -1,0 +1,54 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import { mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { createElement } from 'react';
+import { createApp } from '../src/api.ts';
+import { IssueStore } from '../src/storage.ts';
+import type { WorkRun } from '../src/workflow.ts';
+import { SelectedReport } from '../src/ui/features/reports/SelectedReport.tsx';
+import { Fixture } from './dropdown-fixture.ts';
+import { getInProcess } from './repository-harness-fixture.ts';
+import { evidenceDirectory } from './helpers/subprocess.ts';
+
+test('read-only run diagnostics project matching maintenance progress and show its current stage without inventing delivery', async () => {
+  const root = evidenceDirectory('maintenance-progress');
+  const store = new IssueStore(join(root, 'state.sqlite'));
+  const fixture = new Fixture();
+  try {
+    const repo = store.work.addRepo({ name: 'Progress fixture', path: join(root, 'repo'), targetBranch: 'main' });
+    const issue = store.create({ title: 'Inspect owner progress', description: 'Read the active maintenance stage.', status: 'open', priority: 'medium', labels: [], work: { repoId: repo.id, requirementId: null, dependsOn: [], acceptance: ['Current progress is inspectable.'], changeKind: 'harness' } });
+    store.work.startIssue(issue.id);
+    const { run } = store.work.claimMaintenance(issue.id, join(root, 'evidence'));
+    assert.equal(run.status, 'running', 'The public read must describe a real already claimed native run.');
+    const app = createApp(store, { instanceId: 'maintenance-progress', version: 'fixture' });
+    const path = `/api/runs/${run.id}`;
+    const historical = await getInProcess(app, path);
+    assert.equal(historical.status, 200, 'The established GET route and claimed-run lookup must work before new progress assertions.');
+    assert.equal((historical.body as { run: WorkRun }).run.id, run.id);
+    assert.equal((historical.body as { delivery: unknown }).delivery, null);
+    const progress = { schemaVersion: 2, runId: run.id, profile: 'harness', status: 'running', stage: 'implementation', sourceHash: 'a'.repeat(64), transitions: [{ stage: 'implementation', startedAt: run.startedAt, durationMs: 0 }] };
+    const artifact = { ...progress, taskId: `issue-${issue.id}`, engine: { sourceHash: 'b'.repeat(64), contractHash: 'c'.repeat(64) }, proofs: {} };
+    mkdirSync(run.evidencePath, { recursive: true });
+    const statePath = join(run.evidencePath, 'run-state.json');
+    writeFileSync(statePath, JSON.stringify(artifact));
+    const response = await getInProcess(app, path);
+    assert.equal(response.status, 200);
+    const body = response.body as { run: WorkRun; delivery: unknown; progress: typeof progress | null };
+    assert.deepEqual(body.progress, progress, 'The existing run read must expose its matching controller-owned current progress.');
+    assert.equal(body.run.id, run.id);
+    assert.equal(body.delivery, null, 'Progress is not a fabricated passing delivery proof.');
+    fixture.response = url => { assert.equal(url, path); return body; };
+    await fixture.mount(createElement(SelectedReport, { runId: run.id }));
+    await fixture.settle();
+    const selected = fixture.named('Selected report');
+    assert.ok(selected, 'The existing public report component renders the selected native run.');
+    assert.match(selected.textContent ?? '', /\bimplementation\b/i, 'Issue diagnostics make the current maintenance stage visible before a delivery report exists.');
+    writeFileSync(statePath, JSON.stringify({ ...artifact, runId: randomUUID() }));
+    assert.equal(((await getInProcess(app, path)).body as { progress: unknown }).progress, null, 'A different run identity cannot supply this run\'s progress.');
+    unlinkSync(statePath);
+    assert.equal(((await getInProcess(app, path)).body as { progress: unknown }).progress, null, 'Historical runs without typed state remain readable with explicit unavailable progress.');
+    assert.equal(store.work.run(run.id)?.status, 'running', 'Read-only projection cannot complete or mutate execution.');
+  } finally { await fixture.dispose(); store.close(); }
+});

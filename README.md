@@ -1,5 +1,7 @@
 # Loop — local issue tracker
 
+See [the serial execution kernel](docs/execution-kernel.md) for shared task and authorized maintenance execution, typed progress, pinned supervisors and compatibility boundaries. [Owner operations](docs/owner-workflow.md) describe admission, frozen verification and bounded continuation.
+
 A local development workbench for learning closed-loop engineering. It tracks repositories, business requirements, issues, dependencies, executions, and delivery reports. A persistent serial queue dispatches Codex workers, independently verifies and reviews candidates, automatically integrates passing changes, and checks the complete business goal.
 
 ## Quick start

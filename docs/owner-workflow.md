@@ -1,15 +1,25 @@
 # Safe owner maintenance and continuation
 
 Current profile: [code-only verification](code-only-verification.md) supersedes earlier browser-specific examples. Four code gates, named Node proofs, frozen inventory and independent reviews remain mandatory; browser obligations and execution are retired.
-Use the existing owner maintenance workflow for harness and acceptance-contract changes. Feature jobs still use the serial queue/controller. These commands add admission and recovery around that controller; they do not create another executor or change its roles, acceptance criteria, full verifier or final independent review.
+Feature and explicitly authorized maintenance jobs share the [serial execution kernel](execution-kernel.md). Owner authorization configures bounded control scope under a pinned pre-change supervisor; it does not create another executor or change roles, acceptance criteria, the full verifier or final independent review.
 
 ## Admit owner work before implementation
 
 Create the separately classified maintenance issue and enqueue it through the existing `POST /api/issues/:id/start` entry point before starting owner work. Retain the issue and job IDs with the original authorization. Ordinary workers exclude maintenance jobs, so enqueueing does not start a competing feature executor. Keep verified dependency evidence and all normal serial ownership guards.
 
-After full verification, independent exact-source approval and verified local integration, use the existing `scripts/record-maintenance.ts` command to record completion. It performs read-only queue eligibility before touching Git, acquiring an integration lock or opening evidence. The diagnostic identifies the requested issue/status, the missing queued job, unmet dependency IDs or the active job, and the appropriate next action. It does not enqueue, claim, restart or complete anything during this preflight. The eventual claim repeats the same eligibility rules in its existing transaction, so a preflight pass cannot authorize a later conflicting claim. All exact-source evidence and review checks remain mandatory.
+Before dispatch, prepare an absolute-path authorization request as specified in [Authority profiles](execution-kernel.md#authority-profiles): UUID, exact issue identity, harness or acceptance-contract profile, safe explicit scope, original authorization, loaded engine/source hash, active contract hash and exact target base commit. Validate these identities before native claim; a maintenance label or submitted classification cannot grant authority.
 
-An issue with no execution history needs explicit enqueueing through the existing entry point. For prior blocked, failed, completed or closed work, inspect the retained outcome and use the applicable owner recovery or follow-up workflow; never restart terminal work just to satisfy the receipt command.
+Settle and stop the exact idle ordinary daemon first, then use its existing exclusive queue lease:
+
+```sh
+DB_PATH=/absolute/platform.sqlite npm run worker -- --once --owner-authorization /absolute/authorization.json
+```
+
+The queue claims the existing native job before role work, captures the verified pre-change supervisor and runs the same typed stage pipeline. Coverage reuse or independently approved extension, focused diagnostics, fresh complete verification, final independent source review and actual integration remain mandatory. The outcome is indexed natively with actual queue waiting, claim-to-completion and phase timing. Restart ordinary service only after this owner dispatch settles. Candidate controls activate only after accepted integration and a quiescent handoff.
+
+`scripts/record-maintenance.ts` remains a compatibility attestation for owner work already verified, independently approved and integrated under the previous owner route. Its read-only queue eligibility preflight precedes Git/evidence access, and its eventual transactional claim repeats eligibility. It cannot enqueue, restart work, manufacture earlier role timing or establish readiness from prose. Retain exact committed-source reports and issue-bound approval. New native maintenance does not need this late completion recorder.
+
+An issue with no execution history needs explicit enqueueing through the existing entry point. For blocked, failed, completed or closed work, inspect retained outcomes and use applicable owner recovery or follow-up workflow; never restart terminal work to satisfy a receipt command.
 
 ## Minimum necessary scope
 
@@ -19,7 +29,7 @@ For existing fixtures, trim only demonstrated unused capabilities under reviewed
 
 ## Freeze before complete verification
 
-Inspect relevant source and select existing meaningful coverage. For a coverage gap, the tests role adds scoped checks, the owner captures actual named assertion reds, and an independent coverage reviewer approves before implementation. An accepted assertion revision belongs to a separate acceptance-contract issue with an equivalence review. Freeze the complete tests/acceptance inventory, including helpers.
+Inspect relevant source and select existing meaningful coverage. For a coverage gap, the tests role adds scoped checks, the owner captures actual named assertion reds, and an independent coverage reviewer approves before implementation. An accepted assertion revision belongs to a separate acceptance-contract issue with an equivalence review. Freeze the complete tests/acceptance inventory, including helpers. An explicit acceptance-contract author may revise or retire only authorized paths while preparing the unapproved draft. Independent coverage approval freezes the exact remaining inventory and any replacement checks. Later implementation cannot change any frozen test bytes. Modern checkpoints preserve both ordinary tracked deletions and approved retirements; recovery validates the reconstructed exact source and inventory.
 
 For a tool or fixture migration, inspect the affected fixtures for removed file references, obsolete startup commands, report paths and named check identities. Run only the affected fixture setup and known-good baseline checks; retain the commands and actual logs/reports in the existing tests summary and coverage feedback. Missing imports, missing files, setup failures and timeouts cannot substitute for a named behavior red. New requested behavior may remain intentionally red after setup succeeds. The existing coverage reviewer checks these focused results alongside owner assertion proofs before freezing. Keep corrections within the unapproved draft and avoid incidental fixed counts when exact case identities express the requirement. This adds no role, approval stage or full verification run.
 
@@ -40,7 +50,7 @@ Finish implementation and related named diagnostics before submitting an absolut
 
 Run `npm run factory -- verify-maintenance request.json`. Admission rejects absent or invalid approval and changed test inventory before starting any gate. A checkout lease rejects concurrent complete runs. The command captures a Git tree using a temporary index, freezes it into an isolated worktree and invokes the existing trusted verifier with owned ports and database. Continue editing only after it returns: edits to the original checkout cannot change the frozen proof, but make that proof stale for delivery. No automatic rerun or retry follows a stale or unknown failure.
 
-Read `readiness.json`, `owner-verification.json`, `verification/summary.json`, raw reports and process receipts. A passing outcome updates the source checkout's `.runs/latest.json`. All four code gates and required named cases remain mandatory. Retain evidence on failure; unsafe process ownership retains the worktree. A fresh independent final source review and verified local integration still precede `scripts/record-maintenance.ts` attestation. The command does not commit or authorize a different source tree.
+Read `readiness.json`, `owner-verification.json`, `verification/summary.json`, raw reports and process receipts. A passing outcome updates the source checkout's `.runs/latest.json`. All four code gates and required named cases remain mandatory. Retain evidence on failure; unsafe process ownership retains the worktree. A fresh independent final source review and verified local integration still precede native completion or compatible `scripts/record-maintenance.ts` attestation. The command does not commit or authorize a different source tree.
 
 ## Diagnose a failed focused check
 
@@ -50,7 +60,7 @@ The controller retains unique `failure-proof-<runId>-<attempt>` report/log copie
 
 Inspect the disposition and original proof before authorizing maintenance or continuation. Correct an accepted observation only through a separately reviewed acceptance-contract issue; never edit its frozen checkpoint or reset the ledger. Reviewed control revisions still invalidate incompatible native reuse. Version-one verification and other existing failure paths retain their current handling. Complete integrated verification, final independent source review, whole-goal acceptance and enrolled GitHub delivery remain mandatory.
 
-## Resume one blocked feature
+## Resume one blocked feature or authorized maintenance job
 
 Stop the normal queue worker using its verified PID and identity before issuing a continuation. Do not kill processes by name or start a competing executor. Inspect the blocked report, original goal, accepted checkpoint and cumulative ledger first. If an unknown ownership or source identity problem remains, resolve it explicitly instead of granting attempts.
 
@@ -66,10 +76,10 @@ Stop the normal queue worker using its verified PID and identity before issuing 
 }
 ```
 
-Preview with `npm run factory -- owner-resume request.json --validate`; execute with the same command without `--validate`. Each allowance is explicit: attempts range from zero to five, time from zero to one hour, and at least one is positive. Preview does not grant budget, claim or enqueue jobs. New owner decisions use new UUIDs; recovery of the same decision reuses its exact request and UUID.
+Preview with `npm run factory -- owner-resume request.json --validate`; execute with the same command without `--validate`. Each allowance is explicit: attempts range from zero to five, time from zero to one hour, and at least one is positive. Preview does not grant budget, claim or enqueue jobs. For authorized maintenance, additionally supply `ownerAuthorizationPath` pointing to the original unchanged authorization request. Engine, contract, issue, base and scope identities must still match before any grant; profile classification alone cannot release work. New owner decisions use new UUIDs; recovery of the same decision reuses its exact request and UUID.
 
 The command checks the original canonical task, assignment, clean enrolled target and predecessor process lineage. Budget grants append to the existing task-bound ledger, preserving spent time, implementation/acceptance counters and public task limits. A crashed reservation is conservatively settled before a grant. Original task/checkpoint bytes are never rewritten to manufacture reuse; native identity validation decides whether reuse remains valid.
 
 A persistent journal under `evidence/owner-resumes/<requestId>` precedes grants and enqueueing. The queued payload binds its owner request ID, so recovery cannot adopt another decision's job. Replay reconciles the recorded job and actual platform outcome; it cannot grant twice or restart terminal work. The existing queue claims only that job through its normal admission and dependency guards, leaving queued siblings untouched. A dead interrupted execution uses native recovery and returns its blocked or merged outcome; another attempt requires a new explicit decision. Live owners, changed goals, ambiguous history and unresolved ownership fail closed. Restart the normal worker only after the owner command settles.
 
-Maintenance jobs remain separate owner deliveries. Requirement verification and GitHub publication remain normal later queue jobs; an owner continuation of one child does not claim that the whole requirement is delivered.
+Maintenance uses the same selected-job continuation and pinned supervising engine with its original explicit authority. Requirement verification and GitHub publication remain normal later queue jobs; an owner continuation of one child does not claim that the whole requirement is delivered.

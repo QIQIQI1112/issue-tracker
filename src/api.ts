@@ -5,7 +5,7 @@ import type { IssueStore } from './storage.ts';
 import { targetHeader, targetIdentity } from './target-safety.ts';
 import { parseRepository } from './repository.ts';
 import { boundedText, ConflictError, positiveId, record } from './workflow.ts';
-import { evidenceFile, readDelivery } from './evidence-files.ts';
+import { evidenceFile, readDelivery, readProgress } from './evidence-files.ts';
 import { basename } from 'node:path';
 import { readRepositoryHarness } from './harness-reader.ts';
 
@@ -86,7 +86,7 @@ export function createApp(store: IssueStore, metadata: { instanceId: string; ver
   app.get('/api/runs/:id', (request, response) => {
     const run = store.work.run(request.params.id);
     if (!run) { response.status(404).json({ error: 'Run not found.' }); return; }
-    response.json({ run, delivery: readDelivery(run.evidencePath) });
+    response.json({ run, delivery: readDelivery(run.evidencePath), progress: readProgress(run.evidencePath, run.id) });
   });
   app.get('/api/runs/:id/evidence', (request, response) => {
     const run = store.work.run(request.params.id);
