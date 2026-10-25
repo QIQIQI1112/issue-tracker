@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { App } from '../src/ui/App.tsx';
+import { WorkspaceLayout } from '../src/ui/layout/WorkspaceLayout.tsx';
+import { Issues } from '../src/ui/features/issues/Issues.tsx';
+import { useIssueCollection } from '../src/ui/shared/useIssueCollection.ts';
+import { IssueFixture } from './dropdown-fixture.ts';
 import { activeJob, currentBlockers, executionContext, requirementProgress, waitingDependencies } from '../src/ui/workbench-state.ts';
 import type { Issue } from '../src/domain.ts';
 import type { Job, Requirement, Workbench as Data, WorkRun } from '../src/workflow.ts';
@@ -27,26 +31,19 @@ test('execution context identifies real repository requirement issue and standal
 });
 
 test('workspace issue navigation retains an explicit initial active state', () => {
-  const html = renderToStaticMarkup(createElement(App));
+  const html = renderToStaticMarkup(createElement(WorkspaceLayout, {
+    repos: [repo], repoFilter: String(repo.id), selectedRepo: repo, subview: 'requirements', registryLoading: false, workbenchError: '',
+    chooseRepository: () => {}, setSubview: () => {}, refreshRepositories: () => {}, children: createElement(IssueFixture),
+  }));
   const buttons = [...html.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].map(item => item[0]);
-  const repositoryNavigation = html.includes('aria-label="Repositories"');
-  const activeLabel = repositoryNavigation ? 'All repositories' : 'All issues';
-  const active = buttons.find(button => button.replace(/<[^>]+>/g, '').trim() === activeLabel);
-  assert.ok(active, activeLabel);
+  const active = buttons.find(button => button.includes(`aria-label="${repo.name}"`));
+  assert.ok(active, repo.name);
   assert.match(active, /aria-pressed="true"/);
   assert.equal(buttons.filter(button => button.includes('aria-pressed="true"')).length, 1);
-  if (repositoryNavigation) {
-    const status = html.match(/<select[^>]*aria-label="Filter by status"[^>]*>[\s\S]*?<\/select>/)?.[0];
-    assert.ok(status);
-    for (const value of ['all', 'open', 'in_progress', 'done']) assert.match(status, new RegExp(`<option[^>]*value="${value}"`));
-    assert.match(status, /<option[^>]*value="all"[^>]*selected=""/);
-  } else {
-    for (const label of ['Open', 'In progress', 'Done']) {
-      const button = buttons.find(item => item.replace(/<[^>]+>/g, '').trim() === label);
-      assert.ok(button, label);
-      assert.match(button, /aria-pressed="false"/);
-    }
-  }
+  const status = html.match(/<select[^>]*aria-label="Filter by status"[^>]*>[\s\S]*?<\/select>/)?.[0];
+  assert.ok(status);
+  for (const value of ['all', 'open', 'in_progress', 'done']) assert.match(status, new RegExp(`<option[^>]*value="${value}"`));
+  assert.match(status, /<option[^>]*value="all"[^>]*selected=""/);
 });
 
 test('requirement metadata counts distinct owned merged child runs', () => {
@@ -134,9 +131,14 @@ test('indexed delivery context preserves failed merged and whole-goal ownership'
 });
 
 test('initial issue controls expose accessible names and live loading semantics', () => {
-  const html = renderToStaticMarkup(createElement(App));
+  function LoadingIssues() {
+    const collection = useIssueCollection([], String(repo.id));
+    return createElement(Issues, { collection, issues: [], loading: true, loadError: null, retryIssues: () => {}, resetFilters: collection.resetFilters, onIssue: () => {} });
+  }
+  const html = renderToStaticMarkup(createElement(LoadingIssues));
+  const workspace = renderToStaticMarkup(createElement(App));
   for (const name of ['Search issues', 'Filter by status', 'Filter by label', 'Sort issues', 'Issue list']) assert.ok(html.includes(`aria-label="${name}"`), name);
-  assert.match(html, /aria-label="(?:Filter by repository|Repositories)"/);
+  assert.match(workspace, /aria-label="(?:Filter by repository|Repositories)"/);
   assert.match(html, /role="status"/);
   assert.match(html, /aria-busy="true"/);
   assert.match(html, /<h1>Issues<\/h1>/);

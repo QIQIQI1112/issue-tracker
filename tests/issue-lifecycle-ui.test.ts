@@ -2,13 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { App } from '../src/ui/App.tsx';
+import { IssueFixture } from './dropdown-fixture.ts';
 import { IssueRow } from '../src/ui/IssueRow.tsx';
 import { currentBlockers, requirementProgress, waitingDependencies } from '../src/ui/workbench-state.ts';
 import { IssueStore } from '../src/storage.ts';
 
 test('status filtering exposes Blocked and Closed independently and keeps All statuses as the default', () => {
-  const html = renderToStaticMarkup(createElement(App));
+  const html = renderToStaticMarkup(createElement(IssueFixture));
   const select = html.match(/<select\b[^>]*aria-label="Filter by status"[^>]*>([\s\S]*?)<\/select>/)?.[1];
   assert.ok(select, 'Lifecycle inspection must retain the accessible status selector.');
   const options = [...select.matchAll(/<option\b([^>]*)>([^<]*)<\/option>/g)];
