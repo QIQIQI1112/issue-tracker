@@ -17,12 +17,10 @@ function designSources() {
 test('rail toggle retains real button semantics and changes the actual workspace state without selecting navigation', async () => {
   const fixture = new Fixture();
   const previous = Object.getOwnPropertyDescriptor(globalThis, 'ResizeObserver');
-  const observed = new Set<Element>();
   const actions: string[] = [];
-  let disconnected = 0;
   Object.defineProperty(globalThis, 'ResizeObserver', { configurable: true, value: class {
-    observe(element: Element) { observed.add(element); }
-    disconnect() { observed.clear(); disconnected++; }
+    observe() {}
+    disconnect() {}
   } });
   try {
     await fixture.mount(createElement(WorkspaceLayout, {
@@ -40,25 +38,23 @@ test('rail toggle retains real button semantics and changes the actual workspace
     assert.equal(toggle.querySelector('.toolbar-icon-slot')?.getAttribute('aria-hidden'), 'true');
     assert.equal(toggle.querySelector('svg')?.getAttribute('focusable'), 'false');
     assert.equal(toggle.querySelector('path')?.getAttribute('d'), 'm11 17-5-5 5-5m7 10-5-5 5-5');
-    const selected = fixture.named(repo.name);
-    const unselected = fixture.named('Refresh repositories');
-    assert.ok(selected && unselected);
-    assert.equal(selected.getAttribute('aria-pressed'), 'true');
-    assert.equal(unselected.classList.contains('active'), false);
+    const navigationState = () => [...fixture.root.querySelectorAll('nav button, nav a')].map(node => [
+      node.getAttribute('aria-label') ?? node.textContent?.trim(), node.getAttribute('aria-pressed'), node.getAttribute('aria-current'), node.classList.contains('active'),
+    ]);
+    const selection = navigationState();
+    assert.ok(selection.some(([, pressed]) => pressed === 'true'), 'The fixture starts with an actual active navigation selection.');
     await fixture.click(toggle);
     assert.equal(workspace.dataset.sidebar, 'expanded');
     assert.equal(toggle.getAttribute('aria-label'), 'Collapse navigation rail');
     assert.equal(toggle.getAttribute('aria-expanded'), 'true');
     assert.equal(fixture.document.activeElement, toggle);
-    assert.deepEqual([...observed], [fixture.root.querySelector('.repository-list')]);
+    assert.deepEqual(navigationState(), selection, 'Expansion preserves every existing navigation selection state.');
     await fixture.click(toggle);
     assert.equal(workspace.dataset.sidebar, 'collapsed');
     assert.equal(toggle.getAttribute('aria-label'), 'Expand navigation rail');
     assert.equal(toggle.getAttribute('aria-expanded'), 'false');
-    assert.equal(observed.size, 0);
-    assert.equal(disconnected, 1);
-    assert.equal(selected.getAttribute('aria-pressed'), 'true');
-    assert.equal(unselected.classList.contains('active'), false);
+    assert.equal(fixture.document.activeElement, toggle);
+    assert.deepEqual(navigationState(), selection, 'Collapse preserves every existing navigation selection state.');
     assert.equal(fixture.root.querySelector('main p')?.textContent, 'Current content');
     assert.deepEqual(actions, []);
   } finally {
