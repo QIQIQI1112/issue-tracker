@@ -44,6 +44,8 @@ export async function integrate(options: { repository: string; branch: string; p
         if (git(repository, ['rev-parse', `refs/heads/${branch}`]).trim() !== before) continue;
         if (git(repository, ['status', '--porcelain']).trim()) throw new Error('Repository changed during integration.');
         const checkedOut = git(repository, ['worktree', 'list', '--porcelain']).split('\n\n').find(block => block.includes(`branch refs/heads/${branch}\n`) || block.endsWith(`branch refs/heads/${branch}`));
+        options.assertCleanupSafe?.();
+        assertOwnedGroupsQuiescent(runDirectory);
         if (checkedOut) {
           const checkout = checkedOut.split('\n')[0].slice('worktree '.length);
           if (git(checkout, ['status', '--porcelain']).trim()) throw new Error('Target checkout has uncommitted changes.');

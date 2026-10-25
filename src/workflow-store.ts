@@ -263,8 +263,7 @@ export class WorkflowStore {
       const action = previous || ['done', 'closed'].includes(issue.status) ? 'Inspect the existing issue/run outcome and use the owner recovery workflow or create a follow-up issue; do not restart terminal work.' : `Queue this maintenance issue through POST /api/issues/${issueId}/start before recording completion.`;
       throw new ConflictError(`${state} has no queued maintenance job${history}. ${action}`);
     }
-    const merged = new Set(this.runs().filter(run => run.status === 'merged').map(run => run.issueId));
-    const dependencies = issue.work.dependsOn.filter(id => !merged.has(id));
+    const dependencies = issue.work.dependsOn.filter(id => !this.dependencyReady(id, issue.work!.requirementId));
     if (dependencies.length) throw new ConflictError(`${state}, job #${job.id} (status: queued), requires verified merge evidence for dependencies ${dependencies.map(id => `#${id}`).join(', ')}. Complete those dependencies before recording maintenance.`);
     return job;
   }

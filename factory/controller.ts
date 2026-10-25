@@ -357,6 +357,7 @@ export async function runController(options: { repository: string; task: unknown
           budget.phase(Math.min(30000, remaining()));
           const result = await runProcess({ command: process.execPath, args: ['--import', 'tsx', '--test', `--test-name-pattern=^${escaped}$`, `--test-reporter=${join(trustedRoot, 'factory/node-reporter.mjs')}`, `--test-reporter-destination=${reportPath}`, check.file], cwd: state.workspace, env, logPath, timeoutMs: Math.min(30000, remaining()), signal: cancelled.signal });
           enforce(true);
+          if (result.error || result.settled !== true) throw new Error(`Initial behavior proof ownership is unsafe: ${result.error ?? result.status}`);
           const records = readFileSync(reportPath, 'utf8').trim().split('\n').map(line => JSON.parse(line));
           const isAssertion = (error: Record<string, unknown> | undefined): boolean => Boolean(error && (error.name === 'AssertionError' || error.code === 'ERR_ASSERTION' || isAssertion(error.cause as Record<string, unknown> | undefined)));
           const failed = records.some(event => event.type === 'test:fail' && event.data.name === check.title && isAssertion(event.data.details?.error));
