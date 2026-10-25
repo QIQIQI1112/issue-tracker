@@ -31,7 +31,7 @@ export function IssueFixture({ records = [issue()], labelFilter }: { records?: I
 type Props = Record<string, unknown>;
 type Component = (props: Props) => ReactNode;
 type Slot = { value?: unknown; deps?: unknown[]; cleanup?: () => void };
-export type InputEvent = { key: string; shiftKey: boolean; defaultPrevented: boolean; propagationStopped: boolean; target: Host; currentTarget: Host; preventDefault: () => void; stopPropagation: () => void; nativeEvent?: InputEvent };
+export type InputEvent = { key: string; shiftKey: boolean; defaultPrevented: boolean; propagationStopped: boolean; target: Host; currentTarget: Host; preventDefault: () => void; stopPropagation: () => void };
 export class Host {
   props: Props = {};
   parentElement: Host | null = null;
@@ -40,7 +40,6 @@ export class Host {
   owner?: Component;
   ownerInput?: ReactElement<Props>;
   style: Record<string, unknown> = {};
-  dataset: Record<string, string> = {};
   scrollTop = 0;
   isConnected = true;
   constructor(public tagName: string, public fixture: Fixture) {}
@@ -48,11 +47,7 @@ export class Host {
   get id() { return String(this.props.id ?? ''); }
   get value() { return String(this.props.value ?? ''); }
   get disabled() { return Boolean(this.props.disabled); }
-  get ownerDocument() { return this.fixture.document; }
-  get options() { const values = this.querySelectorAll('option'); return Object.assign(values, { item: (index: number) => values[index] }); }
   getAttribute(name: string) { const value = this.props[name]; return value === undefined ? null : String(value); }
-  setAttribute(name: string, value: string) { this.props[name] = value; }
-  removeAttribute(name: string) { delete this.props[name]; }
   contains(node: Host | null): boolean { return node === this || this.children.some(child => child.contains(node)); }
   focus() { this.fixture.document.activeElement = this; }
   scrollIntoView() {}
@@ -65,7 +60,7 @@ export class Host {
     }
     return [this.getBoundingClientRect()];
   }
-  getBoundingClientRect() { return { ...this.fixture.rect, toJSON: () => ({}) }; }
+  getBoundingClientRect() { return { ...this.fixture.rect }; }
   matches(selector: string): boolean {
     return selector.split(/,(?![^()]*\))/).some(part => {
       const text = part.trim();
@@ -83,18 +78,17 @@ export class Host {
   }
   closest(selector: string): Host | null { return this.matches(selector) ? this : this.parentElement?.closest(selector) ?? null; }
   querySelectorAll<T = Host>(selector: string): T[] { return this.children.flatMap(child => [...(child.matches(selector) ? [child] : []), ...child.querySelectorAll(selector)]) as T[]; }
-  querySelector(selector: string) { return this.querySelectorAll<Host>(selector)[0] ?? null; }
 }
 
 export class Fixture {
   root = new Host('root', this);
   rect = { left: 282, right: 382, top: 530, bottom: 562, width: 100, height: 32, x: 282, y: 530 };
   viewport = { width: 390, height: 600 };
-  document = { activeElement: null as Host | null, body: new Host('body', this), documentElement: { dataset: {} as Record<string, string>, clientWidth: 390, clientHeight: 600 }, addEventListener: (name: string, callback: EventListener) => this.listen(name, callback), removeEventListener: (name: string, callback: EventListener) => this.listeners.get(name)?.delete(callback), getElementById: (id: string) => this.all().find(node => node.id === id) ?? null, querySelector: (selector: string) => this.root.querySelector(selector) };
+  document = { activeElement: null as Host | null, body: new Host('body', this), documentElement: { dataset: {} as Record<string, string> }, addEventListener: (name: string, callback: EventListener) => this.listen(name, callback), removeEventListener: (name: string, callback: EventListener) => this.listeners.get(name)?.delete(callback), getElementById: (id: string) => this.all().find(node => node.id === id) ?? null };
   listeners = new Map<string, Set<EventListener>>();
   intervals = new Map<number, () => void>();
   requests: string[] = [];
-  callbacks: { component: Component; prop: string; args: unknown[] }[] = [];
+  callbacks: { args: unknown[] }[] = [];
   response: (url: string) => unknown = url => url.startsWith('/api/issues/') ? { issue: issue(), runs: [run(1), run(2), run(7, 99), run(8, 37, { repoId: 2 })] } : { run: workbench().runs.find(value => url.endsWith(value.id)) ?? run(1), delivery: null };
   private cells = new Map<string, Slot[]>();
   private hosts = new Map<string, Host>();
@@ -112,9 +106,6 @@ export class Fixture {
     replace('window', { innerWidth: this.viewport.width, innerHeight: this.viewport.height, addEventListener: this.document.addEventListener, removeEventListener: this.document.removeEventListener, visualViewport: null });
     replace('HTMLElement', Host);
     replace('Node', Host);
-    replace('requestAnimationFrame', (callback: () => void) => { callback(); return 1; });
-    replace('cancelAnimationFrame', () => {});
-    replace('getComputedStyle', (node: Host) => ({ direction: 'ltr', position: 'static', ...declarations(node) }));
     replace('setInterval', (callback: () => void) => { const id = this.intervals.size + 1; this.intervals.set(id, callback); return id; });
     replace('clearInterval', (id: number) => this.intervals.delete(id));
     replace('fetch', async (url: string) => { this.requests.push(String(url)); const data = this.response(String(url)); return typeof data === 'string' ? new Response(data) : Response.json(data); });
@@ -133,7 +124,6 @@ export class Fixture {
   active(trigger: Host) { return this.all().find(node => node.id === trigger.props['aria-activedescendant']); }
   event(node: Host, type: string, key = '', shiftKey = false) {
     const event: InputEvent = { key, shiftKey, defaultPrevented: false, propagationStopped: false, target: node, currentTarget: node, preventDefault() { this.defaultPrevented = true; }, stopPropagation() { this.propagationStopped = true; } };
-    event.nativeEvent = event;
     for (const listener of [...this.listeners.get(type.toLowerCase()) ?? []]) listener(event as unknown as Event);
     for (let current: Host | null = node; current && !event.propagationStopped; current = current.parentElement) {
       event.currentTarget = current;
@@ -175,14 +165,12 @@ export class Fixture {
       const effect = (callback: () => (() => void) | void, deps?: unknown[]) => { const cell = slot(); cursor++; if (!deps || !cell.deps || deps.some((value, index) => !Object.is(value, cell.deps![index]))) { cell.deps = deps; this.effects.push(() => { cell.cleanup?.(); cell.cleanup = callback() ?? undefined; }); } };
       const internals = (React as unknown as { __CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE: { H: unknown } }).__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
       const previous = internals.H;
-      internals.H = { useState: state, useRef: (value: unknown) => memo(() => ({ current: value }), []), useMemo: memo, useCallback: (callback: unknown, deps: unknown[]) => memo(() => callback, deps), useEffect: effect, useLayoutEffect: effect, useId: () => memo(() => `fixture-${identity.replace(/[^\w-]/g, '-')}-${cursor}`, []), useReducer: (reducer: (state: unknown, action: unknown) => unknown, initial: unknown) => { const [value, set] = state(initial) as [unknown, (value: unknown) => void]; return [value, (action: unknown) => set((old: unknown) => reducer(old, action))]; } };
+      internals.H = { useState: state, useRef: (value: unknown) => memo(() => ({ current: value }), []), useCallback: (callback: unknown, deps: unknown[]) => memo(() => callback, deps), useEffect: effect, useLayoutEffect: effect, useId: () => memo(() => `fixture-${identity.replace(/[^\w-]/g, '-')}-${cursor}`, []) };
       let output: ReactNode;
       try {
         const props = { ...element.props };
-        for (const name of ['onChange', 'onValueChange', 'onSelect']) {
-          const callback = props[name];
-          if (typeof callback === 'function') props[name] = (...args: unknown[]) => { this.callbacks.push({ component, prop: name, args }); return callback(...args); };
-        }
+        const callback = props.onChange;
+        if (typeof callback === 'function') props.onChange = (...args: unknown[]) => { this.callbacks.push({ args }); return callback(...args); };
         output = component(props);
       } finally { internals.H = previous; }
       return this.expand(output, identity, parent, component, element);
