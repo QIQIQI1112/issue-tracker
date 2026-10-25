@@ -26,6 +26,17 @@ function limits(ledger: Ledger, task: Task) {
   return { maxAttempts, totalTimeoutMs };
 }
 
+export function validateRevisionBudget(ledger: Ledger, task: Task, grant: OwnerBudgetGrant): void {
+  validateOwnerGrant(grant);
+  const effective = limits(ledger, task);
+  const previous = ledger.ownerGrants?.find(item => item.requestId === grant.requestId);
+  if (previous && JSON.stringify(previous) !== JSON.stringify(grant)) throw new Error('Owner grant request identity changed.');
+  const attempts = effective.maxAttempts + (previous ? 0 : grant.additionalAttempts);
+  const time = effective.totalTimeoutMs + (previous ? 0 : grant.additionalTimeMs);
+  if (![attempts, time].every(Number.isSafeInteger) || ledger.active && (!Number.isSafeInteger(ledger.active.reservedMs) || ledger.active.reservedMs < 0 || ledger.active.reservedMs > effective.totalTimeoutMs)) throw new Error('Revision continuation budget reservation is invalid.');
+  if (ledger.acceptanceAttempts >= attempts || ledger.implementationAttempts >= attempts || ledger.usedMs + (ledger.active?.reservedMs ?? 0) >= time) throw new Error('Revision continuation cumulative acceptance or implementation budget exhausted.');
+}
+
 export function grantExecutionBudget(root: string, key: string, task: Task, input: OwnerBudgetGrant): OwnerBudgetGrant {
   validateOwnerGrant(input);
   const grant = { requestId: input.requestId, fromRunId: input.fromRunId, additionalAttempts: input.additionalAttempts, additionalTimeMs: input.additionalTimeMs, reason: input.reason };
