@@ -18,7 +18,7 @@ export function environmentIdentity(repository: string, engine: string): string 
   return digest(JSON.stringify({ controls, runtime }));
 }
 
-type Checkpoint = { schemaVersion: 1; runId: string; taskHash: string; environment: string; baselineTree: string; baseCommit: string; sourceHash: string; patchHash: string; accepted: boolean; regressions?: AcceptedRegression[]; pendingRegression?: PendingRegression; pendingFailureTriage?: ControllerState['pendingFailureTriage']; plan?: Plan; acceptanceReceipt?: NonNullable<ControllerState['reviewReceipts']>[number]; acceptedChecks: { path: string; hash: string }[]; redChecks: ControllerState['redChecks']; browserRedChecks?: ControllerState['browserRedChecks']; proofs: { path: string; hash: string }[] };
+type Checkpoint = { schemaVersion: 1; runId: string; taskHash: string; environment: string; baselineTree: string; baseCommit: string; sourceHash: string; patchHash: string; missingPaths?: string[]; accepted: boolean; regressions?: AcceptedRegression[]; pendingRegression?: PendingRegression; pendingFailureTriage?: ControllerState['pendingFailureTriage']; plan?: Plan; acceptanceReceipt?: NonNullable<ControllerState['reviewReceipts']>[number]; acceptedChecks: { path: string; hash: string }[]; redChecks: ControllerState['redChecks']; browserRedChecks?: ControllerState['browserRedChecks']; proofs: { path: string; hash: string }[] };
 
 export function assertTestInventory(files: { path: string; hash: string }[], approved: { path: string; hash: string }[]): void {
   const current = new Map(files.filter(file => /^(tests|acceptance)\//.test(file.path)).map(file => [file.path, file.hash]));
@@ -50,7 +50,7 @@ export function saveCheckpoint(state: ControllerState, task: Task, environment: 
     if (triage.receipt) paths.push(triage.receipt.evidencePath);
   }
   const proofs = accepted ? paths.map(path => ({ path, hash: digest(readFileSync(join(state.runDirectory, path))) })) : [];
-  const checkpoint: Checkpoint = { schemaVersion: 1, runId: state.runId, taskHash: taskIdentity(task), environment, baselineTree: state.baselineTree, baseCommit: state.baseCommit, sourceHash: source.hash, patchHash: digest(patch), accepted, regressions: state.regressions, pendingRegression: state.pendingRegression, pendingFailureTriage: triage, plan: state.plan, acceptanceReceipt, acceptedChecks, redChecks: state.redChecks, browserRedChecks: state.browserRedChecks ?? [], proofs };
+  const checkpoint: Checkpoint = { schemaVersion: 1, runId: state.runId, taskHash: taskIdentity(task), environment, baselineTree: state.baselineTree, baseCommit: state.baseCommit, sourceHash: source.hash, patchHash: digest(patch), missingPaths: source.files.filter(file => !existsSync(join(state.workspace, file.path))).map(file => file.path), accepted, regressions: state.regressions, pendingRegression: state.pendingRegression, pendingFailureTriage: triage, plan: state.plan, acceptanceReceipt, acceptedChecks, redChecks: state.redChecks, browserRedChecks: state.browserRedChecks ?? [], proofs };
   renameSync(join(state.runDirectory, 'checkpoint.patch.tmp'), join(state.runDirectory, 'checkpoint.patch'));
   writeJson(join(state.runDirectory, 'checkpoint.json'), checkpoint);
 }
@@ -164,7 +164,8 @@ export function loadCheckpoint(directory: string, root: string, task: Task, envi
 
 export function restoreCheckpoint(checkpoint: Checkpoint, directory: string, workspace: string): void {
   const patch = join(directory, 'checkpoint.patch');
-  if (readFileSync(patch).length) git(workspace, ['apply', patch]);
+  if (readFileSync(patch).length) git(workspace, ['apply', ...(checkpoint.missingPaths ? ['--index'] : []), patch]);
+  if (checkpoint.missingPaths?.length) git(workspace, ['reset', checkpoint.baselineTree, '--', ...checkpoint.missingPaths]);
   const source = snapshot(workspace);
   if (source.hash !== checkpoint.sourceHash) throw new Error('Restored checkpoint source hash mismatch.');
   assertTestInventory(source.files, checkpoint.acceptedChecks);
@@ -183,10 +184,11 @@ export function captureInterruptedDraft(directory: string): void {
   const baselinePaths = new Set(original.files.map(file => file.path));
   const accepted = new Map((readJson(join(directory, 'accepted-checks.json')) as { path: string; hash: string }[]).map(file => [file.path, file.hash]));
   for (const [path, hash] of accepted) if (hashes.get(path) !== hash) throw new Error(`Interrupted draft changed frozen controls or checks: ${path}`);
+  const authority = existsSync(join(directory, 'owner-authorization.json')) ? readJson(join(directory, 'owner-authorization.json')) as { scope: string[] } : undefined;
   const baseline = new Map(original.files.map(file => [file.path, file.hash]));
   for (const path of new Set([...baseline.keys(), ...hashes.keys()])) {
     if (baseline.get(path) === hashes.get(path) || accepted.has(path) && accepted.get(path) === hashes.get(path)) continue;
-    if (!task.scope.some(scope => scope.endsWith('/') ? path.startsWith(scope) : path === scope) || protectedPath(path, baselinePaths)) throw new Error(`Interrupted draft changed scope: ${path}`);
+    if (!task.scope.some(scope => scope.endsWith('/') ? path.startsWith(scope) : path === scope) || protectedPath(path, baselinePaths) && !authority?.scope.some(scope => scope.endsWith('/') ? path.startsWith(scope) : path === scope)) throw new Error(`Interrupted draft changed scope: ${path}`);
   }
   saveCheckpoint(state, task, value.environment, true);
   writeJson(join(directory, 'recovered-draft.json'), { sourceHash: current.hash, recoveredAt: new Date().toISOString() });

@@ -22,6 +22,22 @@ export function parseRunState(input: unknown): RunState {
   return value;
 }
 
+export function recoverRunState(directory: string, sourceHash: string): void {
+  const value = parseRunState(readJson(join(directory, 'run-state.json')));
+  for (const key of ['verification', 'review'] as const) {
+    const proof = value.proofs[key];
+    if (!proof || proof.sourceHash !== sourceHash || digest(readFileSync(join(directory, proof.path))) !== proof.sha256) throw new Error('Recovered integration lacks unchanged same-source typed proofs.');
+  }
+  if (value.status === 'merged') return;
+  const base = { ...value, failure: undefined };
+  const completedAt = new Date().toISOString();
+  const phase = base.transitions.at(-1)!;
+  phase.completedAt ??= completedAt;
+  phase.durationMs = Date.parse(phase.completedAt) - Date.parse(phase.startedAt);
+  base.transitions.push({ stage: 'completed', startedAt: completedAt, completedAt, durationMs: 0 });
+  writeJson(join(directory, 'run-state.json'), parseRunState({ ...base, status: 'merged', stage: 'completed', sourceHash }));
+}
+
 export class StageRunner {
   private value: RunState;
   private pendingFailure?: Failure;

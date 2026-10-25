@@ -23,20 +23,22 @@ import type { GitHubHost } from './github.ts';
 import { recoverMerge } from './recovery.ts';
 import { executionPolicy } from './optimization.ts';
 import { reusableRequirementVerification } from './verification-reuse.ts';
+import { ownerAuthorization, supervisedRunner } from './profiles.ts';
+import type { OwnerAuthorization } from './profiles.ts';
 
-export function issueTask(store: IssueStore, issue: Issue, feedback = '') {
+export function issueTask(store: IssueStore, issue: Issue, feedback = '', authority?: OwnerAuthorization) {
   const repo = store.work.repo(issue.work!.repoId)!;
   const requirement = issue.work!.requirementId ? store.work.requirement(issue.work!.requirementId) : undefined;
   const targetBranch = requirement?.publication?.branch ?? repo.targetBranch;
   const policy = executionPolicy(repo.path);
   const onlyChild = requirement && store.list().filter(child => child.work?.requirementId === requirement.id).length === 1;
-  return parseTask({ schemaVersion: policy.mode === 'adaptive-v2' ? 2 : 1, id: `issue-${issue.id}`, title: issue.title, goal: issue.description || issue.title, ...(policy.mode === 'adaptive-v2' && onlyChild ? { wholeGoal: { requirementId: requirement.id, goal: requirement.goal } } : {}), acceptance: issue.work!.acceptance.map((description, index) => ({ id: `criterion-${index + 1}`, description })), scope: ['src/', 'tests/', 'acceptance/', 'docs/'], verificationCommand: 'npm run verify', budget: { maxAttempts: 3, workerTimeoutMs: 600000, totalTimeoutMs: 3600000 }, notes: `Repository ${repo.name}; target ${targetBranch}. Complete only after independent review and automatic integration.${feedback}` });
+  return parseTask({ schemaVersion: policy.mode === 'adaptive-v2' ? 2 : 1, id: `issue-${issue.id}`, title: issue.title, goal: issue.description || issue.title, ...(policy.mode === 'adaptive-v2' && onlyChild ? { wholeGoal: { requirementId: requirement.id, goal: requirement.goal } } : {}), acceptance: issue.work!.acceptance.map((description, index) => ({ id: `criterion-${index + 1}`, description })), scope: authority ? [...new Set(['tests/', ...authority.scope])] : ['src/', 'tests/', 'acceptance/', 'docs/'], verificationCommand: 'npm run verify', budget: { maxAttempts: 3, workerTimeoutMs: 600000, totalTimeoutMs: 3600000 }, notes: `Repository ${repo.name}; target ${targetBranch}. Complete only after independent review and automatic integration.${feedback}` }, authority?.scope);
 }
 
 export class SerialQueue {
   readonly evidenceRoot: string;
   private busy = false;
-  constructor(private store: IssueStore, private options: { evidenceRoot?: string; agent?: Agent; planner?: Planner; signal?: AbortSignal; github?: GitHubHost; publicationPollMs?: number } = {}) {
+  constructor(private store: IssueStore, private options: { evidenceRoot?: string; agent?: Agent; planner?: Planner; signal?: AbortSignal; github?: GitHubHost; publicationPollMs?: number; ownerAuthorizationPath?: string } = {}) {
     this.evidenceRoot = resolve(options.evidenceRoot ?? join(dirname(store.path), 'evidence'));
     mkdirSync(this.evidenceRoot, { recursive: true });
   }
@@ -46,7 +48,9 @@ export class SerialQueue {
     this.busy = true;
     let claimed: { job: Job; run: WorkRun } | undefined;
     try {
-      claimed = this.store.work.claim(this.evidenceRoot, targetJobId);
+      const authority = this.options.ownerAuthorizationPath ? ownerAuthorization(this.store, this.options.ownerAuthorizationPath) : undefined;
+      if (authority && targetJobId !== undefined && this.store.work.maintenanceAdmission(authority.issueId).id !== targetJobId) throw new Error('Owner authorization cannot select another queued job.');
+      claimed = authority ? this.store.work.claimMaintenance(authority.issueId, this.evidenceRoot) : this.store.work.claim(this.evidenceRoot, targetJobId);
       if (!claimed) return false;
       const { job, run } = claimed;
       const repo = this.store.work.repo(job.repoId)!;
@@ -61,14 +65,17 @@ export class SerialQueue {
         this.store.work.updatePublication(requirement.id, { baseCommit });
       }
       const targetBranch = requirement?.publication?.branch ?? repo.targetBranch;
-      if (job.kind === 'issue') {
+      if (job.kind === 'issue' || job.kind === 'maintenance') {
         const issue = JSON.parse(job.payload) as Issue;
         const issueHistory = this.store.work.runs().filter(item => item.id !== run.id && item.repoId === repo.id && item.issueId === issue.id);
         for (const prior of issueHistory) assertRunQuiescent(prior.evidencePath);
         const previous = this.store.work.runs().filter(item => item.id !== run.id && item.repoId === repo.id && item.issueId === issue.id && item.status === 'blocked').sort((a, b) => b.jobId - a.jobId)[0];
         const feedback = previous ? `\nPrevious blocked attempt, diagnostic context only: ${JSON.stringify({ runId: previous.id, ...(policy.mode === 'legacy-v1' ? { reason: previous.reason ?? null } : {}), reasonPath: join(previous.evidencePath, 'state.json'), deliveryPath: join(previous.evidencePath, 'delivery.json'), evidencePath: previous.evidencePath })}. Address the recorded failure without changing the original goal, criteria, or review gates.` : '';
-        const task = issueTask(this.store, issue, feedback);
-        const state = await runController({ repository: repo.path, task, agent: this.options.agent ?? codexAgent(process.env.FACTORY_CODEX_BIN ?? 'codex'), baseRef: targetBranch, mergeTarget: targetBranch, evidenceRoot: this.evidenceRoot, runId: run.id, signal: this.options.signal, resumeFrom: previous?.evidencePath, budgetKey: `repo-${repo.id}:issue-${issue.id}` });
+        const task = issueTask(this.store, issue, feedback, authority);
+        const execute = authority ? await supervisedRunner(run.evidencePath, authority) : runController;
+        const state = await execute({ repository: repo.path, task, agent: this.options.agent ?? codexAgent(process.env.FACTORY_CODEX_BIN ?? 'codex'), baseRef: targetBranch, mergeTarget: targetBranch, evidenceRoot: this.evidenceRoot, runId: run.id, signal: this.options.signal, resumeFrom: previous?.evidencePath, budgetKey: `repo-${repo.id}:issue-${issue.id}`, authority });
+        const report = readJson(join(run.evidencePath, 'delivery.json')) as Delivery;
+        saveDelivery(run.evidencePath, { ...report, lifecycle: { profile: authority?.profile ?? 'feature', queuedAt: job.createdAt, claimedAt: run.startedAt, completedAt: state.completedAt!, queueWaitMs: Math.max(0, Date.parse(run.startedAt) - Date.parse(job.createdAt)), wallMs: Math.max(0, Date.parse(state.completedAt!) - Date.parse(run.startedAt)) } });
         this.store.work.finish(run.id, state.status === 'merged' ? 'merged' : 'blocked', state.reason ?? null);
       } else if (job.kind === 'requirement_publish') await this.publicationJob(job, run);
       else await this.requirementJob(job, run);
@@ -113,7 +120,8 @@ export class SerialQueue {
       const state = readJson(join(run.evidencePath, 'state.json')) as ControllerState;
       state.status = 'blocked'; state.failedPhase ??= state.phase; state.reason = reason; state.completedAt = new Date().toISOString();
       writeJson(join(run.evidencePath, 'state.json'), state);
-      controllerDelivery(state, parseTask(readJson(join(run.evidencePath, 'task.json'))));
+      const authority = existsSync(join(run.evidencePath, 'owner-authorization.json')) ? readJson(join(run.evidencePath, 'owner-authorization.json')) as OwnerAuthorization : undefined;
+      controllerDelivery(state, parseTask(readJson(join(run.evidencePath, 'task.json')), authority?.scope));
     } else {
       const payload = JSON.parse(job.payload) as { title: string; goal?: string; description?: string };
       const review = existsSync(join(run.evidencePath, 'review.json')) ? readJson(join(run.evidencePath, 'review.json')) as { approved: boolean; summary: string } : null;

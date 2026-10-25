@@ -1,10 +1,11 @@
+import type { OwnerAuthorization } from './profiles.ts';
 import type { Task, Plan, Review } from './contracts.ts';
 import type { VerificationSummary } from './evidence.ts';
 import type { Delivery } from '../src/workflow.ts';
 import type { PendingRegression, AcceptedRegression, RedCheck, ReviewReceipt } from './regression.ts';
 
 export type Phase = 'plan' | 'tests' | 'regression-tests' | 'acceptance-review' | 'implement' | 'repair' | 'review';
-export type AgentInput = { phase: Phase; task: Task; plan?: Plan; cwd: string; attempt: number; feedback: string; directory: string; timeoutMs: number; signal: AbortSignal; env: NodeJS.ProcessEnv; context?: { indexPath: string; path: string; bytes: number; sha256: string } };
+export type AgentInput = { authority?: OwnerAuthorization; phase: Phase; task: Task; plan?: Plan; cwd: string; attempt: number; feedback: string; directory: string; timeoutMs: number; signal: AbortSignal; env: NodeJS.ProcessEnv; context?: { indexPath: string; path: string; bytes: number; sha256: string } };
 export type Agent = { run: (input: AgentInput) => Promise<unknown> };
 export type Verification = VerificationSummary;
 export type PendingFailureTriage = { sourceHash: string; check: RedCheck; reportHash: string; logHash: string; receipt?: ReviewReceipt };

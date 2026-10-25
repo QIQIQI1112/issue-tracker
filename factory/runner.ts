@@ -24,12 +24,13 @@ import { StageRunner } from './stages.ts';
 import type { Operation } from './stages.ts';
 import { AgentSession } from './agent-session.ts';
 import { ScopeGuard } from './scope-guard.ts';
+import type { OwnerAuthorization } from './profiles.ts';
 
 class IntegrationRejected extends Error {}
 class FocusedFailureHold extends Error {}
 
-export async function runController(options: { repository: string; task: unknown; agent: Agent; baseRef?: string; evidenceRoot?: string; runId?: string; mergeTarget?: string; signal?: AbortSignal; resumeFrom?: string; budgetKey?: string }): Promise<ControllerState> {
-  const task = parseTask(options.task);
+export async function runController(options: { repository: string; task: unknown; agent: Agent; baseRef?: string; evidenceRoot?: string; runId?: string; mergeTarget?: string; signal?: AbortSignal; resumeFrom?: string; budgetKey?: string; authority?: OwnerAuthorization }): Promise<ControllerState> {
+  const task = parseTask(options.task, options.authority?.scope);
   const repository = resolve(options.repository);
   const runId = options.runId ?? `${task.id}-${randomUUID()}`;
   if (!/^[a-z0-9-]+$/.test(runId)) throw new Error('Invalid run ID.');
@@ -38,7 +39,7 @@ export async function runController(options: { repository: string; task: unknown
   const state: ControllerState = { schemaVersion: 1, taskId: task.id, runId, runDirectory, workspace: join(runDirectory, 'workspace'), status: 'running', phase: 'prepare', startedAt: new Date().toISOString(), redChecks: [], browserRedChecks: [], attempts: [], phases: [], reviewReceipts: [] };
   if (task.schemaVersion === 2) state.efficiency = { agentInvocations: 0, testAuthoringInvocations: 0, verificationExecutions: 0, verificationRetries: 0, verificationReuses: 0, elapsedMs: 0, durations: { planningMs: 0, testAuthoringMs: 0, acceptanceReviewMs: 0, implementationMs: 0, verificationMs: 0, codeReviewMs: 0 } };
   const engineRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-  const stages = new StageRunner(runDirectory, task, engineRoot, snapshot(repository).hash, runId);
+  const stages = new StageRunner(runDirectory, task, engineRoot, snapshot(repository).hash, runId, options.authority?.profile);
   let budget: ReturnType<typeof executionBudget> | undefined;
   let checkpoint: (() => void) | undefined;
   let settled = true;
@@ -67,7 +68,7 @@ export async function runController(options: { repository: string; task: unknown
     if (value <= 0) throw new Error('Total task timeout exceeded.');
     return value;
   };
-  const session = new AgentSession({ state, task, agent: options.agent, resumeFrom: options.resumeFrom, signal: cancelled.signal, budget: () => budget!, remaining, environment: () => env, enter, unsafe: () => { settled = false; } });
+  const session = new AgentSession({ state, task, authority: options.authority, agent: options.agent, resumeFrom: options.resumeFrom, signal: cancelled.signal, budget: () => budget!, remaining, environment: () => env, enter, unsafe: () => { settled = false; } });
   const invoke = session.invoke.bind(session);
 
   try {
@@ -100,7 +101,7 @@ export async function runController(options: { repository: string; task: unknown
     env = processEnvironment({ API_PORT: apiPort, UI_PORT: uiPort, TEST_API_PORT: apiPort, TEST_UI_PORT: uiPort, DB_PATH: join(runDirectory, 'worker.sqlite'), INSTANCE_ID: runId, FACTORY_TASK_ID: task.id });
     const baseline = snapshot(state.workspace);
     writeJson(join(runDirectory, 'baseline.json'), baseline);
-    const guard = new ScopeGuard(state.workspace, task, baseline);
+    const guard = new ScopeGuard(state.workspace, task, baseline, options.authority);
     const { protectedFiles, originalChecks } = guard;
     let proofsComplete = false;
     const enforce = guard.enforce.bind(guard);
@@ -399,7 +400,7 @@ export async function runController(options: { repository: string; task: unknown
         enter('integrate', cwd);
         state.integration = { branch: options.mergeTarget!, before };
         enter('integration-verify', cwd);
-        const latestContract = parseVerificationContract(readJson(join(cwd, 'factory/verification-contract.json')));
+        const latestContract = options.authority ? parseVerificationContract(contract) : parseVerificationContract(readJson(join(cwd, 'factory/verification-contract.json')));
         for (const check of contract.requiredNodeTests) if (!latestContract.requiredNodeTests.some(item => item.file === check.file && item.title === check.title)) latestContract.requiredNodeTests.push(check);
         const integrationContract = join(trustedRoot, `integration-contract-${attempt}.json`); writeJson(integrationContract, latestContract);
         const directory = join(runDirectory, `integration-verification-${number}-${attempt}`);
