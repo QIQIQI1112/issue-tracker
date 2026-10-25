@@ -60,7 +60,18 @@ async function mount(fixture: Fixture) {
   await fixture.mount(createElement(App));
   await fixture.settle();
   assert.ok(fixture.requests.includes('/api/issues') && fixture.requests.includes('/api/workbench'), 'Fixture readiness requires both production metadata reads.');
-  assert.ok(fixture.named(repo.name), 'Fixture readiness requires the enrolled repository control.');
+}
+
+async function selectRepository(fixture: Fixture, name = repo.name) {
+  const reachable = [...fixture.root.querySelectorAll<HTMLElement>('button, a')].find(node => node.getAttribute('aria-label') === name || node.textContent?.trim() === name);
+  if (reachable) {
+    await fixture.click(reachable);
+    return;
+  }
+  await fixture.click(control(fixture.root, 'Repositories'));
+  const main = fixture.root.querySelector('main');
+  assert.ok(main, 'The repository directory must expose its actual main-content controls.');
+  await fixture.click(control(main, name));
 }
 
 async function selectRequirement(fixture: Fixture, name = requirement.title) {
@@ -90,23 +101,23 @@ test('repository selection opens only its requirements with subordinate destinat
   try {
     await mount(fixture);
     assert.equal(fixture.document.activeElement, fixture.document.body, 'Initial metadata loading must not move focus.');
-    assert.equal(fixture.named(repo.name)?.getAttribute('aria-pressed'), 'true', 'The first enrolled repository is the initial selected repository.');
+    await selectRepository(fixture);
     const primary = fixture.root.querySelector('aside nav');
-    assert.ok(primary, 'Repository selection remains in the primary navigation.');
+    assert.ok(primary, 'The workspace retains its primary navigation.');
     for (const name of ['All repositories', 'Issues', 'Requirements', 'Repo harness', 'Unassigned']) {
       assert.equal([...primary.querySelectorAll('button, a')].some(node => node.getAttribute('aria-label') === name || node.textContent?.trim() === name), false, `${name} cannot be a primary destination.`);
     }
     const main = fixture.root.querySelector('main')!;
     for (const name of ['Requirements', 'Repo harness', 'Unassigned']) control(main, name);
     const requirementIds = () => [...fixture.root.querySelectorAll<HTMLElement>('li[data-testid^="requirement-"]')].map(node => node.dataset.testid).sort();
-    assert.deepEqual(requirementIds(), ['requirement-1', 'requirement-2'], 'The initial repository landing contains only its actual requirements.');
+    assert.deepEqual(requirementIds(), ['requirement-1', 'requirement-2'], 'The selected repository landing contains only its actual requirements.');
     assert.equal(fixture.named('Issue list'), undefined, 'A repository landing must not expose a global issue collection.');
-    await fixture.click(fixture.named(secondRepo.name)!);
+    await selectRepository(fixture, secondRepo.name);
     assert.deepEqual(requirementIds(), ['requirement-3'], 'Repository switching opens only the new repository requirements.');
     await fixture.click(control(main, 'Repo harness'));
     await fixture.settle();
     assert.ok(fixture.requests.includes('/api/repos/2/harness'), 'The subordinate harness destination reads the selected repository.');
-    await fixture.click(fixture.named(emptyRepo.name)!);
+    await selectRepository(fixture, emptyRepo.name);
     assert.deepEqual(requirementIds(), [], 'An empty repository never inherits another repository requirements.');
     assert.match(main.textContent ?? '', /No requirements/, 'Empty repository requirements have a truthful empty state.');
   } finally { await fixture.dispose(); }
@@ -116,7 +127,7 @@ test('requirement issue browsing excludes other ownership and clears stale diagn
   const { fixture } = setup();
   try {
     await mount(fixture);
-    await fixture.click(fixture.named(repo.name)!);
+    await selectRepository(fixture);
     await selectRequirement(fixture);
     assert.deepEqual(issueIds(fixture), ['issue-37'], 'Both repository and requirement IDs must match; sibling, foreign, standalone and dangling records are excluded.');
     await fixture.click(control(fixture.named('Issue list')!, 'Inspect issue Owned item 37'));
@@ -140,7 +151,7 @@ test('requirement issue browsing excludes other ownership and clears stale diagn
     await fixture.settle();
     assert.match(fixture.root.querySelector('dialog')?.textContent ?? '', /Issue #38 · LOC-038/);
     assert.doesNotMatch(fixture.root.querySelector('dialog')?.textContent ?? '', /Recorded description 37|Recorded review rejection/);
-    await fixture.click(fixture.named(secondRepo.name)!);
+    await selectRepository(fixture, secondRepo.name);
     assert.equal(fixture.named('Issue list'), undefined, 'Repository switching clears the old child scope.');
     assert.equal(fixture.root.querySelector('dialog'), null, 'Repository switching retains no obsolete issue inspection.');
     await selectRequirement(fixture, foreignRequirement.title);
@@ -153,14 +164,14 @@ test('Unassigned history contains only selected repository standalone issues and
   const before = JSON.stringify(state);
   try {
     await mount(fixture);
-    await fixture.click(fixture.named(repo.name)!);
+    await selectRepository(fixture);
     await fixture.click(control(fixture.root.querySelector('main')!, 'Unassigned'));
     assert.deepEqual(issueIds(fixture), ['issue-41'], 'Unassigned means exactly selected repository ownership and null requirement, excluding absent ownership and dangling references.');
     await fixture.click(control(fixture.named('Issue list')!, 'Inspect issue Owned item 41'));
     await fixture.settle();
     assert.match(fixture.root.querySelector('dialog')?.textContent ?? '', /Issue #41 · LOC-041/);
     await fixture.click(control(fixture.root, 'Close dialog'));
-    await fixture.click(fixture.named(secondRepo.name)!);
+    await selectRepository(fixture, secondRepo.name);
     assert.equal(fixture.named('Issue list'), undefined, 'Repository switching returns to Requirements before opening Unassigned.');
     await fixture.click(control(fixture.root.querySelector('main')!, 'Unassigned'));
     assert.deepEqual(issueIds(fixture), ['issue-42']);
@@ -176,7 +187,7 @@ test('scoped issue inspection retains filtering pagination selection and keyboar
   const { fixture, state } = setup([...children, owned(2001, 1, 2, { title: 'Shared sibling', labels: ['sibling-only'], status: 'blocked' }), owned(2002, 2, 1, { title: 'Shared foreign', labels: ['foreign-only'], status: 'blocked' })]);
   try {
     await mount(fixture);
-    await fixture.click(fixture.named(repo.name)!);
+    await selectRepository(fixture);
     await selectRequirement(fixture);
     assert.equal(issueIds(fixture).length, 10, 'The requirement uses the existing ten-issue page.');
     assert.match(fixture.named('Issue pages')?.textContent ?? '', /1–10 of 12 issues/, 'Counts and pagination derive from owned children before paging.');

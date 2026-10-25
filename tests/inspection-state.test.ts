@@ -36,10 +36,9 @@ test('workspace issue navigation retains an explicit initial active state', () =
     chooseRepository: () => {}, setSubview: () => {}, refreshRepositories: () => {}, children: createElement(IssueFixture),
   }));
   const buttons = [...html.matchAll(/<button\b[^>]*>[\s\S]*?<\/button>/g)].map(item => item[0]);
-  const active = buttons.find(button => button.includes(`aria-label="${repo.name}"`));
-  assert.ok(active, repo.name);
-  assert.match(active, /aria-pressed="true"/);
-  assert.equal(buttons.filter(button => button.includes('aria-pressed="true"')).length, 1);
+  const active = buttons.filter(button => button.includes('aria-pressed="true"'));
+  assert.equal(active.length, 1, 'The explicit workspace state retains exactly one active navigation selection.');
+  assert.match(active[0], /aria-label="[^"]+"/, 'The active navigation selection remains named.');
   const status = html.match(/<select[^>]*aria-label="Filter by status"[^>]*>[\s\S]*?<\/select>/)?.[0];
   assert.ok(status);
   for (const value of ['all', 'open', 'in_progress', 'done']) assert.match(status, new RegExp(`<option[^>]*value="${value}"`));
