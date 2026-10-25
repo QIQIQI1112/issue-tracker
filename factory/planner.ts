@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import { runProcess } from './process.ts';
 import { writeJson } from './evidence.ts';
 import { parseReview, reviewSchema } from './contracts.ts';
+import { minimumImplementation } from './agent.ts';
 import { parseDecomposition } from '../src/submission.ts';
 import type { Decomposition, Requirement } from '../src/workflow.ts';
 import { snapshot } from './evidence.ts';
@@ -31,7 +32,7 @@ export function codexPlanner(binary = 'codex'): Planner {
     const reference = { path: evidencePath, bytes: evidence.byteLength, sha256: createHash('sha256').update(evidence).digest('hex') };
     const context = writeRoleContext({ directory: input.directory, role: `requirement-${mode}`, goal: input.requirement.goal, sourceHash: snapshot(input.cwd).hash, feedback: input.evidence, evidence: [{ path: evidencePath, purpose: 'Complete immutable requirement input and retained delivery references.' }] });
     const inline = evidence.byteLength <= 8 * 1024 ? `\n\nEvidence (inline):\n${input.evidence}` : '';
-    const prompt = `Follow AGENTS.md. This is a read-only ${mode} phase. Do not edit, commit, merge, push, or start servers. Return the structured response within five minutes. Write reports in English.\n\n${instruction}\n\nRequirement:\n${JSON.stringify(input.requirement)}\n\nContext index:\n${context.indexPath}\n\nEvidence file:\n${JSON.stringify(reference)}\nRead the indexed complete retained evidence and inspect relevant actual source and underlying machine reports. Start with named checks and referenced paths; expand repository exploration when a concrete coverage gap or inconsistency requires it. Never approve from summaries alone. The reference preserves complete evidence; large manifests are omitted from inline input without truncating the file.${inline}`;
+    const prompt = `Follow AGENTS.md. This is a read-only ${mode} phase. Do not edit, commit, merge, push, or start servers. Return the structured response within five minutes. Write reports in English.\n\n${minimumImplementation}\n\n${instruction}\n\nRequirement:\n${JSON.stringify(input.requirement)}\n\nContext index:\n${context.indexPath}\n\nEvidence file:\n${JSON.stringify(reference)}\nRead the indexed complete retained evidence and inspect relevant actual source and underlying machine reports. Start with named checks and referenced paths; expand repository exploration when a concrete coverage gap or inconsistency requires it. Never approve from summaries alone. The reference preserves complete evidence; large manifests are omitted from inline input without truncating the file.${inline}`;
     writeFileSync(join(input.directory, 'prompt.txt'), prompt);
     input.onInvocation?.();
     const result = await runProcess({ command: binary, args: ['-c', 'approval_policy="never"', 'exec', '--json', '--sandbox', 'read-only', '--ephemeral', '--cd', input.cwd, '--output-schema', schemaPath, '--output-last-message', responsePath, '-'], cwd: input.cwd, env: input.env, input: prompt, logPath: join(input.directory, 'events.log'), timeoutMs: 300000, signal: input.signal });

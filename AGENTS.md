@@ -32,6 +32,13 @@ This is a local autonomous development workbench with a reproducible verifier, a
 - `scripts/` owns repeatable operating procedures.
 - `factory/` owns task contracts, evidence validation, process budgets, and controller orchestration. Application code must not import it.
 
+## Minimum necessary implementation
+
+- Apply the same minimum-necessary standard to product code, tests and fixtures. Every added capability, optional API, state, abstraction, dependency or helper needs the current requirement, an actual caller or an existing documented contract. Do not add unused modes or extension points for hypothetical future needs.
+- Preserve necessary validation, error handling, accessibility, security and accepted quality obligations. Minimal means the simplest maintainable implementation of the current contract, not the fewest lines or deletion of an untriggered safeguard.
+- Reuse meaningful existing checks and helpers. Keep fixtures and mocks limited to necessary data and external boundaries; do not add or expand framework/browser reimplementations or introduce private framework API use for tests. Record retained existing fixture limitations without turning a scoped cleanup into an unrelated framework migration.
+- Existing planning, test authoring, coverage review and final code review assess this necessity inside the changed scope. Explain real tradeoffs in existing defaults or review summaries; add no role, gate or report schema for this rule.
+
 ## Workflow
 
 1. Inspect the relevant code and documentation.

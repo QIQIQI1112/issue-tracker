@@ -11,6 +11,12 @@ After full verification, independent exact-source approval and verified local in
 
 An issue with no execution history needs explicit enqueueing through the existing entry point. For prior blocked, failed, completed or closed work, inspect the retained outcome and use the applicable owner recovery or follow-up workflow; never restart terminal work just to satisfy the receipt command.
 
+## Minimum necessary scope
+
+Apply the minimum-necessary rules in AGENTS.md to application changes, tests and helpers. Require a current goal, actual caller or existing documented contract before adding an optional capability. Existing coverage and source reviewers assess scaffolding necessity alongside behavior; preserve necessary correctness, accessibility, security and all accepted quality gates. Use current defaults and summaries for rationale, without another role, approval stage or report field. Deterministic prompt checks establish instruction delivery only; they do not prove agent compliance.
+
+For existing fixtures, trim only demonstrated unused capabilities under reviewed coverage equivalence. Preserve accepted assertions and independently freeze the complete inventory before product edits. Do not add or expand custom framework/browser runtime imitations or private framework API use. Record any retained limitation and keep an unrelated fixture-framework replacement outside a scoped cleanup.
+
 ## Freeze before complete verification
 
 Inspect relevant source and select existing meaningful coverage. For a coverage gap, the tests role adds scoped checks, the owner captures actual named assertion reds, and an independent coverage reviewer approves before implementation. An accepted assertion revision belongs to a separate acceptance-contract issue with an equivalence review. Freeze the complete tests/acceptance inventory, including helpers.
