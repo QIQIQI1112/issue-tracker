@@ -1,0 +1,1625 @@
+{
+  "schemaVersion": 1,
+  "taskId": "issue-89",
+  "status": "inactive",
+  "purpose": "Stage only the approved four-line Issue88 fixture observation correction for later native owner-resume adoption. No baseline test, original evidence, checkpoint, authority or cumulative budget is changed.",
+  "authorization": {
+    "request": {
+      "path": "/Users/louis/issue-tracker/.data/evidence/loop-stabilization-20261025/contract-revision-authorization.json",
+      "hash": "3f9dde281b97d4a1dde9dad5d5a5345163d0149578579d561e189c1a6120d5c3"
+    },
+    "decision": {
+      "path": "/Users/louis/issue-tracker/.data/evidence/loop-stabilization-20261025/approved-continuation-decision.json",
+      "hash": "7f67c3ec2574206ea92ab26ed33c34b1bebe8c9a7b73f1f1502882d9611b2de2"
+    },
+    "proposal": {
+      "path": "/Users/louis/issue-tracker/.data/evidence/loop-stabilization-20261025/continuation-resolution-proposal.md",
+      "hash": "819f9c7bac3bd8b049e3b221f1b9f782afbdd8eae7bde056988565f866ba7582"
+    },
+    "nativeBudgetProposal": {
+      "path": "/Users/louis/issue-tracker/.data/evidence/loop-stabilization-20261025/fixture-observation-proposal-native-budget.json",
+      "hash": "0ad09cc175467602f35252acc001423a20d005d6408f500dbebd6901e009193c"
+    }
+  },
+  "original": {
+    "issueId": 88,
+    "requirementId": 30,
+    "runId": "f285afff-536c-472e-b164-79add0771431",
+    "taskHash": "12731eca7c8593d0564c45b525b7145b45145a4fe9fcfd32cba2cd2f45628c70",
+    "taskFile": {
+      "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/task.json",
+      "hash": "92f87d1fb81d8cc4c0b3e90600045bfd464f4a3c21fedcf47b323b0baac0a7f5"
+    },
+    "task": {
+      "schemaVersion": 2,
+      "id": "issue-88",
+      "title": "Preserve native recovery budgets and adopt selective regression guidance",
+      "goal": "Extend the existing owner-resume entry point with a clear remaining-budget continuation using original authority, canonical task and same cumulative ledger, without granting attempts/time or restarting terminal completed work. Preserve existing positive owner-grant semantics and all accepted assertions. A successful native continuation must carry valid checkpoint lineage through fresh required verification, independent review, integration and standard reports; repeated identical decisions replay without execution. Unsafe identity, live ownership, exhausted budget or invalid proof remains blocked. Align AGENTS.md, existing role prompts and English harness documentation with the user policy: only confirmed significant or recurring project defects whose deterministic prevention outweighs authoring, maintenance and run cost warrant new permanent checks. Ordinary minor one-off findings use existing meaningful coverage plus repair/review; new business behavior still needs meaningful acceptance and major harness safety still needs targeted regressions. Use existing response fields and summaries without a defect registry, new role, service or schema. Document one fixed control baseline and three future genuine business observations using existing reports; do not invent product changes, count fixtures as observations, or claim observations already completed. Generic orchestration and project-specific test obligations remain separate.",
+      "acceptance": [
+        {
+          "id": "criterion-1",
+          "description": "The existing owner-resume command supports an explicitly identified continuation within remaining original attempts/time without changing task limits, adding owner grants, resetting counters or weakening legacy positive-grant validation. Validation is read-only and unsafe or exhausted requests do not enqueue."
+        },
+        {
+          "id": "criterion-2",
+          "description": "Minimal deterministic native exercises demonstrate settled interruption followed by selected-job continuation, retained checkpoint/budget/history, fresh required verification and independent integration; replay makes no new job/agent invocation and queued siblings remain untouched. Reuse existing protection checks."
+        },
+        {
+          "id": "criterion-3",
+          "description": "Controller-generated delivery preserves actual lineage, attempts and cumulative time automatically. No temporary recovery executor, manual state/status repair or late compatibility completion is required. Same source, authority, engine and accepted evidence identities remain required."
+        },
+        {
+          "id": "criterion-4",
+          "description": "Existing prompts, AGENTS.md and English harness docs consistently require meaningful acceptance while limiting new permanent defect checks to confirmed significant or recurring problems with worthwhile deterministic prevention. Use existing review/coverage summaries for judgment; retain all accepted tests and required gates."
+        },
+        {
+          "id": "criterion-5",
+          "description": "Establish a documented fixed flow baseline and three pending real-business observations measured from existing evidence. Keep normal role boundaries, scoped maintenance, complete final verification, independent source and original-goal review, protected GitHub CI/merge and quiescent activation. Disposable exercises prove mechanisms only and cannot fabricate observation completion."
+        }
+      ],
+      "scope": [
+        "tests/",
+        "factory/owner-recovery.ts",
+        "factory/budget.ts",
+        "factory/agent.ts",
+        "factory/planner.ts",
+        "AGENTS.md",
+        "factory/README.md",
+        "docs/owner-workflow.md",
+        "docs/harness-reliability.md",
+        "docs/execution-kernel.md",
+        "docs/loop-optimization.md",
+        "docs/verification.md",
+        "docs/stability-observation.md",
+        "docs/adaptive-execution-contract.md",
+        "docs/assertion-observations.md"
+      ],
+      "verificationCommand": "npm run verify",
+      "budget": {
+        "maxAttempts": 3,
+        "workerTimeoutMs": 600000,
+        "totalTimeoutMs": 3600000
+      },
+      "notes": "Repository issue-tracker; target codex/requirement-30-065c0f48. Complete only after independent review and automatic integration.\nPrevious blocked attempt, diagnostic context only: {\"runId\":\"cf850732-c36f-4388-89ae-bd5b80f1b962\",\"reasonPath\":\"/Users/louis/issue-tracker/.data/evidence/cf850732-c36f-4388-89ae-bd5b80f1b962/state.json\",\"deliveryPath\":\"/Users/louis/issue-tracker/.data/evidence/cf850732-c36f-4388-89ae-bd5b80f1b962/delivery.json\",\"evidencePath\":\"/Users/louis/issue-tracker/.data/evidence/cf850732-c36f-4388-89ae-bd5b80f1b962\"}. Address the recorded failure without changing the original goal, criteria, or review gates."
+    },
+    "plan": {
+      "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/plan.json",
+      "hash": "2af166bc413bc779861e9f1dfd74a30ccd7da6998446370f07a44b205d4c688d"
+    },
+    "checkpoint": {
+      "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/checkpoint.json",
+      "hash": "1336ef6df8c8f5cf1107069631f7b4d6983f8105640aa793e583388f6acf9391"
+    },
+    "checkpointPatch": {
+      "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/checkpoint.patch",
+      "hash": "d5d53a66ba030f122d2e625008b8712f025ebc0c8c6f51f3bf3d2ee55f235e64"
+    },
+    "baseCommit": "7f2bed7ceb63a3ff194dea89bc67459715a538ff",
+    "baselineTree": "beac0710c31fa5f5242a13c3d0ee2cddfff637b8",
+    "environment": "fee2ce18c687cc7310b7b4a9d94c9da4c877f85f784406b64537afb94d614fd1",
+    "sourceHash": "65d6a9f9d360d65ea0fa4e022f2fe3fcc86e5dbad6edce30badf096262b9841c",
+    "ownerAuthorization": {
+      "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/owner-authorization.json",
+      "hash": "0ae498305b5b3c3575b301172978851edf29a26ffc396e56ac0e3d3d26555fee"
+    },
+    "state": {
+      "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/state.json",
+      "hash": "90def80dc4d80c1ad690f7d56a40336e2b5e3af910cbe9987e62a11898ed447c"
+    },
+    "acceptedChecksFile": {
+      "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/accepted-checks.json",
+      "hash": "e980858cd98cb1b48b2593a28dc2c50adf803fa956047b322bf832986ab5a427"
+    },
+    "acceptanceReceipt": {
+      "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/review-receipt-f285afff-536c-472e-b164-79add0771431-1.json",
+      "hash": "1a52390a9af40da9bef7e3e2ce6993e009f20fab06a692fdd22cf8b38a542f31"
+    },
+    "checkpointProofs": [
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/accepted-checks.json",
+        "hash": "e980858cd98cb1b48b2593a28dc2c50adf803fa956047b322bf832986ab5a427"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/acceptance-review.json",
+        "hash": "21592ff1b5a48289536d7cfc3a2af74ce0c43d327d3dd69d56ebbe5a779026a4"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-0.log",
+        "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-0.jsonl",
+        "hash": "3cd4b886f5fbb5e5a11a5fc6fabe7a5d278b37329e72273eb691a902d6450513"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-1.log",
+        "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-1.jsonl",
+        "hash": "c594349391498ad5e095466439a05a05d95eeb2acdecc0ae101bbeb77340307b"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-2.log",
+        "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-2.jsonl",
+        "hash": "5d353dcb65d713ef90ae21cc0de64e2eca8f148eb49be8a29f892e130cb98f7d"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-3.log",
+        "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-3.jsonl",
+        "hash": "e31816e0b414a280ce0db0003378f2a25aba337773d2d26e08812dc45cacca82"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-4.log",
+        "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-4.jsonl",
+        "hash": "ba7c3253c3d99428402055904f8e1dc6282bb66ce1b802d447b0c98c473e14cc"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-5.log",
+        "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-5.jsonl",
+        "hash": "49dd83c2fa9d3e930f4c4fce68cad0e7c7519af1686722cb34670e00fd5bfa8e"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-6.log",
+        "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-6.jsonl",
+        "hash": "fa77b6c4c65e4b1f354c37d8f8acdb5f22edf7a65380867706c660350cee9039"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-7.log",
+        "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-7.jsonl",
+        "hash": "32d5040ddc99328dbd6f8bc9461e35808b853c9503a997df283237289f5d9d4b"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-8.log",
+        "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-8.jsonl",
+        "hash": "41fd5e4bf08d6fc193ef4226253e579bf448461e139b5e2a894eb2a442054fbf"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-9.log",
+        "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-9.jsonl",
+        "hash": "adc188387eb977426909c196c61e52177829a3a60e585be9248f9ff20a955e9d"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-10.log",
+        "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-10.jsonl",
+        "hash": "87148c467a2cb7ed08161ca25bb6e273196d41c02b006b66ba7fbc987b5c9138"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-11.log",
+        "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-11.jsonl",
+        "hash": "a31c9bef50ec8ffe69ebe5cc95706a12553336bd0858d4b4c25fc6e3f633378f"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-12.log",
+        "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-12.jsonl",
+        "hash": "196a8e51e4104a8e4df3cbc31ca31939efb4f51bd96f0f25d039b0f29ab1c82f"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-13.log",
+        "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-13.jsonl",
+        "hash": "0c97f3f109be346b31c2c13441efcce96a8e0d6d1cae5cbaa73bb51b991ed485"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-14.log",
+        "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-14.jsonl",
+        "hash": "384e5775def25194ad52defe8e4a58c3f2ab612e0f5cfeb8632d94e3d7dae3a7"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-15.log",
+        "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-15.jsonl",
+        "hash": "75d813cffbb815f4b9e3639e1c9947bf25d699a433b4ff956c9688c0445b9b05"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-16.log",
+        "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-16.jsonl",
+        "hash": "2046053868a924da06dd9fe868692330e0905964aa57449c5c880a836a239500"
+      },
+      {
+        "path": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/review-receipt-f285afff-536c-472e-b164-79add0771431-1.json",
+        "hash": "1a52390a9af40da9bef7e3e2ce6993e009f20fab06a692fdd22cf8b38a542f31"
+      }
+    ]
+  },
+  "revision": {
+    "patch": {
+      "path": "docs/remaining-budget-fixture-revision.patch",
+      "hash": "689f31c453a2d1ac9e361d8e9718f1d55f86c4afa8ab524efb618b27b5b1bf51"
+    },
+    "approvedPatch": {
+      "path": "/Users/louis/issue-tracker/.data/evidence/loop-stabilization-20261025/fixture-observation-proposal.patch",
+      "hash": "689f31c453a2d1ac9e361d8e9718f1d55f86c4afa8ab524efb618b27b5b1bf51"
+    },
+    "replacedLines": 4,
+    "sourceHash": "b78f810045564a94b602c1d2dfb6532f09bc360c389f62f9e7c1a1ea2d723b08",
+    "originalInventory": [
+      {
+        "path": "tests/acceptance-feedback.test.ts",
+        "hash": "e8c6ac4c8e266862d8c24aced7d43e329f58e6dcc67493b63d6df8474618e792"
+      },
+      {
+        "path": "tests/acceptance-retirement.test.ts",
+        "hash": "c64397314e357ebf9dd2852cd25600fedc9f97337dff9ca6ae67a3895f09a764"
+      },
+      {
+        "path": "tests/adaptive-checkpoint.test.ts",
+        "hash": "82ac9f898236fe89aa5588677cc3f5d168ba04633535119eb92238446ae4c5d9"
+      },
+      {
+        "path": "tests/adaptive-contract.test.ts",
+        "hash": "1dae28e40c100737f09be964084a9e054723430a5eda2ff2b5f6967fcf546e83"
+      },
+      {
+        "path": "tests/adaptive-controller.test.ts",
+        "hash": "5fd33fe5e29ecae4bfcfd20f915ccb479f62bf6e2c003af9534f91a803a122f1"
+      },
+      {
+        "path": "tests/adaptive-focused-integrity.test.ts",
+        "hash": "4c5e7a8637954a212009e38de43869f295450db2c4b2bd9c5f79a5d4fda07dc9"
+      },
+      {
+        "path": "tests/adaptive-queue-policy.test.ts",
+        "hash": "68ed7a5fd1658c1454b798c70cc99821873e17dd587990033bd4a39a15226d2f"
+      },
+      {
+        "path": "tests/adaptive-queue-reuse.test.ts",
+        "hash": "60370ae18fd5f613779f40c9b9f4b9eb59f01ea68c77dc51dfb5470ebfeb39df"
+      },
+      {
+        "path": "tests/agent-startup-evidence.test.ts",
+        "hash": "c291f0287082a6e49f59d273dd6cb0e494f46e3121aa784b5fe1408943f736b2"
+      },
+      {
+        "path": "tests/agent.test.ts",
+        "hash": "677454c3a8d18308b790e306108f7a4081e08713aff58cabf258d999931ba1c6"
+      },
+      {
+        "path": "tests/api.test.ts",
+        "hash": "426b45101c9b88ea10cc5c12ea3994243ccf1404a5df2d6ae8a1c6fcbfd5daa7"
+      },
+      {
+        "path": "tests/assertion-observation-guidance.test.ts",
+        "hash": "d4d096c031968ac508df95c8e21b6a21a208bc1d8a835445efdbbf9655c8d7cf"
+      },
+      {
+        "path": "tests/authorized-harness-coverage.test.ts",
+        "hash": "099d3f0d9f3f329f17360ae69a5c3e831c42a24a5265d598764711d598429cbe"
+      },
+      {
+        "path": "tests/authorized-owner-lifecycle.test.ts",
+        "hash": "f103866e1770cd845b07573e21b28936782ea1cb183f07dfc67d0b722087a8c0"
+      },
+      {
+        "path": "tests/budget.test.ts",
+        "hash": "15bc868f41930474cb2bc8bc0ec862372d4b7a35dab5e28ddd19439f762beedc"
+      },
+      {
+        "path": "tests/change-policy.test.ts",
+        "hash": "a60026850a2ac8a8bcc9e005b168f6f716ad6a2c8890bf57dbd8f23681f28eed"
+      },
+      {
+        "path": "tests/checkpoint-initial-baseline.test.ts",
+        "hash": "77d684c7f9b6e647bb056112f16e17923ea900a2f3ffa88138228e05ccc61e50"
+      },
+      {
+        "path": "tests/ci-critical-contract.test.ts",
+        "hash": "c04f6e7763ea52cf83155a406ef032c0ea4f5e94a0fd648a40167e90d6fc39f5"
+      },
+      {
+        "path": "tests/ci-critical-runner.test.ts",
+        "hash": "f5b3dabae17b08894780d15b4b79644d0e1559f0d0b5041e638500eddffec22a"
+      },
+      {
+        "path": "tests/code-only-verification.test.ts",
+        "hash": "0613fce8f2e8461a6d01712e07b59d114e762d0fb9efb75bed8fec0c3f40b142"
+      },
+      {
+        "path": "tests/contracts.test.ts",
+        "hash": "d80aaf6c7658e05e5952b804dd2ce37c3ee8d75cf855942dc87ddfc6bdd3f2bf"
+      },
+      {
+        "path": "tests/controller.test.ts",
+        "hash": "54b1fa27702a8da4059f3af76522609957c79dcddda52002ddc00c11401300b8"
+      },
+      {
+        "path": "tests/database-alias-ownership.test.ts",
+        "hash": "6b9a7bd9378855aec1e72f7e55680459d73c2b0263e11168ca82fd9a46f7404c"
+      },
+      {
+        "path": "tests/delivery-owner-outcome.test.ts",
+        "hash": "862f0014a11d64b59221d9da0ec3f9c505bd5b6f0468c0056ed8916060cb3478"
+      },
+      {
+        "path": "tests/domain.test.ts",
+        "hash": "3e89fdba5a5d04c08f8a89e6bc6a04c8ba555c5ca9fb893c2d49c3b622e0a62c"
+      },
+      {
+        "path": "tests/dropdown-fixture.ts",
+        "hash": "7405c0df437002331f9fb59786e9daf05d87bd87ca47f758a6804f79a675ca91"
+      },
+      {
+        "path": "tests/dropdown-home-regression.test.ts",
+        "hash": "10fbbff8eb0463f0009c32b37aa06dcdb9308046fe2a645a882a92d1e7748aaa"
+      },
+      {
+        "path": "tests/dropdown-preview.test.ts",
+        "hash": "a72df6b1aebb7a646e4c61db68462b548ff694925c13b6a851e44c208ed2e4b2"
+      },
+      {
+        "path": "tests/dropdown-recipe.test.ts",
+        "hash": "fddf08e18844266545ba377c8e9e3397cf3d3c7f1f3b07ac76262ba80de53712"
+      },
+      {
+        "path": "tests/dropdown-selectors.test.ts",
+        "hash": "8e7edb41e6b320917e951229a431d8f6fbc01d7feaf178beea0d421f654fa99d"
+      },
+      {
+        "path": "tests/dropdown-theme.test.ts",
+        "hash": "c03ef0eef6d80eddb2e224f4347aed9781d9fd262de4ae754c43c686dd113402"
+      },
+      {
+        "path": "tests/dropdown.test.ts",
+        "hash": "7482bdc92f6d1f6bef5206c98b91698bbdaa732b4656f4588cd61690996ce351"
+      },
+      {
+        "path": "tests/eslint.test.ts",
+        "hash": "f8fe93bb73ba45691047d832cc7e3525876a41fcc0236ec8a257cf470776c9c3"
+      },
+      {
+        "path": "tests/fixtures/exited-watcher.mjs",
+        "hash": "d825e5461cad19ac2444aa41081abcb56622f717f2c608132baf67f4cae33b90"
+      },
+      {
+        "path": "tests/fixtures/resistant-child.mjs",
+        "hash": "6f890e40285641d34931f8b1f33494e5d9406651c401c9a36fb3d9070daa440e"
+      },
+      {
+        "path": "tests/fixtures/subprocess-leader.mjs",
+        "hash": "b3ee2275a0192e57f190bc2afd24f013a962f04898dab371f1402248c301c694"
+      },
+      {
+        "path": "tests/focused-failure-triage.test.ts",
+        "hash": "125a14e1cfb9879b2df062a2d99b656111028210a86c8f4a15494396d4b4ff1a"
+      },
+      {
+        "path": "tests/focused-triage-capture.test.ts",
+        "hash": "458027c9ac07ed0138b6b816041914d143b34b40f3bb70153edc92b5af088b00"
+      },
+      {
+        "path": "tests/github-approval-recovery.test.ts",
+        "hash": "5d99c63d0be71fbfcb10ccb13772ca6b8154f33465c94f11df3f1ca7552dfec5"
+      },
+      {
+        "path": "tests/github-canonical-identity.test.ts",
+        "hash": "27880b830d9c439d943d2e17559175331eabfb47cd13efb3fc8177334a5adc4b"
+      },
+      {
+        "path": "tests/github-integration-lock.test.ts",
+        "hash": "7f79197fe56fd091cee4b1d13f916b0f2665a3994d330f4c2cff7d35539099fc"
+      },
+      {
+        "path": "tests/github-publication.test.ts",
+        "hash": "505d10ae88068bd29a55e95f4e82ef1cc9eb038c1638205bfac872a578104512"
+      },
+      {
+        "path": "tests/github-remote.test.ts",
+        "hash": "ba9d2a7e1f93eb1a2952e4bd8c955c62e7b625bdf282eca76369354bfb847151"
+      },
+      {
+        "path": "tests/helpers/factory-fixture.ts",
+        "hash": "0d115ee10490955c4656a9ba9f913a486b00bec26155eac66f0bc62f9090774b"
+      },
+      {
+        "path": "tests/helpers/subprocess.ts",
+        "hash": "43fd00cafaf76a988ab18cd4965533b423cbaec38b7b9838e0abad7de5a6a627"
+      },
+      {
+        "path": "tests/initial-proof-ownership.test.ts",
+        "hash": "671866b0c80103d73d40b01bddb88047c153adf08fafa8f6c19b9fc27e3ef05f"
+      },
+      {
+        "path": "tests/inspection-state.test.ts",
+        "hash": "a582eb253e31a00d77be9c4f6318f83430bca1432d5b03cd858783f506e768bf"
+      },
+      {
+        "path": "tests/instance.test.ts",
+        "hash": "e2c4329bb70c38642ae3ab5b41a064efa01fa47455e3720253ec8a1a662769b6"
+      },
+      {
+        "path": "tests/integration-ownership.test.ts",
+        "hash": "3e9067988b6fc20464487e66ecc82b180989b9fd4615cd4b344df97ec425fc27"
+      },
+      {
+        "path": "tests/integration.test.ts",
+        "hash": "27ff43591a2ad4555264d0f939007b3e9af6492bf7c02ed853ee18dbb1617a53"
+      },
+      {
+        "path": "tests/issue-diagnostics.test.ts",
+        "hash": "138d476d26057e1bca3d7422bdb496f4e67eb866c38137451a83f66c7d017a25"
+      },
+      {
+        "path": "tests/issue-lifecycle-migration.test.ts",
+        "hash": "875d5981a0a67798dc7dbd1f274a1074d70535835ff02f4de039a044f1a67e66"
+      },
+      {
+        "path": "tests/issue-lifecycle-ui.test.ts",
+        "hash": "0075f200f189aeaf466dbd6ebd405111dec491bd7bdc084ea00b79ddc39fe634"
+      },
+      {
+        "path": "tests/issue-lifecycle.test.ts",
+        "hash": "60776dd4574a76d8a72a2a7c6151a230192f5541024e2d8a0e86a114a6c21dae"
+      },
+      {
+        "path": "tests/issue-metadata-refresh.test.ts",
+        "hash": "ff4d69dca1d4ae7bb27b7bf7caf967ea6d3405d0f39078256d4d48871dbadc92"
+      },
+      {
+        "path": "tests/labels.test.ts",
+        "hash": "75ee1f02b05e8c7098a657c4fa0bf9a491f25728d1036e1963a0c24dca3c3bd6"
+      },
+      {
+        "path": "tests/lifecycle.test.ts",
+        "hash": "639e894ba648bea36f67ddf0bc441be67f70496bf44b0231d4fd4dec127f8d87"
+      },
+      {
+        "path": "tests/maintenance-admission.test.ts",
+        "hash": "7d0b3d4ea82c276a5a713ab1fb5e8cfce2da37fbe1814b495b10278d1ffcf53a"
+      },
+      {
+        "path": "tests/maintenance-progress.test.ts",
+        "hash": "afdf241431e65ea35f2b23a86463b484d62476a425df5269d17451459d216a73"
+      },
+      {
+        "path": "tests/maintenance-publication-dependency.test.ts",
+        "hash": "70b5d8efd8a48b304b91e6a9d5387c6ffe80e8171fa123492696ccde855e088c"
+      },
+      {
+        "path": "tests/maintenance.test.ts",
+        "hash": "d3641cbda3e0fceac5b99e40664f2ddfd9622e9f914ce2d626a3b3f67507bb15"
+      },
+      {
+        "path": "tests/minimum-implementation-guidance.test.ts",
+        "hash": "29a74a9a70374bcada9644d5d72e89c666dd6da6c2c17b0100a789a23b7b4f35"
+      },
+      {
+        "path": "tests/node-concurrency.test.ts",
+        "hash": "22781356872cb0f2c2b3da4999f2aee58af2800a9998cf857d21a6e532771af2"
+      },
+      {
+        "path": "tests/node-report-interpretation.test.ts",
+        "hash": "496b1a58d43176e25ea126ffeff8c2b4c414354abf50e2d76db7571877f0a31d"
+      },
+      {
+        "path": "tests/optimization-policy.test.ts",
+        "hash": "46737d908e1d13b3a7bc6172a2e95c5d4a4782e8870ec28c2c24b447a2176810"
+      },
+      {
+        "path": "tests/owner-resume.test.ts",
+        "hash": "ea381c76676c88385c1888c7419d5908365ff68c4685714ed037102e5188b895"
+      },
+      {
+        "path": "tests/owner-verification.test.ts",
+        "hash": "85d14df893df7e9dab8a42a91d560aecd3e9808a45b3c7371b3eb6c5b42731eb"
+      },
+      {
+        "path": "tests/ownership.test.ts",
+        "hash": "61420dceef7bcd6ea0e9ad32ae9fb36982e5c0db25064730e22363527b98ec7b"
+      },
+      {
+        "path": "tests/planner-evidence.test.ts",
+        "hash": "1c8d26380feb96419b32ca6ccf621aa1d19d4a70250311ed85dde1b9d0c9e19c"
+      },
+      {
+        "path": "tests/planner-invocation-metrics.test.ts",
+        "hash": "9e78cbd191a631b274b5b2062b564a9585aaca9b340608d90ef691d61c47a971"
+      },
+      {
+        "path": "tests/planner.test.ts",
+        "hash": "241fdb4e5179666c417ca3b0b95f654ddaa97870b4f12a1d8f8e784fc3f14b1c"
+      },
+      {
+        "path": "tests/process-probe.test.ts",
+        "hash": "7b3e3f104a60e669e2ae312186aefbff7d68f20c64c7cbbedd9e250ca8025a96"
+      },
+      {
+        "path": "tests/process.test.ts",
+        "hash": "415c12e55a798e2635eeb66a05a9a78397dd2a998c9f01c247ceee1b531e8dc7"
+      },
+      {
+        "path": "tests/proportionate-coverage-guidance.test.ts",
+        "hash": "3602c34492cd231cb7dbc29b9cc2ececd9af1caa51f1c66663d6983bdf705fed"
+      },
+      {
+        "path": "tests/queue.test.ts",
+        "hash": "13b201a5f7be4b6d1ce084065d0b3f546e1f511fb8864330ea9bd3872d8a754d"
+      },
+      {
+        "path": "tests/rail-toggle.test.ts",
+        "hash": "6012a200f4e0bb1268feffc9a42b7eeb4960b087fcb7227afce7455f767c1c2a"
+      },
+      {
+        "path": "tests/react-dom-fixture-lifecycle.test.ts",
+        "hash": "58505157ed0f67e6f075ccfb7488cbab02201a58b6e0977aaa45857d81c70a85"
+      },
+      {
+        "path": "tests/read-only-ui.test.ts",
+        "hash": "1a3f32cb43361d8eb6605ccc1a122787e61ec41463faa230263572cfd50ec612"
+      },
+      {
+        "path": "tests/regression-loop.test.ts",
+        "hash": "a8a5648565ef492ff2bebdb1b1c4e2b95343b570c2b563242f4459f6a020cd3d"
+      },
+      {
+        "path": "tests/regression-safety.test.ts",
+        "hash": "d70c3677dd17efc731787a258a89b88bbf80187deed6fc5cde76dbdd9a4bf6e6"
+      },
+      {
+        "path": "tests/repository-harness-fixture.ts",
+        "hash": "e24284e37012f3b37c8595796edbb51eb784d52c45fe8222181ea5d847ff8bf4"
+      },
+      {
+        "path": "tests/repository-harness.test.ts",
+        "hash": "0f231f6e407f958717a676421391ea019f875da5f921c552b89cead106e84c3e"
+      },
+      {
+        "path": "tests/repository-navigation.test.ts",
+        "hash": "255a9ad123b4babf19853db837e58fb3ee127d9b4c6726f9ab43a8244152eb23"
+      },
+      {
+        "path": "tests/resume.test.ts",
+        "hash": "f9c9f41185504a08b547cb0d273c2524cceff9e4510e82ee46008dcb280bf64d"
+      },
+      {
+        "path": "tests/review-flow.test.ts",
+        "hash": "b67982c2af07f781a104d7ffdd6ca216129ae26dadde01af7f81c871e65299f1"
+      },
+      {
+        "path": "tests/review-protocol-repair.test.ts",
+        "hash": "e6128482973281c23bc765f2b170b8f588ccf9c1f07a7022a785cf9066c23ec7"
+      },
+      {
+        "path": "tests/review-response-json.test.ts",
+        "hash": "da1e9e4d582e2a74a289f6b3be6d4329e9b67465288446926272a50f4320efe2"
+      },
+      {
+        "path": "tests/role-context.test.ts",
+        "hash": "c3d37220e4d03b89b0522f207a364d824c33b0563a06ff75f40d123d5fce628e"
+      },
+      {
+        "path": "tests/run-state-recovery.test.ts",
+        "hash": "abef8dcf4115a3fa708c0917fe767dc434db6447d140f867ead079272134e596"
+      },
+      {
+        "path": "tests/schema-version.test.ts",
+        "hash": "5c59ba5c4a7ac7aa71a4058103122db61c4d67ec16939a9775044459f34b7c3a"
+      },
+      {
+        "path": "tests/storage.test.ts",
+        "hash": "b32ec9ed48d078586be68704032baea350e0463458f23ba017fff62e6a991cb9"
+      },
+      {
+        "path": "tests/submission.test.ts",
+        "hash": "fb06bb0580c936cd2a5b4cc25e850db2d8d32fcef5e2073ce730ce8aa15930f6"
+      },
+      {
+        "path": "tests/target-safety.test.ts",
+        "hash": "983be020826d23b9b1d0e917f067a02ef783e786cb7088bc178afeee56e8d71a"
+      },
+      {
+        "path": "tests/test-authoring-guidance.test.ts",
+        "hash": "914c5679e2ab94cd914ca34051575e2564b3b5133c6fdf5a2f3cf0b4f52e89dc"
+      },
+      {
+        "path": "tests/test-inventory.test.ts",
+        "hash": "795162d265b571ace4e0506f1e349223587aff4089d935c1fab0a5b0bb9fd5a8"
+      },
+      {
+        "path": "tests/toolbar-provenance.test.ts",
+        "hash": "84dbef79800dc20ef58a795784208b3e50c70df32553bb2e711169d165f92786"
+      },
+      {
+        "path": "tests/typed-run-state.test.ts",
+        "hash": "bfa280aef98503ec2826ef752f15c4732e3936ec35a4a93085a57cf95dcc7e6d"
+      },
+      {
+        "path": "tests/ui-design-contract.ts",
+        "hash": "9e3d90c93f8926a7441538bfe9a6216189bec4691362cf5b5d8759a9ca7f61cd"
+      },
+      {
+        "path": "tests/ui-preview-build.test.ts",
+        "hash": "fd86481804f617d18d3bed5524f7065b779f46a55be2ae34373711df406816c5"
+      },
+      {
+        "path": "tests/verification-diagnosis.test.ts",
+        "hash": "b7b943b58cafb48ae465a1a968386582ec355e0b47d536d02ed93bf628f5b047"
+      },
+      {
+        "path": "tests/verification-input-binding.test.ts",
+        "hash": "b9c39f58ac9936222503db4cd68eea09b7dcf6b639dc4804690b9140198d4b09"
+      },
+      {
+        "path": "tests/verification-retry.test.ts",
+        "hash": "344782aec2a88b770b67099dc843f9d95746b13119849b24703cf53264100868"
+      },
+      {
+        "path": "tests/verification-reuse-cross-child.test.ts",
+        "hash": "cfe69a734c1fc5f92e998edc4f9565a8ef2380a1a82e7a452c1156e1f0d1615a"
+      },
+      {
+        "path": "tests/verification-reuse-node-mapping.test.ts",
+        "hash": "2fd5e41d5aae21ffce58d89e8663c0b87530041688e67f347095412062184616"
+      },
+      {
+        "path": "tests/verification-reuse.test.ts",
+        "hash": "9581168e93571217865cfd137849064868fe17a5e0f378ce34c321f8c0c85dc5"
+      },
+      {
+        "path": "tests/verifier.test.ts",
+        "hash": "eefa60346f8e9a9a73792c8fb327fb68edbd9c61f96e7cf323c7c3d24611adb6"
+      },
+      {
+        "path": "tests/vite-cache-isolation.test.ts",
+        "hash": "bf19dcb7faf54a5d41a7bd9178e1c3cfb5ab0bb131c96f8f5d3aa5891d45e353"
+      },
+      {
+        "path": "tests/workbench.test.ts",
+        "hash": "860dc61d9dd26b0e17b2fd35bb8830dcdcf4f8de8baf58e66d80bf9c72774d4b"
+      },
+      {
+        "path": "tests/workflow-guidance.test.ts",
+        "hash": "e0df0e3232a2efeba106e26bbf867608b018a5c44915146c9394fc0912d88f98"
+      },
+      {
+        "path": "tests/remaining-budget-maintenance.test.ts",
+        "hash": "d23d58d263bbb6912e75351f20baace99c5b404b288680408393246f96dfe8f1"
+      },
+      {
+        "path": "tests/remaining-budget-recovery.test.ts",
+        "hash": "8abd6045d891af44a9854acbf0634706538571abcfe51a1bc51eb2ebc7e9f7c7"
+      },
+      {
+        "path": "tests/selective-regression-guidance.test.ts",
+        "hash": "27518a6f948ee7ddad679be62ef4be45d6bb7e01f617cb1ff64e814b55e41167"
+      }
+    ],
+    "proposedInventory": [
+      {
+        "path": "tests/acceptance-feedback.test.ts",
+        "hash": "e8c6ac4c8e266862d8c24aced7d43e329f58e6dcc67493b63d6df8474618e792"
+      },
+      {
+        "path": "tests/acceptance-retirement.test.ts",
+        "hash": "c64397314e357ebf9dd2852cd25600fedc9f97337dff9ca6ae67a3895f09a764"
+      },
+      {
+        "path": "tests/adaptive-checkpoint.test.ts",
+        "hash": "82ac9f898236fe89aa5588677cc3f5d168ba04633535119eb92238446ae4c5d9"
+      },
+      {
+        "path": "tests/adaptive-contract.test.ts",
+        "hash": "1dae28e40c100737f09be964084a9e054723430a5eda2ff2b5f6967fcf546e83"
+      },
+      {
+        "path": "tests/adaptive-controller.test.ts",
+        "hash": "5fd33fe5e29ecae4bfcfd20f915ccb479f62bf6e2c003af9534f91a803a122f1"
+      },
+      {
+        "path": "tests/adaptive-focused-integrity.test.ts",
+        "hash": "4c5e7a8637954a212009e38de43869f295450db2c4b2bd9c5f79a5d4fda07dc9"
+      },
+      {
+        "path": "tests/adaptive-queue-policy.test.ts",
+        "hash": "68ed7a5fd1658c1454b798c70cc99821873e17dd587990033bd4a39a15226d2f"
+      },
+      {
+        "path": "tests/adaptive-queue-reuse.test.ts",
+        "hash": "60370ae18fd5f613779f40c9b9f4b9eb59f01ea68c77dc51dfb5470ebfeb39df"
+      },
+      {
+        "path": "tests/agent-startup-evidence.test.ts",
+        "hash": "c291f0287082a6e49f59d273dd6cb0e494f46e3121aa784b5fe1408943f736b2"
+      },
+      {
+        "path": "tests/agent.test.ts",
+        "hash": "677454c3a8d18308b790e306108f7a4081e08713aff58cabf258d999931ba1c6"
+      },
+      {
+        "path": "tests/api.test.ts",
+        "hash": "426b45101c9b88ea10cc5c12ea3994243ccf1404a5df2d6ae8a1c6fcbfd5daa7"
+      },
+      {
+        "path": "tests/assertion-observation-guidance.test.ts",
+        "hash": "d4d096c031968ac508df95c8e21b6a21a208bc1d8a835445efdbbf9655c8d7cf"
+      },
+      {
+        "path": "tests/authorized-harness-coverage.test.ts",
+        "hash": "099d3f0d9f3f329f17360ae69a5c3e831c42a24a5265d598764711d598429cbe"
+      },
+      {
+        "path": "tests/authorized-owner-lifecycle.test.ts",
+        "hash": "f103866e1770cd845b07573e21b28936782ea1cb183f07dfc67d0b722087a8c0"
+      },
+      {
+        "path": "tests/budget.test.ts",
+        "hash": "15bc868f41930474cb2bc8bc0ec862372d4b7a35dab5e28ddd19439f762beedc"
+      },
+      {
+        "path": "tests/change-policy.test.ts",
+        "hash": "a60026850a2ac8a8bcc9e005b168f6f716ad6a2c8890bf57dbd8f23681f28eed"
+      },
+      {
+        "path": "tests/checkpoint-initial-baseline.test.ts",
+        "hash": "77d684c7f9b6e647bb056112f16e17923ea900a2f3ffa88138228e05ccc61e50"
+      },
+      {
+        "path": "tests/ci-critical-contract.test.ts",
+        "hash": "c04f6e7763ea52cf83155a406ef032c0ea4f5e94a0fd648a40167e90d6fc39f5"
+      },
+      {
+        "path": "tests/ci-critical-runner.test.ts",
+        "hash": "f5b3dabae17b08894780d15b4b79644d0e1559f0d0b5041e638500eddffec22a"
+      },
+      {
+        "path": "tests/code-only-verification.test.ts",
+        "hash": "0613fce8f2e8461a6d01712e07b59d114e762d0fb9efb75bed8fec0c3f40b142"
+      },
+      {
+        "path": "tests/contracts.test.ts",
+        "hash": "d80aaf6c7658e05e5952b804dd2ce37c3ee8d75cf855942dc87ddfc6bdd3f2bf"
+      },
+      {
+        "path": "tests/controller.test.ts",
+        "hash": "54b1fa27702a8da4059f3af76522609957c79dcddda52002ddc00c11401300b8"
+      },
+      {
+        "path": "tests/database-alias-ownership.test.ts",
+        "hash": "6b9a7bd9378855aec1e72f7e55680459d73c2b0263e11168ca82fd9a46f7404c"
+      },
+      {
+        "path": "tests/delivery-owner-outcome.test.ts",
+        "hash": "862f0014a11d64b59221d9da0ec3f9c505bd5b6f0468c0056ed8916060cb3478"
+      },
+      {
+        "path": "tests/domain.test.ts",
+        "hash": "3e89fdba5a5d04c08f8a89e6bc6a04c8ba555c5ca9fb893c2d49c3b622e0a62c"
+      },
+      {
+        "path": "tests/dropdown-fixture.ts",
+        "hash": "7405c0df437002331f9fb59786e9daf05d87bd87ca47f758a6804f79a675ca91"
+      },
+      {
+        "path": "tests/dropdown-home-regression.test.ts",
+        "hash": "10fbbff8eb0463f0009c32b37aa06dcdb9308046fe2a645a882a92d1e7748aaa"
+      },
+      {
+        "path": "tests/dropdown-preview.test.ts",
+        "hash": "a72df6b1aebb7a646e4c61db68462b548ff694925c13b6a851e44c208ed2e4b2"
+      },
+      {
+        "path": "tests/dropdown-recipe.test.ts",
+        "hash": "fddf08e18844266545ba377c8e9e3397cf3d3c7f1f3b07ac76262ba80de53712"
+      },
+      {
+        "path": "tests/dropdown-selectors.test.ts",
+        "hash": "8e7edb41e6b320917e951229a431d8f6fbc01d7feaf178beea0d421f654fa99d"
+      },
+      {
+        "path": "tests/dropdown-theme.test.ts",
+        "hash": "c03ef0eef6d80eddb2e224f4347aed9781d9fd262de4ae754c43c686dd113402"
+      },
+      {
+        "path": "tests/dropdown.test.ts",
+        "hash": "7482bdc92f6d1f6bef5206c98b91698bbdaa732b4656f4588cd61690996ce351"
+      },
+      {
+        "path": "tests/eslint.test.ts",
+        "hash": "f8fe93bb73ba45691047d832cc7e3525876a41fcc0236ec8a257cf470776c9c3"
+      },
+      {
+        "path": "tests/fixtures/exited-watcher.mjs",
+        "hash": "d825e5461cad19ac2444aa41081abcb56622f717f2c608132baf67f4cae33b90"
+      },
+      {
+        "path": "tests/fixtures/resistant-child.mjs",
+        "hash": "6f890e40285641d34931f8b1f33494e5d9406651c401c9a36fb3d9070daa440e"
+      },
+      {
+        "path": "tests/fixtures/subprocess-leader.mjs",
+        "hash": "b3ee2275a0192e57f190bc2afd24f013a962f04898dab371f1402248c301c694"
+      },
+      {
+        "path": "tests/focused-failure-triage.test.ts",
+        "hash": "125a14e1cfb9879b2df062a2d99b656111028210a86c8f4a15494396d4b4ff1a"
+      },
+      {
+        "path": "tests/focused-triage-capture.test.ts",
+        "hash": "458027c9ac07ed0138b6b816041914d143b34b40f3bb70153edc92b5af088b00"
+      },
+      {
+        "path": "tests/github-approval-recovery.test.ts",
+        "hash": "5d99c63d0be71fbfcb10ccb13772ca6b8154f33465c94f11df3f1ca7552dfec5"
+      },
+      {
+        "path": "tests/github-canonical-identity.test.ts",
+        "hash": "27880b830d9c439d943d2e17559175331eabfb47cd13efb3fc8177334a5adc4b"
+      },
+      {
+        "path": "tests/github-integration-lock.test.ts",
+        "hash": "7f79197fe56fd091cee4b1d13f916b0f2665a3994d330f4c2cff7d35539099fc"
+      },
+      {
+        "path": "tests/github-publication.test.ts",
+        "hash": "505d10ae88068bd29a55e95f4e82ef1cc9eb038c1638205bfac872a578104512"
+      },
+      {
+        "path": "tests/github-remote.test.ts",
+        "hash": "ba9d2a7e1f93eb1a2952e4bd8c955c62e7b625bdf282eca76369354bfb847151"
+      },
+      {
+        "path": "tests/helpers/factory-fixture.ts",
+        "hash": "0d115ee10490955c4656a9ba9f913a486b00bec26155eac66f0bc62f9090774b"
+      },
+      {
+        "path": "tests/helpers/subprocess.ts",
+        "hash": "43fd00cafaf76a988ab18cd4965533b423cbaec38b7b9838e0abad7de5a6a627"
+      },
+      {
+        "path": "tests/initial-proof-ownership.test.ts",
+        "hash": "671866b0c80103d73d40b01bddb88047c153adf08fafa8f6c19b9fc27e3ef05f"
+      },
+      {
+        "path": "tests/inspection-state.test.ts",
+        "hash": "a582eb253e31a00d77be9c4f6318f83430bca1432d5b03cd858783f506e768bf"
+      },
+      {
+        "path": "tests/instance.test.ts",
+        "hash": "e2c4329bb70c38642ae3ab5b41a064efa01fa47455e3720253ec8a1a662769b6"
+      },
+      {
+        "path": "tests/integration-ownership.test.ts",
+        "hash": "3e9067988b6fc20464487e66ecc82b180989b9fd4615cd4b344df97ec425fc27"
+      },
+      {
+        "path": "tests/integration.test.ts",
+        "hash": "27ff43591a2ad4555264d0f939007b3e9af6492bf7c02ed853ee18dbb1617a53"
+      },
+      {
+        "path": "tests/issue-diagnostics.test.ts",
+        "hash": "138d476d26057e1bca3d7422bdb496f4e67eb866c38137451a83f66c7d017a25"
+      },
+      {
+        "path": "tests/issue-lifecycle-migration.test.ts",
+        "hash": "875d5981a0a67798dc7dbd1f274a1074d70535835ff02f4de039a044f1a67e66"
+      },
+      {
+        "path": "tests/issue-lifecycle-ui.test.ts",
+        "hash": "0075f200f189aeaf466dbd6ebd405111dec491bd7bdc084ea00b79ddc39fe634"
+      },
+      {
+        "path": "tests/issue-lifecycle.test.ts",
+        "hash": "60776dd4574a76d8a72a2a7c6151a230192f5541024e2d8a0e86a114a6c21dae"
+      },
+      {
+        "path": "tests/issue-metadata-refresh.test.ts",
+        "hash": "ff4d69dca1d4ae7bb27b7bf7caf967ea6d3405d0f39078256d4d48871dbadc92"
+      },
+      {
+        "path": "tests/labels.test.ts",
+        "hash": "75ee1f02b05e8c7098a657c4fa0bf9a491f25728d1036e1963a0c24dca3c3bd6"
+      },
+      {
+        "path": "tests/lifecycle.test.ts",
+        "hash": "639e894ba648bea36f67ddf0bc441be67f70496bf44b0231d4fd4dec127f8d87"
+      },
+      {
+        "path": "tests/maintenance-admission.test.ts",
+        "hash": "7d0b3d4ea82c276a5a713ab1fb5e8cfce2da37fbe1814b495b10278d1ffcf53a"
+      },
+      {
+        "path": "tests/maintenance-progress.test.ts",
+        "hash": "afdf241431e65ea35f2b23a86463b484d62476a425df5269d17451459d216a73"
+      },
+      {
+        "path": "tests/maintenance-publication-dependency.test.ts",
+        "hash": "70b5d8efd8a48b304b91e6a9d5387c6ffe80e8171fa123492696ccde855e088c"
+      },
+      {
+        "path": "tests/maintenance.test.ts",
+        "hash": "d3641cbda3e0fceac5b99e40664f2ddfd9622e9f914ce2d626a3b3f67507bb15"
+      },
+      {
+        "path": "tests/minimum-implementation-guidance.test.ts",
+        "hash": "29a74a9a70374bcada9644d5d72e89c666dd6da6c2c17b0100a789a23b7b4f35"
+      },
+      {
+        "path": "tests/node-concurrency.test.ts",
+        "hash": "22781356872cb0f2c2b3da4999f2aee58af2800a9998cf857d21a6e532771af2"
+      },
+      {
+        "path": "tests/node-report-interpretation.test.ts",
+        "hash": "496b1a58d43176e25ea126ffeff8c2b4c414354abf50e2d76db7571877f0a31d"
+      },
+      {
+        "path": "tests/optimization-policy.test.ts",
+        "hash": "46737d908e1d13b3a7bc6172a2e95c5d4a4782e8870ec28c2c24b447a2176810"
+      },
+      {
+        "path": "tests/owner-resume.test.ts",
+        "hash": "ea381c76676c88385c1888c7419d5908365ff68c4685714ed037102e5188b895"
+      },
+      {
+        "path": "tests/owner-verification.test.ts",
+        "hash": "85d14df893df7e9dab8a42a91d560aecd3e9808a45b3c7371b3eb6c5b42731eb"
+      },
+      {
+        "path": "tests/ownership.test.ts",
+        "hash": "61420dceef7bcd6ea0e9ad32ae9fb36982e5c0db25064730e22363527b98ec7b"
+      },
+      {
+        "path": "tests/planner-evidence.test.ts",
+        "hash": "1c8d26380feb96419b32ca6ccf621aa1d19d4a70250311ed85dde1b9d0c9e19c"
+      },
+      {
+        "path": "tests/planner-invocation-metrics.test.ts",
+        "hash": "9e78cbd191a631b274b5b2062b564a9585aaca9b340608d90ef691d61c47a971"
+      },
+      {
+        "path": "tests/planner.test.ts",
+        "hash": "241fdb4e5179666c417ca3b0b95f654ddaa97870b4f12a1d8f8e784fc3f14b1c"
+      },
+      {
+        "path": "tests/process-probe.test.ts",
+        "hash": "7b3e3f104a60e669e2ae312186aefbff7d68f20c64c7cbbedd9e250ca8025a96"
+      },
+      {
+        "path": "tests/process.test.ts",
+        "hash": "415c12e55a798e2635eeb66a05a9a78397dd2a998c9f01c247ceee1b531e8dc7"
+      },
+      {
+        "path": "tests/proportionate-coverage-guidance.test.ts",
+        "hash": "3602c34492cd231cb7dbc29b9cc2ececd9af1caa51f1c66663d6983bdf705fed"
+      },
+      {
+        "path": "tests/queue.test.ts",
+        "hash": "13b201a5f7be4b6d1ce084065d0b3f546e1f511fb8864330ea9bd3872d8a754d"
+      },
+      {
+        "path": "tests/rail-toggle.test.ts",
+        "hash": "6012a200f4e0bb1268feffc9a42b7eeb4960b087fcb7227afce7455f767c1c2a"
+      },
+      {
+        "path": "tests/react-dom-fixture-lifecycle.test.ts",
+        "hash": "58505157ed0f67e6f075ccfb7488cbab02201a58b6e0977aaa45857d81c70a85"
+      },
+      {
+        "path": "tests/read-only-ui.test.ts",
+        "hash": "1a3f32cb43361d8eb6605ccc1a122787e61ec41463faa230263572cfd50ec612"
+      },
+      {
+        "path": "tests/regression-loop.test.ts",
+        "hash": "a8a5648565ef492ff2bebdb1b1c4e2b95343b570c2b563242f4459f6a020cd3d"
+      },
+      {
+        "path": "tests/regression-safety.test.ts",
+        "hash": "d70c3677dd17efc731787a258a89b88bbf80187deed6fc5cde76dbdd9a4bf6e6"
+      },
+      {
+        "path": "tests/remaining-budget-maintenance.test.ts",
+        "hash": "94d82c9307f434073c75eae3fbefcc8aae2f3a01e98b4341084766580742bdcc"
+      },
+      {
+        "path": "tests/remaining-budget-recovery.test.ts",
+        "hash": "2abaf0eed93bf915f4b030eaa57479257346746e9e4c72920eb5084cc012a3eb"
+      },
+      {
+        "path": "tests/repository-harness-fixture.ts",
+        "hash": "e24284e37012f3b37c8595796edbb51eb784d52c45fe8222181ea5d847ff8bf4"
+      },
+      {
+        "path": "tests/repository-harness.test.ts",
+        "hash": "0f231f6e407f958717a676421391ea019f875da5f921c552b89cead106e84c3e"
+      },
+      {
+        "path": "tests/repository-navigation.test.ts",
+        "hash": "255a9ad123b4babf19853db837e58fb3ee127d9b4c6726f9ab43a8244152eb23"
+      },
+      {
+        "path": "tests/resume.test.ts",
+        "hash": "f9c9f41185504a08b547cb0d273c2524cceff9e4510e82ee46008dcb280bf64d"
+      },
+      {
+        "path": "tests/review-flow.test.ts",
+        "hash": "b67982c2af07f781a104d7ffdd6ca216129ae26dadde01af7f81c871e65299f1"
+      },
+      {
+        "path": "tests/review-protocol-repair.test.ts",
+        "hash": "e6128482973281c23bc765f2b170b8f588ccf9c1f07a7022a785cf9066c23ec7"
+      },
+      {
+        "path": "tests/review-response-json.test.ts",
+        "hash": "da1e9e4d582e2a74a289f6b3be6d4329e9b67465288446926272a50f4320efe2"
+      },
+      {
+        "path": "tests/role-context.test.ts",
+        "hash": "c3d37220e4d03b89b0522f207a364d824c33b0563a06ff75f40d123d5fce628e"
+      },
+      {
+        "path": "tests/run-state-recovery.test.ts",
+        "hash": "abef8dcf4115a3fa708c0917fe767dc434db6447d140f867ead079272134e596"
+      },
+      {
+        "path": "tests/schema-version.test.ts",
+        "hash": "5c59ba5c4a7ac7aa71a4058103122db61c4d67ec16939a9775044459f34b7c3a"
+      },
+      {
+        "path": "tests/selective-regression-guidance.test.ts",
+        "hash": "27518a6f948ee7ddad679be62ef4be45d6bb7e01f617cb1ff64e814b55e41167"
+      },
+      {
+        "path": "tests/storage.test.ts",
+        "hash": "b32ec9ed48d078586be68704032baea350e0463458f23ba017fff62e6a991cb9"
+      },
+      {
+        "path": "tests/submission.test.ts",
+        "hash": "fb06bb0580c936cd2a5b4cc25e850db2d8d32fcef5e2073ce730ce8aa15930f6"
+      },
+      {
+        "path": "tests/target-safety.test.ts",
+        "hash": "983be020826d23b9b1d0e917f067a02ef783e786cb7088bc178afeee56e8d71a"
+      },
+      {
+        "path": "tests/test-authoring-guidance.test.ts",
+        "hash": "914c5679e2ab94cd914ca34051575e2564b3b5133c6fdf5a2f3cf0b4f52e89dc"
+      },
+      {
+        "path": "tests/test-inventory.test.ts",
+        "hash": "795162d265b571ace4e0506f1e349223587aff4089d935c1fab0a5b0bb9fd5a8"
+      },
+      {
+        "path": "tests/toolbar-provenance.test.ts",
+        "hash": "84dbef79800dc20ef58a795784208b3e50c70df32553bb2e711169d165f92786"
+      },
+      {
+        "path": "tests/typed-run-state.test.ts",
+        "hash": "bfa280aef98503ec2826ef752f15c4732e3936ec35a4a93085a57cf95dcc7e6d"
+      },
+      {
+        "path": "tests/ui-design-contract.ts",
+        "hash": "9e3d90c93f8926a7441538bfe9a6216189bec4691362cf5b5d8759a9ca7f61cd"
+      },
+      {
+        "path": "tests/ui-preview-build.test.ts",
+        "hash": "fd86481804f617d18d3bed5524f7065b779f46a55be2ae34373711df406816c5"
+      },
+      {
+        "path": "tests/verification-diagnosis.test.ts",
+        "hash": "b7b943b58cafb48ae465a1a968386582ec355e0b47d536d02ed93bf628f5b047"
+      },
+      {
+        "path": "tests/verification-input-binding.test.ts",
+        "hash": "b9c39f58ac9936222503db4cd68eea09b7dcf6b639dc4804690b9140198d4b09"
+      },
+      {
+        "path": "tests/verification-retry.test.ts",
+        "hash": "344782aec2a88b770b67099dc843f9d95746b13119849b24703cf53264100868"
+      },
+      {
+        "path": "tests/verification-reuse-cross-child.test.ts",
+        "hash": "cfe69a734c1fc5f92e998edc4f9565a8ef2380a1a82e7a452c1156e1f0d1615a"
+      },
+      {
+        "path": "tests/verification-reuse-node-mapping.test.ts",
+        "hash": "2fd5e41d5aae21ffce58d89e8663c0b87530041688e67f347095412062184616"
+      },
+      {
+        "path": "tests/verification-reuse.test.ts",
+        "hash": "9581168e93571217865cfd137849064868fe17a5e0f378ce34c321f8c0c85dc5"
+      },
+      {
+        "path": "tests/verifier.test.ts",
+        "hash": "eefa60346f8e9a9a73792c8fb327fb68edbd9c61f96e7cf323c7c3d24611adb6"
+      },
+      {
+        "path": "tests/vite-cache-isolation.test.ts",
+        "hash": "bf19dcb7faf54a5d41a7bd9178e1c3cfb5ab0bb131c96f8f5d3aa5891d45e353"
+      },
+      {
+        "path": "tests/workbench.test.ts",
+        "hash": "860dc61d9dd26b0e17b2fd35bb8830dcdcf4f8de8baf58e66d80bf9c72774d4b"
+      },
+      {
+        "path": "tests/workflow-guidance.test.ts",
+        "hash": "e0df0e3232a2efeba106e26bbf867608b018a5c44915146c9394fc0912d88f98"
+      }
+    ],
+    "files": [
+      {
+        "path": "tests/remaining-budget-recovery.test.ts",
+        "originalHash": "8abd6045d891af44a9854acbf0634706538571abcfe51a1bc51eb2ebc7e9f7c7",
+        "replacementHash": "2abaf0eed93bf915f4b030eaa57479257346746e9e4c72920eb5084cc012a3eb",
+        "content": "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\nimport { randomUUID } from 'node:crypto';\nimport { existsSync, readFileSync, writeFileSync } from 'node:fs';\nimport { join } from 'node:path';\nimport { IssueStore } from '../src/storage.ts';\nimport { SerialQueue } from '../factory/queue.ts';\nimport { ownerResume } from '../factory/owner-recovery.ts';\nimport { digest, taskIdentity } from '../factory/checkpoint.ts';\nimport type { Task } from '../factory/contracts.ts';\nimport { git } from '../factory/workspace.ts';\nimport { fixtureAgent, fixtureRepository } from './helpers/factory-fixture.ts';\nimport { evidenceDirectory } from './helpers/subprocess.ts';\n\nasync function interrupted() {\n  const root = evidenceDirectory('remaining-budget-recovery');\n  const repository = fixtureRepository(join(root, 'repo'));\n  const store = new IssueStore(join(root, 'state.sqlite'));\n  const repo = store.work.addRepo({ name: 'Remaining budget', path: repository, targetBranch: 'main' });\n  const issue = store.create({ title: 'Ready', description: 'Return ready.', status: 'open', priority: 'medium', labels: [], work: { repoId: repo.id, requirementId: null, dependsOn: [], acceptance: ['The value is ready.'] } });\n  const job = store.work.startIssue(issue.id);\n  const delegate = fixtureAgent();\n  try {\n    assert.equal(await new SerialQueue(store, { agent: { run: async input => {\n      if (input.phase === 'implement') {\n        writeFileSync(join(input.cwd, 'src/value.ts'), \"export const value = 'ready';\\n\");\n        throw new Error('Intentional settled interruption after accepted checks.');\n      }\n      return delegate.run(input);\n    } } }).processNext(job.id), true);\n    const run = store.work.runs().find(item => item.jobId === job.id)!;\n    assert.equal(run.status, 'blocked', 'Fixture setup must settle the actual native interruption.');\n    assert.equal(existsSync(join(run.evidencePath, 'checkpoint.json')), true, `Fixture setup must reach accepted coverage before testing continuation: ${run.reason}`);\n    assert.equal(JSON.parse(readFileSync(join(run.evidencePath, 'checkpoint.json'), 'utf8')).accepted, true, 'Fixture setup must retain real accepted coverage.');\n    const task = JSON.parse(readFileSync(join(run.evidencePath, 'task.json'), 'utf8')) as Task;\n    const evidenceRoot = join(root, 'evidence');\n    const ledgerPath = join(evidenceRoot, 'budgets', `${digest(`repo-${repo.id}:issue-${issue.id}`)}.json`);\n    const request = { schemaVersion: 1, requestId: randomUUID(), databasePath: store.path, issueId: issue.id, additionalAttempts: 0, additionalTimeMs: 0, reason: 'Continue the unchanged task using remaining original capacity.' };\n    return { root, repository, store, repo, issue, run, task, evidenceRoot, ledgerPath, request };\n  } catch (error) { store.close(); throw error; }\n}\n\ntype Fixture = Awaited<ReturnType<typeof interrupted>>;\nfunction retained(fixture: Fixture) {\n  return { ledger: readFileSync(fixture.ledgerPath, 'utf8'), jobs: fixture.store.work.jobs(), runs: fixture.store.work.runs(), issue: fixture.store.get(fixture.issue.id) };\n}\n\ntest('remaining-budget validation checks task-bound implementation and time capacity without side effects', { timeout: 60000 }, async () => {\n  const fixture = await interrupted();\n  try {\n    const original = JSON.parse(readFileSync(fixture.ledgerPath, 'utf8'));\n    const request = fixture.request;\n    for (const [name, patch, allowed] of [\n      ['accepted checkpoint at acceptance limit', { acceptanceAttempts: fixture.task.budget.maxAttempts }, true],\n      ['implementation exhausted', { implementationAttempts: fixture.task.budget.maxAttempts }, false],\n      ['time exhausted', { usedMs: fixture.task.budget.totalTimeoutMs }, false],\n      ['crashed reservation exhausts remaining time', { usedMs: fixture.task.budget.totalTimeoutMs - 1000, active: { runId: fixture.run.id, startedAt: 1, reservedMs: 1000 } }, false],\n      ['crashed reservation leaves capacity', { active: { runId: fixture.run.id, startedAt: 1, reservedMs: 1000 } }, true],\n      ['task identity changed', { taskHash: '0'.repeat(64) }, false],\n    ] as const) {\n      writeFileSync(fixture.ledgerPath, JSON.stringify({ ...original, ...patch }));\n      const before = retained(fixture);\n      let status: string | undefined;\n      let failure: unknown;\n      try { status = (await ownerResume(request, { validateOnly: true })).status; } catch (error) { failure = error; }\n      assert.deepEqual(retained(fixture), before, `${name}: preview must not settle reservations, grant, enqueue or alter history.`);\n      assert.equal(existsSync(join(fixture.evidenceRoot, 'owner-resumes', request.requestId)), false, `${name}: preview creates no journal.`);\n      if (allowed) assert.equal(status, 'valid', `${name}: explicit zero/zero must validate remaining original capacity; ${String(failure)}`);\n      else {\n        assert.ok(failure instanceof Error, `${name}: unsafe capacity must be rejected.`);\n        assert.match(failure.message, /budget|capacity|exhaust|identity|ledger/i, `${name}: rejection must come from task-bound capacity or identity validation.`);\n        await assert.rejects(ownerResume(request, { agent: { run: async () => assert.fail('Rejected capacity must invoke no worker.') } }));\n        assert.deepEqual(retained(fixture), before, `${name}: actual admission rejection must also be read-only.`);\n        assert.equal(existsSync(join(fixture.evidenceRoot, 'owner-resumes', request.requestId)), false, `${name}: rejected admission creates no journal.`);\n      }\n    }\n    const checkpointPath = join(fixture.run.evidencePath, 'checkpoint.json');\n    const checkpoint = JSON.parse(readFileSync(checkpointPath, 'utf8'));\n    writeFileSync(checkpointPath, JSON.stringify({ ...checkpoint, accepted: false }));\n    writeFileSync(fixture.ledgerPath, JSON.stringify({ ...original, acceptanceAttempts: fixture.task.budget.maxAttempts }));\n    const before = retained(fixture);\n    await assert.rejects(ownerResume(request, { validateOnly: true }), /acceptance|budget|capacity|exhaust/i, 'An unapproved draft still needs acceptance capacity.');\n    assert.deepEqual(retained(fixture), before);\n    assert.equal(existsSync(join(fixture.evidenceRoot, 'owner-resumes', request.requestId)), false);\n  } finally { fixture.store.close(); }\n});\n\ntest('remaining-budget admission rejects invalid accepted checkpoint proof before journaling or enqueueing', { timeout: 60000 }, async () => {\n  const fixture = await interrupted();\n  try {\n    const proof = join(fixture.run.evidencePath, 'accepted-checks.json');\n    writeFileSync(proof, `${readFileSync(proof, 'utf8')}\\n`);\n    const before = retained(fixture);\n    for (const validateOnly of [true, false]) {\n      let failure: unknown;\n      try { await ownerResume(fixture.request, { validateOnly, agent: { run: async () => assert.fail('Invalid accepted proof cannot invoke an agent.') } }); }\n      catch (error) { failure = error; }\n      assert.deepEqual(retained(fixture), before, 'Invalid accepted proof cannot mutate budget, issue or job/run history.');\n      assert.equal(existsSync(join(fixture.evidenceRoot, 'owner-resumes', fixture.request.requestId)), false, 'Invalid proof must be rejected before durable admission.');\n      assert.ok(failure instanceof Error, 'Damaged claimed acceptance proof must fail closed.');\n      assert.match(failure.message, /checkpoint|proof|inventory/i, 'Admission must inspect the damaged accepted checkpoint rather than reject zero/zero as a grant.');\n    }\n  } finally { fixture.store.close(); }\n});\n\ntest('remaining-budget continuation retains native lineage and limits while replay and terminal requests execute no work', { timeout: 90000 }, async () => {\n  const fixture = await interrupted();\n  try {\n    const sibling = fixture.store.create({ title: 'Queued sibling', description: 'Remain queued.', status: 'open', priority: 'medium', labels: [], work: { repoId: fixture.repo.id, requirementId: null, dependsOn: [], acceptance: ['Remain queued.'] } });\n    const siblingJob = fixture.store.work.startIssue(sibling.id);\n    const oldRun = fixture.store.work.run(fixture.run.id);\n    const before = JSON.parse(readFileSync(fixture.ledgerPath, 'utf8'));\n    const delegate = fixtureAgent();\n    const phases: string[] = [];\n    const agent = { run: async (input: Parameters<typeof delegate.run>[0]) => {\n      assert.equal(input.task.id, `issue-${fixture.issue.id}`, 'Selected-job continuation must not execute queued siblings.');\n      phases.push(input.phase);\n      if (input.phase === 'implement' || input.phase === 'repair') assert.equal(readFileSync(join(input.cwd, 'src/value.ts'), 'utf8'), \"export const value = 'ready';\\n\", 'Native reconstruction retains the interrupted accepted draft.');\n      return delegate.run(input);\n    } };\n    let result: Awaited<ReturnType<typeof ownerResume>> | undefined;\n    await assert.doesNotReject(async () => { result = await ownerResume(fixture.request, { agent }); }, 'Explicit zero/zero must continue through the native selected-job lifecycle without a grant.');\n    assert.equal(result?.status, 'merged');\n    const run = fixture.store.work.run(result!.runId!)!;\n    const state = JSON.parse(readFileSync(join(run.evidencePath, 'state.json'), 'utf8'));\n    const task = JSON.parse(readFileSync(join(run.evidencePath, 'task.json'), 'utf8')) as Task;\n    assert.equal(taskIdentity(task), taskIdentity(fixture.task));\n    assert.deepEqual(task.budget, fixture.task.budget);\n    assert.equal(state.resume.fromRunId, fixture.run.id);\n    assert.equal(state.resume.reused, true);\n    assert.equal(state.integration.verification.status, 'passed');\n    assert.equal(state.integration.review.approved, true);\n    assert.equal(state.integration.commit, git(fixture.repository, ['rev-parse', 'main']).trim());\n    assert.equal(phases.some(phase => phase === 'implement' || phase === 'repair'), true);\n    assert.equal(phases.includes('review'), true);\n    assert.equal(phases.some(phase => ['plan', 'tests', 'acceptance-review'].includes(phase)), false);\n    assert.deepEqual(fixture.store.work.run(fixture.run.id), oldRun, 'Continuation preserves the actual interrupted run history.');\n    assert.equal(fixture.store.get(fixture.issue.id)?.status, 'done');\n    assert.deepEqual(fixture.store.work.jobs().find(job => job.id === siblingJob.id), siblingJob);\n    const after = JSON.parse(readFileSync(fixture.ledgerPath, 'utf8'));\n    assert.equal(after.implementationAttempts, before.implementationAttempts + 1);\n    assert.equal(after.acceptanceAttempts, before.acceptanceAttempts);\n    assert.ok(after.usedMs >= before.usedMs);\n    assert.deepEqual(after.ownerGrants, before.ownerGrants, 'Remaining-capacity continuation must append no owner grant.');\n    assert.equal(state.budget.maxAttempts, fixture.task.budget.maxAttempts);\n    assert.equal(state.budget.totalTimeoutMs, fixture.task.budget.totalTimeoutMs);\n    const settled = retained(fixture);\n    const calls = [...phases];\n    assert.deepEqual(await ownerResume(fixture.request, { agent }), result);\n    assert.deepEqual(retained(fixture), settled, 'Exact replay creates no job, run or ledger write.');\n    assert.deepEqual(phases, calls, 'Exact replay invokes no agent.');\n    const terminal = { ...fixture.request, requestId: randomUUID() };\n    await assert.rejects(ownerResume(terminal, { agent }), /blocked|terminal|completed|done/i, 'A new decision cannot restart completed work.');\n    assert.deepEqual(retained(fixture), settled);\n    assert.deepEqual(phases, calls);\n    assert.equal(existsSync(join(fixture.evidenceRoot, 'owner-resumes', terminal.requestId)), false);\n  } finally { fixture.store.close(); }\n});\n"
+      },
+      {
+        "path": "tests/remaining-budget-maintenance.test.ts",
+        "originalHash": "d23d58d263bbb6912e75351f20baace99c5b404b288680408393246f96dfe8f1",
+        "replacementHash": "94d82c9307f434073c75eae3fbefcc8aae2f3a01e98b4341084766580742bdcc",
+        "content": "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\nimport { randomUUID } from 'node:crypto';\nimport { existsSync, readFileSync, writeFileSync } from 'node:fs';\nimport { join, resolve } from 'node:path';\nimport { fileURLToPath } from 'node:url';\nimport { IssueStore } from '../src/storage.ts';\nimport { SerialQueue } from '../factory/queue.ts';\nimport { ownerResume } from '../factory/owner-recovery.ts';\nimport { maintenanceIdentity } from '../factory/maintenance.ts';\nimport { digest, taskIdentity } from '../factory/checkpoint.ts';\nimport { snapshot } from '../factory/evidence.ts';\nimport { git, processEnvironment } from '../factory/workspace.ts';\nimport { runProcess } from '../factory/process.ts';\nimport type { Agent } from '../factory/controller.ts';\nimport { fixtureAgent, fixtureRepository } from './helpers/factory-fixture.ts';\nimport { evidenceDirectory } from './helpers/subprocess.ts';\n\ntest('remaining-budget maintenance continuation delivers through pinned native verification review and integration', { timeout: 90000 }, async () => {\n  const root = evidenceDirectory('remaining-budget-maintenance');\n  const repository = fixtureRepository(join(root, 'repo'));\n  writeFileSync(join(repository, 'src/value.ts'), \"export {value} from '../factory/value.ts';\\n\");\n  writeFileSync(join(repository, 'factory/value.ts'), \"export const value = 'broken';\\n\");\n  writeFileSync(join(repository, 'factory/execution-policy.json'), JSON.stringify({ schemaVersion: 1, mode: 'adaptive-v2' }));\n  git(repository, ['add', '.']);\n  git(repository, ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@localhost', '-c', 'commit.gpgsign=false', 'commit', '-qm', 'Prepare bounded maintenance']);\n  const store = new IssueStore(join(root, 'state.sqlite'));\n  try {\n    const repo = store.work.addRepo({ name: 'Remaining maintenance', path: repository, targetBranch: 'main' });\n    const issue = store.create({ title: 'Ready maintenance', description: 'Return the ready value.', status: 'open', priority: 'medium', labels: [], work: { repoId: repo.id, requirementId: null, dependsOn: [], acceptance: ['The value is ready.'], changeKind: 'harness' } });\n    const job = store.work.startIssue(issue.id);\n    const engine = fileURLToPath(new URL('../', import.meta.url));\n    const authority = { schemaVersion: 1, requestId: randomUUID(), issueId: issue.id, issueHash: maintenanceIdentity(issue), profile: 'harness', scope: ['factory/value.ts'], authorization: 'Maintain the ready value under the original bounded authority.', engineSourceHash: snapshot(engine).hash, contractHash: digest(readFileSync(join(engine, 'factory/verification-contract.json'))), baseCommit: git(repository, ['rev-parse', 'main']).trim() };\n    const authorizationPath = join(root, 'authority.json');\n    writeFileSync(authorizationPath, JSON.stringify(authority));\n    const evidenceRoot = join(root, 'evidence');\n    const delegate = fixtureAgent();\n    const interrupted: Agent = { run: async input => {\n      if (input.phase === 'plan') return { schemaVersion: 2, taskId: input.task.id, coverage: { mode: 'reuse', reason: 'The frozen value check observes this maintenance.' }, assumptions: [], slices: [{ id: 'ready', goal: input.task.goal, acceptanceIds: input.task.acceptance.map(item => item.id), checks: [{ file: 'tests/value.test.ts', title: 'value is ready' }] }], browserChecks: [] };\n      if (input.phase === 'implement') {\n        writeFileSync(join(input.cwd, 'factory/value.ts'), \"export const value = 'ready';\\n\");\n        throw new Error('Intentional settled maintenance interruption.');\n      }\n      return delegate.run(input);\n    } };\n    assert.equal(await new SerialQueue(store, { evidenceRoot, agent: interrupted, ownerAuthorizationPath: authorizationPath }).processNext(job.id), true);\n    const first = store.work.runs().find(run => run.jobId === job.id)!;\n    assert.equal(first.status, 'blocked', 'Fixture setup must settle a real authorized native interruption.');\n    assert.equal(existsSync(join(first.evidencePath, 'checkpoint.json')), true, `Fixture setup must reach frozen coverage before continuation: ${first.reason}`);\n    assert.equal(JSON.parse(readFileSync(join(first.evidencePath, 'checkpoint.json'), 'utf8')).accepted, true);\n    assert.equal(git(repository, ['rev-parse', 'main']).trim(), authority.baseCommit);\n    const originalTask = JSON.parse(readFileSync(join(first.evidencePath, 'task.json'), 'utf8'));\n    const ledgerPath = join(evidenceRoot, 'budgets', `${digest(`repo-${repo.id}:issue-${issue.id}`)}.json`);\n    const before = JSON.parse(readFileSync(ledgerPath, 'utf8'));\n    const request = { schemaVersion: 1, requestId: randomUUID(), databasePath: store.path, issueId: issue.id, additionalAttempts: 0, additionalTimeMs: 0, reason: 'Continue within the original maintenance budget.', ownerAuthorizationPath: authorizationPath };\n    const requestPath = join(root, 'resume.json');\n    writeFileSync(requestPath, JSON.stringify(request));\n    const retained = readFileSync(ledgerPath, 'utf8');\n    const preview = await runProcess({ command: process.execPath, args: ['--import', 'tsx', resolve('factory/cli.ts'), 'owner-resume', requestPath, '--validate'], cwd: process.cwd(), env: processEnvironment({}), logPath: join(root, 'preview.log'), timeoutMs: 15000 });\n    assert.equal(preview.settled, true);\n    assert.equal(readFileSync(ledgerPath, 'utf8'), retained, 'CLI validation cannot write or grant budget.');\n    assert.equal(preview.status, 'passed', `The existing CLI must admit explicit zero/zero with original pinned authority. ${preview.output}`);\n    const phases: string[] = [];\n    const resumed: Agent = { run: async input => {\n      const claimed = store.work.jobs().find(item => item.issueId === issue.id && item.status === 'running');\n      assert.ok(claimed?.runId, 'Native maintenance claims before invoking any role.');\n      assert.deepEqual(input.authority, authority, 'Every continuation role retains original pinned authority.');\n      phases.push(input.phase);\n      if (input.phase === 'implement' || input.phase === 'repair') {\n        assert.equal(readFileSync(join(input.cwd, 'factory/value.ts'), 'utf8'), \"export const value = 'ready';\\n\");\n        return { schemaVersion: 1, taskId: input.task.id, summary: 'Retained the accepted ready draft.', blockers: [] };\n      }\n      return delegate.run(input);\n    } };\n    const result = await ownerResume(request, { agent: resumed });\n    assert.equal(result.status, 'merged');\n    const run = store.work.run(result.runId!)!;\n    const state = JSON.parse(readFileSync(join(run.evidencePath, 'state.json'), 'utf8'));\n    const progress = JSON.parse(readFileSync(join(run.evidencePath, 'run-state.json'), 'utf8'));\n    const delivery = JSON.parse(readFileSync(join(run.evidencePath, 'delivery.json'), 'utf8'));\n    assert.equal(progress.profile, 'harness');\n    assert.deepEqual(progress.engine, { sourceHash: authority.engineSourceHash, contractHash: authority.contractHash });\n    assert.deepEqual(JSON.parse(readFileSync(join(run.evidencePath, 'owner-authorization.json'), 'utf8')), authority);\n    const task = JSON.parse(readFileSync(join(run.evidencePath, 'task.json'), 'utf8'));\n    assert.equal(taskIdentity(task), taskIdentity(originalTask));\n    assert.deepEqual(task.budget, originalTask.budget);\n    assert.equal(state.resume.fromRunId, first.id);\n    assert.equal(state.resume.reused, true);\n    assert.equal(phases.some(phase => phase === 'implement' || phase === 'repair'), true);\n    assert.equal(phases.includes('review'), true);\n    assert.equal(phases.some(phase => ['plan', 'tests', 'acceptance-review'].includes(phase)), false);\n    assert.equal(state.integration.verification.status, 'passed');\n    assert.equal(state.integration.review.approved, true);\n    const verification = JSON.parse(readFileSync(resolve(run.evidencePath, progress.proofs.verification.path), 'utf8'));\n    assert.equal(verification.runDirectory.startsWith(`${run.evidencePath}/`), true, 'Continuation must produce fresh verification inside its own run.');\n    assert.equal(verification.snapshot.hash, progress.sourceHash);\n    assert.deepEqual(verification.checks.map((gate: { name: string; status: string }) => [gate.name, gate.status]), [['lint', 'passed'], ['typecheck', 'passed'], ['test', 'passed'], ['build', 'passed']]);\n    assert.equal(delivery.status, 'merged');\n    assert.equal(delivery.integration.commit, git(repository, ['rev-parse', 'main']).trim());\n    assert.equal(delivery.review.approved, true);\n    assert.deepEqual(delivery.resume, state.resume);\n    assert.deepEqual(delivery.budget, state.budget);\n    assert.equal(delivery.efficiency.agentInvocations, phases.length);\n    assert.ok(delivery.phases.every((phase: { status: string; durationMs: number }) => phase.status !== 'running' && Number.isFinite(phase.durationMs) && phase.durationMs >= 0));\n    const after = JSON.parse(readFileSync(ledgerPath, 'utf8'));\n    assert.equal(after.implementationAttempts, before.implementationAttempts + 1);\n    assert.equal(after.acceptanceAttempts, before.acceptanceAttempts);\n    assert.ok(after.usedMs >= before.usedMs);\n    assert.deepEqual(after.ownerGrants, before.ownerGrants);\n    assert.equal(store.work.run(first.id)?.status, 'blocked');\n    assert.equal(store.get(issue.id)?.status, 'done');\n    const settled = { jobs: store.work.jobs(), runs: store.work.runs(), ledger: readFileSync(ledgerPath, 'utf8'), calls: [...phases] };\n    assert.deepEqual(await ownerResume(request, { agent: resumed }), result);\n    assert.deepEqual({ jobs: store.work.jobs(), runs: store.work.runs(), ledger: readFileSync(ledgerPath, 'utf8'), calls: phases }, settled);\n  } finally { store.close(); }\n});\n"
+      }
+    ],
+    "equivalence": "The restored runner invokes repair and still consumes implementation budget. The revised guards check reconstructed bytes before either implementation phase and keep the maintenance repair inside its existing authorized branch; requiring an actual implement or repair call preserves the original semantic obligation. Existing state.resume.reused and predecessor assertions, no-planning/no-tests/no-acceptance-review assertions, original authority and limits, fresh verification and independent integration review, merge/report lineage, counters/no-grant, sibling/history isolation, idempotent replay and terminal refusal remain present. This matches unchanged tests/authorized-owner-lifecycle.test.ts:175-178.",
+    "preservedAssertions": [
+      "Real settled interruption and accepted native checkpoint",
+      "Reconstructed draft bytes checked before delegate work",
+      "Selected issue and queued sibling isolation",
+      "Original task identity and canonical task limits",
+      "Original pinned maintenance authority, engine and contract",
+      "Cumulative implementation and acceptance counters, elapsed usage and no owner grant for zero/zero",
+      "Fresh four-gate verification and independent integration review",
+      "Verified integration commit, standard delivery lineage, metrics and settled durations",
+      "Unchanged predecessor history",
+      "Execution-free exact replay and terminal refusal"
+    ]
+  },
+  "evidence": {
+    "diagnosis": {
+      "path": "/Users/louis/issue-tracker/.data/evidence/loop-stabilization-20261025/fixture-contract-review.json",
+      "hash": "d72c2f3e9da97829e11a834d1f4761e98721c0f166be86539ab5302d437f7768"
+    },
+    "author": {
+      "path": "/Users/louis/issue-tracker/.data/evidence/loop-stabilization-20261025/contract-revision-author.json",
+      "hash": "8a70935c7bc183b9b31be718e4da43f5ac4cb1fb6d0a9fb1d1a82a3bdeb0ef98"
+    },
+    "originalFailureResults": {
+      "path": "/Users/louis/issue-tracker/.data/evidence/loop-stabilization-20261025/fixture-diagnosis/results.json",
+      "hash": "dee29a7b5f0a1a4d2016708809cdbea0ee4dc827ea5eef56ebb095a0d0683586"
+    },
+    "originalFailureSourceHash": "65d6a9f9d360d65ea0fa4e022f2fe3fcc86e5dbad6edce30badf096262b9841c",
+    "originalFailureProofs": [
+      {
+        "check": {
+          "file": "tests/remaining-budget-recovery.test.ts",
+          "title": "remaining-budget continuation retains native lineage and limits while replay and terminal requests execute no work"
+        },
+        "status": "failed",
+        "report": {
+          "path": "/Users/louis/issue-tracker/.data/evidence/loop-stabilization-20261025/fixture-diagnosis/check-0.jsonl",
+          "hash": "3106c3621b7a1445f363590223da5d8fe0b14d135448e579e645e033b83c8c5d"
+        },
+        "log": {
+          "path": "/Users/louis/issue-tracker/.data/evidence/loop-stabilization-20261025/fixture-diagnosis/check-0.log",
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "ownership": {
+          "path": "/Users/louis/issue-tracker/.data/evidence/loop-stabilization-20261025/fixture-diagnosis/check-0.log.owner.json",
+          "hash": "5eba10a2f2e828c4b7048e6e598543a3e71cab043f2c9b8be7735dd57af13a40"
+        }
+      },
+      {
+        "check": {
+          "file": "tests/remaining-budget-maintenance.test.ts",
+          "title": "remaining-budget maintenance continuation delivers through pinned native verification review and integration"
+        },
+        "status": "failed",
+        "report": {
+          "path": "/Users/louis/issue-tracker/.data/evidence/loop-stabilization-20261025/fixture-diagnosis/check-1.jsonl",
+          "hash": "32c8785a20ee5ecb5f296e056996ebec69293bf5301bdc11ea487e5400ebee62"
+        },
+        "log": {
+          "path": "/Users/louis/issue-tracker/.data/evidence/loop-stabilization-20261025/fixture-diagnosis/check-1.log",
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "ownership": {
+          "path": "/Users/louis/issue-tracker/.data/evidence/loop-stabilization-20261025/fixture-diagnosis/check-1.log.owner.json",
+          "hash": "b705375d459684518f108aa6788325c209e19eb01d9f60dfa3f4465278dc534e"
+        }
+      }
+    ],
+    "originalFailureNativeEvidence": [
+      {
+        "path": "/var/folders/cz/rqnyxdx107b83zcr2k5vfl7m0000gn/T/issue-remaining-budget-maintenance-HnDfmt/evidence/36729142-2a4d-4120-9a61-4e7dfc23045e/state.json",
+        "hash": "a1a1bb052355f1d437d43b5ec2c05dd4a5131d38e5419b76bcdf473aa04eb716"
+      },
+      {
+        "path": "/var/folders/cz/rqnyxdx107b83zcr2k5vfl7m0000gn/T/issue-remaining-budget-maintenance-HnDfmt/evidence/36729142-2a4d-4120-9a61-4e7dfc23045e/delivery.json",
+        "hash": "f286dd3e68f5e8fe541d9f016967c4f91fc772d5f15471a1a7fb490a0752a557"
+      },
+      {
+        "path": "/var/folders/cz/rqnyxdx107b83zcr2k5vfl7m0000gn/T/issue-remaining-budget-maintenance-HnDfmt/evidence/36729142-2a4d-4120-9a61-4e7dfc23045e/owner-authorization.json",
+        "hash": "414c3285aad848796700a773220753d5033d8b321c9cd7176bd952279700b56b"
+      },
+      {
+        "path": "/var/folders/cz/rqnyxdx107b83zcr2k5vfl7m0000gn/T/issue-remaining-budget-maintenance-HnDfmt/evidence/b6721de1-a744-47a7-8774-583320c90667/state.json",
+        "hash": "7ea6a0ef2acd56190aa349956b97299045c7d8c4e42f1a504db2776212c9b3dd"
+      },
+      {
+        "path": "/var/folders/cz/rqnyxdx107b83zcr2k5vfl7m0000gn/T/issue-remaining-budget-recovery-u6dSst/evidence/f5d6f444-0bd9-4764-acdf-76f2e9cca2c3/state.json",
+        "hash": "1dcd921c0364dd33ce215ca5221350f19aec5ce922b71a6ea3d4b1695cbdb753"
+      },
+      {
+        "path": "/var/folders/cz/rqnyxdx107b83zcr2k5vfl7m0000gn/T/issue-remaining-budget-recovery-u6dSst/evidence/f5d6f444-0bd9-4764-acdf-76f2e9cca2c3/delivery.json",
+        "hash": "94aaebbd98d33712ca5970aa77c6895e6ece1e470aec8c21d483ee3d6efc7683"
+      },
+      {
+        "path": "/var/folders/cz/rqnyxdx107b83zcr2k5vfl7m0000gn/T/issue-remaining-budget-recovery-u6dSst/evidence/f5d6f444-0bd9-4764-acdf-76f2e9cca2c3/integration-verification-1-1/summary.json",
+        "hash": "02150c80c8cfc75ba75a375ffc8d19064ad679e38138d9b5d9e0a1bf8a4d547b"
+      },
+      {
+        "path": "/var/folders/cz/rqnyxdx107b83zcr2k5vfl7m0000gn/T/issue-remaining-budget-recovery-u6dSst/evidence/f4feb58b-40e9-4794-ad9e-3aa1e7da7689/state.json",
+        "hash": "be80637b256d0b11b0de12ef05c561e6e8245b4a77d9039be10cf5f036810895"
+      }
+    ],
+    "correctedResults": {
+      "path": "/Users/louis/issue-tracker/.data/evidence/loop-stabilization-20261025/fixture-revision-proofs/results.json",
+      "hash": "45a700129484253ba2a352de32153e16d14a3b04d52c4858ad106860def38045"
+    },
+    "correctedSourceHash": "b78f810045564a94b602c1d2dfb6532f09bc360c389f62f9e7c1a1ea2d723b08",
+    "correctedProofs": [
+      {
+        "check": {
+          "file": "tests/remaining-budget-recovery.test.ts",
+          "title": "remaining-budget continuation retains native lineage and limits while replay and terminal requests execute no work"
+        },
+        "status": "passed",
+        "report": {
+          "path": "/Users/louis/issue-tracker/.data/evidence/loop-stabilization-20261025/fixture-revision-proofs/check-0.jsonl",
+          "hash": "756475d38d27784e1ce8e9cbe831c6f84a1f45c742cd63c0357c3af5c0b47a84"
+        },
+        "log": {
+          "path": "/Users/louis/issue-tracker/.data/evidence/loop-stabilization-20261025/fixture-revision-proofs/check-0.log",
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "ownership": {
+          "path": "/Users/louis/issue-tracker/.data/evidence/loop-stabilization-20261025/fixture-revision-proofs/check-0.log.owner.json",
+          "hash": "8b7584fbc702a1515fa7bd786e81f9767f0eddffeff9f8fabb889aabe2cdffc1"
+        }
+      },
+      {
+        "check": {
+          "file": "tests/remaining-budget-maintenance.test.ts",
+          "title": "remaining-budget maintenance continuation delivers through pinned native verification review and integration"
+        },
+        "status": "passed",
+        "report": {
+          "path": "/Users/louis/issue-tracker/.data/evidence/loop-stabilization-20261025/fixture-revision-proofs/check-1.jsonl",
+          "hash": "f449313d50674a0e3966d1df706e9bf4ec70ed404ba16d041ebcc92a6644e0e1"
+        },
+        "log": {
+          "path": "/Users/louis/issue-tracker/.data/evidence/loop-stabilization-20261025/fixture-revision-proofs/check-1.log",
+          "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "ownership": {
+          "path": "/Users/louis/issue-tracker/.data/evidence/loop-stabilization-20261025/fixture-revision-proofs/check-1.log.owner.json",
+          "hash": "fea7200b7b6647a767375ca81b080bd1edf4151ebab4bfa20c249ff221a75155"
+        }
+      }
+    ],
+    "correctedNativeRuns": [
+      {
+        "runId": "c841c566-3895-4aa0-8b8b-433df1ba5835",
+        "predecessorRunId": "19c69ca1-3c76-4225-a853-4a801e32c8a1",
+        "state": {
+          "path": "/var/folders/cz/rqnyxdx107b83zcr2k5vfl7m0000gn/T/issue-remaining-budget-recovery-FvyDii/evidence/c841c566-3895-4aa0-8b8b-433df1ba5835/state.json",
+          "hash": "8bb9c2b3dbeba2e6a7c1372ad89db11ccd7ecd2caaf29bca577a8eec4cdf927d"
+        },
+        "delivery": {
+          "path": "/var/folders/cz/rqnyxdx107b83zcr2k5vfl7m0000gn/T/issue-remaining-budget-recovery-FvyDii/evidence/c841c566-3895-4aa0-8b8b-433df1ba5835/delivery.json",
+          "hash": "016041e92cf0412f54a8a736dfaa1483fd3cd79f02127910cd9e0acc0fa3c30d"
+        },
+        "verification": {
+          "path": "/var/folders/cz/rqnyxdx107b83zcr2k5vfl7m0000gn/T/issue-remaining-budget-recovery-FvyDii/evidence/c841c566-3895-4aa0-8b8b-433df1ba5835/integration-verification-1-1/summary.json",
+          "hash": "a4735a09511d258f0cc97989278b7dd5c202eeb766f87d1522b9b33de3473f35"
+        },
+        "nodeReport": {
+          "path": "/var/folders/cz/rqnyxdx107b83zcr2k5vfl7m0000gn/T/issue-remaining-budget-recovery-FvyDii/evidence/c841c566-3895-4aa0-8b8b-433df1ba5835/integration-verification-1-1/node-results.jsonl",
+          "hash": "6977cc89cc0195a73c5ce660015dfeba21382158f4127d6b1b925ffab2d9eacc"
+        },
+        "verificationOwnership": {
+          "path": "/var/folders/cz/rqnyxdx107b83zcr2k5vfl7m0000gn/T/issue-remaining-budget-recovery-FvyDii/evidence/c841c566-3895-4aa0-8b8b-433df1ba5835/integration-verification-1-1.log.owner.json",
+          "hash": "d0adde92c208aea0422ee6c734a496d06a864e58018c2208d3d5afff0ed2b4c1"
+        },
+        "sourceReview": {
+          "path": "/var/folders/cz/rqnyxdx107b83zcr2k5vfl7m0000gn/T/issue-remaining-budget-recovery-FvyDii/evidence/c841c566-3895-4aa0-8b8b-433df1ba5835/review-receipt-c841c566-3895-4aa0-8b8b-433df1ba5835-2.json",
+          "hash": "67710ad4976b3bd0d83a407e59d46505a8e8d64ec5d0c1890114efba80b7e7f6"
+        },
+        "originalState": {
+          "path": "/var/folders/cz/rqnyxdx107b83zcr2k5vfl7m0000gn/T/issue-remaining-budget-recovery-FvyDii/evidence/19c69ca1-3c76-4225-a853-4a801e32c8a1/state.json",
+          "hash": "9ae7d7b150e8480baf641b78c60b5fe1a62a9f697df1716f9a1c5acd7bd779b3"
+        }
+      },
+      {
+        "runId": "69ff6298-4e72-48a0-9b23-8f0d9cdddc61",
+        "predecessorRunId": "12280e24-4e59-44df-864d-b8c26ab79e99",
+        "state": {
+          "path": "/var/folders/cz/rqnyxdx107b83zcr2k5vfl7m0000gn/T/issue-remaining-budget-maintenance-2YMtpj/evidence/69ff6298-4e72-48a0-9b23-8f0d9cdddc61/state.json",
+          "hash": "16d06ac08e2dd12c4d05ab47dd76fe95184b6234962defd444e42161a505ad47"
+        },
+        "delivery": {
+          "path": "/var/folders/cz/rqnyxdx107b83zcr2k5vfl7m0000gn/T/issue-remaining-budget-maintenance-2YMtpj/evidence/69ff6298-4e72-48a0-9b23-8f0d9cdddc61/delivery.json",
+          "hash": "4a78b6ec366c5bbb8f17ccfc59141837e6ebad39738cae55a744d60849dde0b9"
+        },
+        "verification": {
+          "path": "/var/folders/cz/rqnyxdx107b83zcr2k5vfl7m0000gn/T/issue-remaining-budget-maintenance-2YMtpj/evidence/69ff6298-4e72-48a0-9b23-8f0d9cdddc61/integration-verification-1-1/summary.json",
+          "hash": "f8199cf1e81d77c86dc35e3f22fdf4946a040d906f0cad240c069e810de5e393"
+        },
+        "nodeReport": {
+          "path": "/var/folders/cz/rqnyxdx107b83zcr2k5vfl7m0000gn/T/issue-remaining-budget-maintenance-2YMtpj/evidence/69ff6298-4e72-48a0-9b23-8f0d9cdddc61/integration-verification-1-1/node-results.jsonl",
+          "hash": "fdb786ce6e28fdda04fc2fb417e19522feb501cd494d4632626a004f03672d7f"
+        },
+        "verificationOwnership": {
+          "path": "/var/folders/cz/rqnyxdx107b83zcr2k5vfl7m0000gn/T/issue-remaining-budget-maintenance-2YMtpj/evidence/69ff6298-4e72-48a0-9b23-8f0d9cdddc61/integration-verification-1-1.log.owner.json",
+          "hash": "1a5758dff25ad70ade05a7ee24e8c79ecbcc4356dd8c44b7dd4fa3c83a3442cb"
+        },
+        "sourceReview": {
+          "path": "/var/folders/cz/rqnyxdx107b83zcr2k5vfl7m0000gn/T/issue-remaining-budget-maintenance-2YMtpj/evidence/69ff6298-4e72-48a0-9b23-8f0d9cdddc61/review-receipt-69ff6298-4e72-48a0-9b23-8f0d9cdddc61-2.json",
+          "hash": "a7fd2c4ca65f4d71cc538e43f681d14ace64696b485a8c188555b01b4a4ec6e1"
+        },
+        "originalState": {
+          "path": "/var/folders/cz/rqnyxdx107b83zcr2k5vfl7m0000gn/T/issue-remaining-budget-maintenance-2YMtpj/evidence/12280e24-4e59-44df-864d-b8c26ab79e99/state.json",
+          "hash": "8d2c660c84d347b080f0f645c6af74af7c04289eb23da9d43f61eeac298d8ddc"
+        }
+      }
+    ],
+    "originalProofs": [
+      {
+        "file": "tests/remaining-budget-recovery.test.ts",
+        "title": "remaining-budget validation checks task-bound implementation and time capacity without side effects",
+        "status": "expected_failure",
+        "reportPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-0.jsonl",
+        "reportSha256": "3cd4b886f5fbb5e5a11a5fc6fabe7a5d278b37329e72273eb691a902d6450513",
+        "logPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-0.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "assertionMessage": "accepted checkpoint at acceptance limit: explicit zero/zero must validate remaining original capacity; Error: Owner budget grant requires an explicit bounded allowance, identity and reason.\n+ actual - expected\n\n+ undefined\n- 'valid'\n"
+      },
+      {
+        "file": "tests/remaining-budget-recovery.test.ts",
+        "title": "remaining-budget admission rejects invalid accepted checkpoint proof before journaling or enqueueing",
+        "status": "expected_failure",
+        "reportPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-1.jsonl",
+        "reportSha256": "c594349391498ad5e095466439a05a05d95eeb2acdecc0ae101bbeb77340307b",
+        "logPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-1.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "assertionMessage": "Admission must inspect the damaged accepted checkpoint rather than reject zero/zero as a grant."
+      },
+      {
+        "file": "tests/remaining-budget-recovery.test.ts",
+        "title": "remaining-budget continuation retains native lineage and limits while replay and terminal requests execute no work",
+        "status": "expected_failure",
+        "reportPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-2.jsonl",
+        "reportSha256": "5d353dcb65d713ef90ae21cc0de64e2eca8f148eb49be8a29f892e130cb98f7d",
+        "logPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-2.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "assertionMessage": "Got unwanted rejection: Explicit zero/zero must continue through the native selected-job lifecycle without a grant.\nActual message: \"Owner budget grant requires an explicit bounded allowance, identity and reason.\""
+      },
+      {
+        "file": "tests/remaining-budget-maintenance.test.ts",
+        "title": "remaining-budget maintenance continuation delivers through pinned native verification review and integration",
+        "status": "expected_failure",
+        "reportPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-3.jsonl",
+        "reportSha256": "e31816e0b414a280ce0db0003378f2a25aba337773d2d26e08812dc45cacca82",
+        "logPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-3.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "assertionMessage": "The existing CLI must admit explicit zero/zero with original pinned authority. Owner budget grant requires an explicit bounded allowance, identity and reason.\n\n\n'failed' !== 'passed'\n"
+      },
+      {
+        "file": "tests/owner-resume.test.ts",
+        "title": "owner continuation grants one bounded native retry for only the selected issue and replays without execution",
+        "status": "already_passed",
+        "reportPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-4.jsonl",
+        "reportSha256": "ba7c3253c3d99428402055904f8e1dc6282bb66ce1b802d447b0c98c473e14cc",
+        "logPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-4.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "file": "tests/owner-resume.test.ts",
+        "title": "owner budget grants preserve canonical identity and crashed reservations while extending limits once",
+        "status": "already_passed",
+        "reportPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-5.jsonl",
+        "reportSha256": "49dd83c2fa9d3e930f4c4fce68cad0e7c7519af1686722cb34670e00fd5bfa8e",
+        "logPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-5.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "file": "tests/owner-resume.test.ts",
+        "title": "owner continuation refuses a live queue owner without granting or enqueuing work",
+        "status": "already_passed",
+        "reportPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-6.jsonl",
+        "reportSha256": "fa77b6c4c65e4b1f354c37d8f8acdb5f22edf7a65380867706c660350cee9039",
+        "logPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-6.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "file": "tests/owner-resume.test.ts",
+        "title": "owner continuation rejects a changed original goal without mutating retained budgets or job history",
+        "status": "already_passed",
+        "reportPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-7.jsonl",
+        "reportSha256": "32d5040ddc99328dbd6f8bc9461e35808b853c9503a997df283237289f5d9d4b",
+        "logPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-7.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "file": "tests/authorized-owner-lifecycle.test.ts",
+        "title": "trusted harness authorization claims before roles and delivers pinned verified maintenance while ordinary and mismatched authority stay excluded",
+        "status": "already_passed",
+        "reportPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-8.jsonl",
+        "reportSha256": "41fd5e4bf08d6fc193ef4226253e579bf448461e139b5e2a894eb2a442054fbf",
+        "logPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-8.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "file": "tests/run-state-recovery.test.ts",
+        "title": "native recovery reconciles an existing delivery while preserving failure context timing proofs and attempts",
+        "status": "already_passed",
+        "reportPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-9.jsonl",
+        "reportSha256": "adc188387eb977426909c196c61e52177829a3a60e585be9248f9ff20a955e9d",
+        "logPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-9.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "file": "tests/selective-regression-guidance.test.ts",
+        "title": "task role prompts require worthwhile regressions for significant or recurring confirmed defects",
+        "status": "expected_failure",
+        "reportPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-10.jsonl",
+        "reportSha256": "87148c467a2cb7ed08161ca25bb6e273196d41c02b006b66ba7fbc987b5c9138",
+        "logPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-10.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "assertionMessage": "plan: permanent defect checks require confirmation and significance OR recurrence."
+      },
+      {
+        "file": "tests/selective-regression-guidance.test.ts",
+        "title": "requirement planner and reviewer deliver selective regression guidance with unchanged acceptance duties",
+        "status": "expected_failure",
+        "reportPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-11.jsonl",
+        "reportSha256": "a31c9bef50ec8ffe69ebe5cc95706a12553336bd0858d4b4c25fc6e3f633378f",
+        "logPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-11.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "assertionMessage": "requirement decompose: permanent defect checks require confirmation and significance OR recurrence."
+      },
+      {
+        "file": "tests/selective-regression-guidance.test.ts",
+        "title": "focused failure triage permits authorized harness source repair while holding uncertain test contracts",
+        "status": "expected_failure",
+        "reportPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-12.jsonl",
+        "reportSha256": "196a8e51e4104a8e4df3cbc31ca31939efb4f51bd96f0f25d039b0f29ab1c82f",
+        "logPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-12.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "assertionMessage": "Authorized harness source compatibility defects must be eligible for scoped source repair."
+      },
+      {
+        "file": "tests/proportionate-coverage-guidance.test.ts",
+        "title": "existing author and coverage reviewer roles require concrete risk rather than redundant assertion matrices",
+        "status": "already_passed",
+        "reportPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-13.jsonl",
+        "reportSha256": "0c97f3f109be346b31c2c13441efcce96a8e0d6d1cae5cbaa73bb51b991ed485",
+        "logPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-13.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "file": "tests/planner-invocation-metrics.test.ts",
+        "title": "queue invocation metrics count both actual planner processes when one review response needs protocol repair",
+        "status": "already_passed",
+        "reportPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-14.jsonl",
+        "reportSha256": "384e5775def25194ad52defe8e4a58c3f2ab612e0f5cfeb8632d94e3d7dae3a7",
+        "logPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-14.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "file": "tests/verification-reuse.test.ts",
+        "title": "whole-requirement reuse preserves original full report timestamps and exact sole-child goal review",
+        "status": "already_passed",
+        "reportPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-15.jsonl",
+        "reportSha256": "75d813cffbb815f4b9e3639e1c9947bf25d699a433b4ff956c9688c0445b9b05",
+        "logPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-15.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "file": "tests/github-publication.test.ts",
+        "title": "GitHub requirements isolate child merges and complete only after exact-source CI and remote merge",
+        "status": "already_passed",
+        "reportPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-16.jsonl",
+        "reportSha256": "2046053868a924da06dd9fe868692330e0905964aa57449c5c880a836a239500",
+        "logPath": "/Users/louis/issue-tracker/.data/evidence/f285afff-536c-472e-b164-79add0771431/red-1-16.log",
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ]
+  },
+  "independentApproval": {
+    "path": "/Users/louis/issue-tracker/.data/evidence/loop-stabilization-20261025/contract-revision-coverage.json",
+    "hash": "49b870f1980fdc74828ccb250794cd9db6033b79dce66346df41193f377d7546",
+    "sourceHash": "b78f810045564a94b602c1d2dfb6532f09bc360c389f62f9e7c1a1ea2d723b08",
+    "scope": "Independent equivalence and complete coverage approval only; this is not final source review, full candidate verification, checkpoint adoption or delivery.",
+    "originalRedEquivalence": "The original recovery lifecycle red rejects zero/zero at the API call before a resumed worker can run; the original maintenance red rejects zero/zero CLI validation before the modified branch. Those unchanged missing-behavior observations remain meaningful after this four-line observation correction. Historical reds are retained under their original hashes and are not represented as executions of the revised source."
+  },
+  "budget": {
+    "ledger": {
+      "path": "/Users/louis/issue-tracker/.data/evidence/budgets/d9ac848bf90b8781dacffacf49baedb8bcda9641e43fa0bb1d2af4dbb51da9ee.json",
+      "hash": "6c2ee3e4e2809ddccd1455fec8a10cdb1becb8f75c29c48057426f08a61786af"
+    },
+    "retained": {
+      "schemaVersion": 1,
+      "taskHash": "12731eca7c8593d0564c45b525b7145b45145a4fe9fcfd32cba2cd2f45628c70",
+      "usedMs": 2001154,
+      "implementationAttempts": 1,
+      "acceptanceAttempts": 3
+    },
+    "canonicalLimits": {
+      "maxAttempts": 3,
+      "workerTimeoutMs": 600000,
+      "totalTimeoutMs": 3600000
+    },
+    "approvedFutureAllowance": {
+      "decision": {
+        "path": "/Users/louis/issue-tracker/.data/evidence/loop-stabilization-20261025/approved-continuation-decision.json",
+        "hash": "7f67c3ec2574206ea92ab26ed33c34b1bebe8c9a7b73f1f1502882d9611b2de2"
+      },
+      "requestId": "f5cdad36-ba77-43b3-8ec1-88c97cbb6a82",
+      "additionalAttempts": 1,
+      "additionalTimeMs": 0,
+      "effectiveSharedMaxAttempts": 4,
+      "status": "Not applied by this staging issue. Native adoption must preserve counters, elapsed usage and ownership lineage."
+    }
+  },
+  "delivery": {
+    "target": "codex/requirement-30-065c0f48",
+    "status": "Pending supervising controller verification, independent final source review and verified local integration.",
+    "requiredGates": [
+      "lint",
+      "typecheck",
+      "all Node tests",
+      "production build"
+    ],
+    "adoptionIssue": "issue-90",
+    "limitations": [
+      "Only the two owner-run corrected lifecycle tests were freshly executed for this equivalence revision; no test or full verifier was run by this reviewer. The other 15 selections retain their exact coverage obligations and require final candidate verification.",
+      "Disposable fixture lint, typecheck and build scripts are existing no-ops. Passing these native exercises proves orchestration and assertions, not the actual repository full verifier.",
+      "Original five criteria remain unchanged; documentation consistency, truthful three pending future business observations and whole-goal satisfaction remain final independent source/original-goal review obligations.",
+      "This artifact may be stored as inactive Issue89 evidence. It neither mutates nor replaces the original frozen Issue88 checkpoint or accepted inventory. Any legal native adoption route needs its separately authorized, independently verified and integrated maintenance delivery.",
+      "The user-authorized one common additional attempt and zero time extension must be handled through native persistent ownership and cumulative budget rules. This reviewer grants no allowance and resets no counter.",
+      "Fresh final integrated lint, typecheck, all Node tests and production build, independent source and original-goal approval, verified integration and enrolled protected GitHub publication remain required. No browser acceptance or completed real-business observation is claimed.",
+      "Issue89 staging neither activates the revised tests nor completes Issue88 or Requirement30. No commit, merge, push, deployment, browser execution or non-disposable data operation is performed by this worker."
+    ]
+  }
+}
