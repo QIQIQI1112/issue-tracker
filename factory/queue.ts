@@ -11,7 +11,7 @@ import { codexAgent } from './agent.ts';
 import { codexPlanner, parseDecomposition } from './planner.ts';
 import type { Planner } from './planner.ts';
 import { allocatePorts, git, prepareWorkspace, processEnvironment } from './workspace.ts';
-import { parseVerificationContract, readJson, snapshot, writeJson } from './evidence.ts';
+import { completeVerification, parseVerificationContract, readJson, snapshot, writeJson } from './evidence.ts';
 import { controllerDelivery, saveDelivery } from './delivery.ts';
 import { runProcess } from './process.ts';
 import type { Verification } from './controller.ts';
@@ -212,13 +212,14 @@ export class SerialQueue {
         for (const name of ['summary.json', 'node-results.jsonl']) copyFileSync(join(verification.runDirectory, name), join(directory, name));
         evidence += `\nRetained original verification and review provenance:\n${JSON.stringify(reused.provenance)}`;
       } else {
-        const verifier = trustedVerifier(join(run.evidencePath, 'trusted'), parseVerificationContract(readJson(join(workspace.path, 'factory/verification-contract.json'))));
+        const contract = parseVerificationContract(readJson(join(workspace.path, 'factory/verification-contract.json')));
+        const verifier = trustedVerifier(join(run.evidencePath, 'trusted'), contract);
         const verificationStarted = Date.now();
         verificationExecutions += 1;
         const result = await runProcess({ command: process.execPath, args: [verifier.command], cwd: workspace.path, env: { ...env, VERIFY_RUN_DIR: directory, VERIFY_CONTRACT_PATH: verifier.contractPath }, logPath: join(run.evidencePath, 'verification.log'), timeoutMs: 610000, signal: this.options.signal });
         verificationMs = Date.now() - verificationStarted;
-        verification = readJson(join(directory, 'summary.json')) as Verification;
-        if (result.status !== 'passed' || verification.status !== 'passed' || verification.snapshot.hash !== before) throw new Error('Whole-requirement verification failed.');
+        if (result.status !== 'passed') throw new Error('Whole-requirement verification failed.');
+        verification = completeVerification(readJson(join(directory, 'summary.json')), { sourceHash: before, contract, nodePath: join(directory, 'node-results.jsonl'), message: 'Whole-requirement verification failed.' }).verification;
       }
       evidence += `\nVerification:\n${JSON.stringify(verification)}`;
     }

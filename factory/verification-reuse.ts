@@ -7,7 +7,7 @@ import type { Requirement, WorkRun } from '../src/workflow.ts';
 import type { ControllerState, Verification } from './controller.ts';
 import { parsePlan, parseReview, parseTask } from './contracts.ts';
 import type { Review } from './contracts.ts';
-import { inspectNodeReport, parseVerificationContract, readJson, snapshot, writeJson } from './evidence.ts';
+import { completeVerification, parseVerificationContract, readJson, snapshot, writeJson } from './evidence.ts';
 import { commitSnapshot } from './maintenance.ts';
 import { git, protectedPath } from './workspace.ts';
 
@@ -90,14 +90,11 @@ function inspect(directory: string, sourceHash: string, certificate?: Certificat
   const inputPath = evidencePath(directory, join(summary.runDirectory, 'verification-input.json'));
   const inputs = readJson(inputPath) as { schemaVersion: number; sourceHash: string; before: string; after: string; verificationRunId: string; summaryHash: string };
   if (inputs.schemaVersion !== 1 || inputs.sourceHash !== sourceHash || !/^[a-f0-9]{64}$/.test(inputs.before) || inputs.before !== inputs.after || inputs.verificationRunId !== summary.runId || inputs.summaryHash !== digest(readFileSync(summaryPath)) || certificate && inputs.before !== certificate.environment) throw new Error('Verification-time input identity stamp is missing or changed.');
-  const gates = ['lint', 'typecheck', 'test', 'build'];
-  if (summary.profile !== 'code-only' || summary.checks.length !== gates.length || !gates.every(name => summary.checks.filter(check => check.name === name && check.status === 'passed').length === 1)) throw new Error('Reusable verification lacks complete passed gates.');
   const contractPath = evidencePath(directory, summary.contractPath!);
   const contract = parseVerificationContract(readJson(contractPath));
   for (const check of plan.slices.flatMap(slice => slice.checks)) if (!contract.requiredNodeTests.some(item => item.file === check.file && item.title === check.title)) throw new Error('Reusable verification omitted a planned Node check.');
   const nodePath = evidencePath(directory, join(summary.runDirectory, 'node-results.jsonl'));
-  const node = inspectNodeReport(nodePath, contract.requiredNodeTests);
-  if (node.passed !== summary.node?.passed) throw new Error('Reusable verification counts do not match actual reports.');
+  completeVerification(summary, { sourceHash, contract, nodePath, message: 'Reusable verification lacks complete passed gates.' });
   const receipt = state.reviewReceipts?.filter(item => ['integrated-code', 'integrated-code-and-whole-goal'].includes(item.purpose) && item.approved && item.sourceHash === sourceHash).at(-1);
   if (!receipt) throw new Error('Reusable verification has no independent integrated approval.');
   const reviewReceiptPath = evidencePath(directory, receipt.evidencePath);

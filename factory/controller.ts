@@ -4,7 +4,9 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parsePlan, parseTask, parseReview, parseWorkerReport, parseRegressionReport, scoped, ReviewResponseFormatError } from './contracts.ts';
 import type { Task, Plan, Review } from './contracts.ts';
-import { parseVerificationContract, readJson, snapshot, writeJson } from './evidence.ts';
+import { completeVerification, parseVerification, parseVerificationContract, readJson, snapshot, writeJson } from './evidence.ts';
+import type { VerificationSummary } from './evidence.ts';
+import { trustedVerifier } from './verifier.ts';
 import { runProcess } from './process.ts';
 import { allocatePorts, git, prepareWorkspace, processEnvironment, protectedPath } from './workspace.ts';
 import { controllerDelivery } from './delivery.ts';
@@ -22,7 +24,7 @@ import { integrate } from './integration.ts';
 export type Phase = 'plan' | 'tests' | 'regression-tests' | 'acceptance-review' | 'implement' | 'repair' | 'review';
 export type AgentInput = { phase: Phase; task: Task; plan?: Plan; cwd: string; attempt: number; feedback: string; directory: string; timeoutMs: number; signal: AbortSignal; env: NodeJS.ProcessEnv; context?: { indexPath: string; path: string; bytes: number; sha256: string } };
 export type Agent = { run: (input: AgentInput) => Promise<unknown> };
-export type Verification = { diagnostics?: { phase: string; code?: string; origin: 'spawn' | 'node-report' | 'report-validation'; kind?: 'product' | 'test-contract'; settled: true }; profile?: 'code-only'; status: string; snapshot: { hash: string }; runDirectory: string; checks: { name: string; status: string; durationMs?: number }[]; node?: { passed: number }; browser?: { passed: number }; error?: string };
+export type Verification = VerificationSummary;
 class IntegrationRejected extends Error {}
 class FocusedFailureHold extends Error {}
 
@@ -192,17 +194,13 @@ export async function runController(options: { repository: string; task: unknown
     if (task.schemaVersion === 2) state.execution = { profile: 'adaptive-v2', coverageMode: state.plan.coverage!.mode, route: state.plan.coverage!.mode === 'reuse' ? 'light' : 'standard', reason: state.plan.coverage!.reason };
     writeJson(join(runDirectory, 'plan.json'), state.plan);
     const trustedRoot = join(runDirectory, 'trusted');
-    for (const path of ['scripts/verify.mjs', 'factory/process.ts', 'factory/ownership.ts', 'factory/evidence.ts', 'factory/node-reporter.mjs']) {
-      const to = join(trustedRoot, path); mkdirSync(dirname(to), { recursive: true }); copyFileSync(join(engineRoot, path), to);
-    }
-    writeJson(join(trustedRoot, 'package.json'), { type: 'module' });
     const contract = parseVerificationContract(readJson(join(options.mergeTarget ? state.workspace : repository, 'factory/verification-contract.json')));
     for (const check of state.plan.slices.flatMap(slice => slice.checks)) if (!contract.requiredNodeTests.some(item => item.file === check.file && item.title === check.title)) contract.requiredNodeTests.push(check);
     for (const regression of state.regressions ?? []) {
       contract.requiredNodeTests.push(...regression.checks);
     }
-    const contractPath = join(trustedRoot, 'factory/verification-contract.json');
-    writeJson(contractPath, contract);
+    const verifier = trustedVerifier(trustedRoot, contract);
+    const contractPath = verifier.contractPath;
     const reviewCandidate = async (phase: 'acceptance-review' | 'review', purpose: string, attempt: number, feedback: Record<string, unknown>, cwd = state.workspace, effectiveContract = contract) => {
       const sourceHash = snapshot(cwd).hash;
       const deadline = Date.now() + Math.min(task.budget.workerTimeoutMs, remaining());
@@ -276,11 +274,12 @@ export async function runController(options: { repository: string; task: unknown
         const timeoutMs = Math.min(600000, remaining()); budget!.phase(timeoutMs);
         if (state.efficiency) { state.efficiency.verificationExecutions += 1; if (generation > 1) state.efficiency.verificationRetries += 1; }
         const inputIdentity = task.schemaVersion === 2 ? verificationInputIdentity(cwd) : undefined;
-        execution = await runProcess({ command: process.execPath, args: [join(trustedRoot, 'scripts/verify.mjs')], cwd, env: { ...env, ...(attemptId ? { FACTORY_ATTEMPT_ID: attemptId } : {}), VERIFY_RUN_DIR: target, VERIFY_CONTRACT_PATH: effectiveContractPath, VERIFY_TOTAL_TIMEOUT_MS: String(timeoutMs), VERIFY_STEP_TIMEOUT_MS: String(Math.min(300000, remaining())), VERIFY_GRACE_MS: '1000' }, logPath: `${target}.log`, timeoutMs: timeoutMs + 3000, signal: cancelled.signal });
+        execution = await runProcess({ command: process.execPath, args: [verifier.command], cwd, env: { ...env, ...(attemptId ? { FACTORY_ATTEMPT_ID: attemptId } : {}), VERIFY_RUN_DIR: target, VERIFY_CONTRACT_PATH: effectiveContractPath, VERIFY_TOTAL_TIMEOUT_MS: String(timeoutMs), VERIFY_STEP_TIMEOUT_MS: String(Math.min(300000, remaining())), VERIFY_GRACE_MS: '1000' }, logPath: `${target}.log`, timeoutMs: timeoutMs + 3000, signal: cancelled.signal });
         if (task.schemaVersion === 2 && (execution.settled !== true || execution.error && !execution.spawnErrorCode || execution.status === 'cancelled' || execution.status === 'timeout')) throw new Error(`Verifier process ownership or execution failed: ${execution.error ?? execution.status}. Retain source and require owner recovery.`);
-        const verification = readJson(join(target, 'summary.json')) as Verification;
+        const verification = parseVerification(readJson(join(target, 'summary.json')));
         if (execution.status !== 'passed' && verification.status === 'passed') throw new Error('Verifier process failed despite a passing summary; inspect owned process evidence.');
         if (snapshot(cwd).hash !== verification.snapshot.hash) throw new Error('Source changed during verification.');
+        if (verification.status === 'passed') completeVerification(verification, { sourceHash: snapshot(cwd).hash, contract: parseVerificationContract(readJson(effectiveContractPath)), nodePath: join(target, 'node-results.jsonl'), message: 'Controller verification lacks complete passing machine evidence.' });
         if (inputIdentity) {
           const after = verificationInputIdentity(cwd);
           writeJson(join(target, 'verification-input.json'), { schemaVersion: 1, sourceHash: verification.snapshot.hash, before: inputIdentity, after, verificationRunId: (verification as Verification & { runId: string }).runId, summaryHash: digest(readFileSync(join(target, 'summary.json'))) });

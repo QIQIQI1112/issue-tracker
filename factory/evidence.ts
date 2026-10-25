@@ -33,6 +33,23 @@ export function snapshot(cwd: string): { hash: string; files: { path: string; ha
 
 type RequiredCase = { file: string; title: string };
 export type VerificationContract = { schemaVersion: 2; profile: 'code-only'; requiredBrowserTests: RequiredCase[]; requiredNodeTests: RequiredCase[] };
+export type VerificationSummary = { diagnostics?: { phase: string; code?: string; origin: 'spawn' | 'node-report' | 'report-validation'; kind?: 'product' | 'test-contract'; settled: true }; profile?: 'code-only'; status: string; snapshot: { hash: string }; runDirectory: string; checks: { name: string; status: string; durationMs?: number }[]; node?: { passed: number }; browser?: { passed: number }; error?: string };
+
+export function parseVerification(input: unknown): VerificationSummary {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Verification summary must be an object.');
+  const value = input as VerificationSummary;
+  if (typeof value.status !== 'string' || !value.snapshot || typeof value.snapshot.hash !== 'string' || !Array.isArray(value.checks) || value.checks.some(check => !check || typeof check.name !== 'string' || typeof check.status !== 'string')) throw new Error('Verification summary is malformed.');
+  return value;
+}
+
+export function completeVerification(input: unknown, options: { sourceHash: string; contract: VerificationContract; nodePath: string; message: string }): { verification: VerificationSummary; node: { passed: number; required: number } } {
+  const verification = parseVerification(input);
+  const gates = ['lint', 'typecheck', 'test', 'build'];
+  if (verification.status !== 'passed' || verification.profile !== 'code-only' || verification.snapshot.hash !== options.sourceHash || verification.checks.length !== gates.length || !gates.every(name => verification.checks.filter(check => check.name === name && check.status === 'passed').length === 1)) throw new Error(options.message);
+  const node = inspectNodeReport(options.nodePath, options.contract.requiredNodeTests);
+  if (node.passed !== verification.node?.passed) throw new Error('Verification counts do not match the executed reports.');
+  return { verification, node };
+}
 
 export function parseVerificationContract(input: unknown): VerificationContract {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Verification contract must be an object.');

@@ -5,7 +5,7 @@ import { dirname, join, resolve } from 'node:path';
 import type { Issue } from '../src/domain.ts';
 import type { IssueStore } from '../src/storage.ts';
 import { acquireDatabaseLock } from '../src/instance.ts';
-import { inspectNodeReport, parseVerificationContract, readJson, writeJson } from './evidence.ts';
+import { completeVerification, parseVerification, parseVerificationContract, readJson, writeJson } from './evidence.ts';
 import { git } from './workspace.ts';
 import { saveDelivery } from './delivery.ts';
 import { controlPlanePath } from './policy.ts';
@@ -43,15 +43,13 @@ export function recordMaintenance(store: IssueStore, input: { issueId: number; c
   try {
     git(repo.path, ['merge-base', '--is-ancestor', input.commit, `refs/heads/${targetBranch}`]);
     const source = commitSnapshot(repo.path, input.commit);
-    const verification = readJson(input.verificationPath) as { profile: string; status: string; snapshot: { hash: string }; checks: Delivery['checks']; node: { passed: number } };
+    const verification = parseVerification(readJson(input.verificationPath));
     const review = readJson(input.reviewPath) as { approved: boolean; sourceHash?: string; reviewedSourceHash?: string; findings: unknown[]; summary: string; coveredIssues?: { issueId: number; contractHash: string }[] };
-    if (verification.profile !== 'code-only' || verification.status !== 'passed' || verification.checks.length !== 4 || verification.snapshot?.hash !== source.hash || !['lint', 'typecheck', 'test', 'build'].every(name => verification.checks.some(check => check.name === name && check.status === 'passed'))) throw new Error('Maintenance requires complete verification of the exact committed source.');
     if (review.approved !== true || !Array.isArray(review.findings) || review.findings.length || (review.sourceHash ?? review.reviewedSourceHash) !== source.hash) throw new Error('Maintenance requires independent approval of the exact source.');
     if (!review.coveredIssues?.some(item => item.issueId === issue.id && item.contractHash === maintenanceIdentity(issue))) throw new Error('Maintenance approval does not cover the exact issue and acceptance contract.');
     const contract = parseVerificationContract(JSON.parse(git(repo.path, ['show', `${input.commit}:factory/verification-contract.json`])));
     const directory = dirname(input.verificationPath);
-    const node = inspectNodeReport(join(directory, 'node-results.jsonl'), contract.requiredNodeTests);
-    if (node.passed !== verification.node.passed) throw new Error('Maintenance verification counts do not match the executed reports.');
+    const { node } = completeVerification(verification, { sourceHash: source.hash, contract, nodePath: join(directory, 'node-results.jsonl'), message: 'Maintenance requires complete verification of the exact committed source.' });
     claim = store.work.claimMaintenance(input.issueId, resolve(input.evidenceRoot ?? join(dirname(store.path), 'evidence')));
     mkdirSync(claim.run.evidencePath, { recursive: true });
     for (const [name, path] of [['verification.json', input.verificationPath], ['review.json', input.reviewPath], ['node-results.jsonl', join(directory, 'node-results.jsonl')]]) writeFileSync(join(claim.run.evidencePath, name), readFileSync(path));
