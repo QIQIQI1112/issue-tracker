@@ -1,43 +1,30 @@
 import { readFileSync } from 'node:fs';
 import postcss from 'postcss';
-import type { Fixture, Host } from './dropdown-fixture.ts';
+import type { Fixture } from './dropdown-fixture.ts';
 
 function stylesheet(url: URL): string {
   return readFileSync(url, 'utf8').replace(/@import\s+['"]([^'"]+)['"];?/g, (_match, path: string) => stylesheet(new URL(path, url)));
 }
 const css = postcss.parse(stylesheet(new URL('../src/ui/styles.css', import.meta.url)));
 type State = { hover?: boolean; focus?: boolean; pseudo?: string };
-function matches(selector: string, node: Host, state: State = {}): boolean {
-  if (selector.includes('[data-theme="dark"]')) return false;
-  if (selector.trim() === ':root') return node === node.fixture.root;
+function matches(selector: string, node: HTMLElement, state: State = {}): boolean {
   if (/::[\w-]+/.test(selector)) {
     if (!state.pseudo || !selector.includes(state.pseudo)) return false;
     selector = selector.replace(/::[\w-]+/g, '');
   } else if (state.pseudo) return false;
   if (selector.includes(':hover') && !state.hover || /:focus(?:-visible)?/.test(selector) && !state.focus) return false;
-  if (selector.includes(':not(.modal)') && node.matches('.modal')) return false;
-  selector = selector.replace(':not(.modal)', '');
-  selector = selector.replace(/:hover|:focus-visible|:focus(?!-)|:root|:not\(:disabled\)/g, '').trim();
-  if (selector.includes(':')) return false;
-  const parts = selector.split(/\s+/).filter(Boolean);
-  const last = parts.pop() ?? '*';
-  if (!node.matches(last)) return false;
-  let ancestor = node.parentElement;
-  while (parts.length) {
-    const part = parts.pop()!;
-    if (part === '>') { if (!ancestor?.matches(parts.pop()!)) return false; ancestor = ancestor.parentElement; }
-    else { while (ancestor && !ancestor.matches(part)) ancestor = ancestor.parentElement; if (!ancestor) return false; ancestor = ancestor.parentElement; }
-  }
-  return true;
+  selector = selector.replace(/:hover|:focus-visible|:focus(?!-)/g, '');
+  return node.matches(selector.trim() || '*');
 }
-export function declarations(node: Host, state: State = {}): Record<string, string> {
+export function declarations(node: HTMLElement, state: State = {}): Record<string, string> {
   const winners = new Map<string, { priority: number; value: string }>();
   css.walkRules(rule => {
     let parent: postcss.Container | postcss.Document | undefined = rule.parent;
     while (parent) {
       if (parent.type === 'atrule' && (parent as postcss.AtRule).name === 'media') {
         const boundary = (parent as postcss.AtRule).params.match(/\((max|min)-width:\s*(\d+)px\)/);
-        if (boundary && (boundary[1] === 'max' ? node.fixture.viewport.width > Number(boundary[2]) : node.fixture.viewport.width < Number(boundary[2]))) return;
+        const width = node.ownerDocument.defaultView!.innerWidth;
+        if (boundary && (boundary[1] === 'max' ? width > Number(boundary[2]) : width < Number(boundary[2]))) return;
         if ((parent as postcss.AtRule).params.includes('prefers-reduced-motion')) return;
       }
       parent = parent.parent;
@@ -52,7 +39,10 @@ export function declarations(node: Host, state: State = {}): Record<string, stri
     }
   });
   const result = Object.fromEntries([...winners].map(([name, value]) => [name, value.value]));
-  if (!state.pseudo) for (const [key, value] of Object.entries(node.style)) result[key.replace(/[A-Z]/g, letter => '-' + letter.toLowerCase())] = typeof value === 'number' ? value + 'px' : String(value);
+  if (!state.pseudo) for (let index = 0; index < node.style.length; index++) {
+    const property = node.style.item(index);
+    result[property] = node.style.getPropertyValue(property);
+  }
   return result;
 }
 export function length(value: string | undefined, total: number, fixture: Fixture): number {
@@ -65,7 +55,7 @@ export function length(value: string | undefined, total: number, fixture: Fixtur
   if (!/^[\d.\s,+*/()-]*(?:(?:min|max|clamp)[\d.\s,+*/()-]*)*$/.test(value)) return NaN;
   return Function('min', 'max', 'clamp', `return (${value})`)(Math.min, Math.max, (low: number, middle: number, high: number) => Math.max(low, Math.min(high, middle))) as number;
 }
-export function effective(node: Host, property: string): string {
+export function effective(node: HTMLElement, property: string): string {
   const value = declarations(node)[property];
   if (value && value !== 'inherit') return value;
   return node.parentElement ? effective(node.parentElement, property) : '';
