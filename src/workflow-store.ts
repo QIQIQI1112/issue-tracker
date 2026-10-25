@@ -4,6 +4,7 @@ import type { IssueStore } from './storage.ts';
 import type { Assignment, GitHubEnrollment, Publication, Decomposition, Job, PlanSubmission, Repo, Requirement, SubmissionReceipt, WorkRun } from './workflow.ts';
 import { changeKind, ConflictError, githubEnrollment } from './workflow.ts';
 import { ValidationError } from './domain.ts';
+import type { Issue } from './domain.ts';
 import { parseSubmission } from './submission.ts';
 
 const repoColumns = 'github, id, name, path, target_branch AS targetBranch, created_at AS createdAt';
@@ -244,10 +245,39 @@ export class WorkflowStore {
   claim(evidenceRoot: string, targetJobId?: number): { job: Job; run: WorkRun } | undefined {
     return this.transaction(() => {
       if (this.jobs().some(job => job.status === 'running')) return undefined;
+      if (targetJobId === undefined) this.resumeDependencyBlocked();
       const job = this.jobs().find(job => (targetJobId === undefined || job.id === targetJobId) && job.status === 'queued' && (job.availableAt ?? 0) <= Date.now() && job.kind !== 'maintenance' && (job.kind !== 'issue' || this.context(job.issueId!)!.dependsOn.every(id => this.dependencyReady(id, job.requirementId))));
       if (!job) return undefined;
       return this.claimJob(job, evidenceRoot);
     });
+  }
+  private resumeDependencyBlocked(): void {
+    const jobs = this.jobs();
+    const runs = this.runs();
+    let resumed = false;
+    for (const issue of this.issues.list()) {
+      const work = issue.work;
+      if (issue.status !== 'blocked' || !work || !work.dependsOn.length || (work.changeKind ?? 'feature') !== 'feature') continue;
+      const history = jobs.filter(job => job.issueId === issue.id);
+      const latest = history.at(-1);
+      if (latest?.kind !== 'issue' || latest.status !== 'blocked' || latest.reason !== 'A dependency failed.' || latest.runId !== null) continue;
+      if (history.some(job => job.runId !== null || job.status === 'queued' || job.status === 'running') || runs.some(run => run.issueId === issue.id)) continue;
+      if (latest.repoId !== work.repoId || latest.requirementId !== work.requirementId) continue;
+      if (work.requirementId !== null) {
+        const requirement = this.requirement(work.requirementId);
+        if (!requirement || requirement.repoId !== work.repoId || requirement.status === 'done' || this.submissionForRequirement(requirement.id) && !this.approvedSubmission(requirement.id)) continue;
+      }
+      let original: Issue;
+      try { original = JSON.parse(latest.payload) as Issue; }
+      catch { continue; }
+      if (original?.id !== issue.id || original.title !== issue.title || original.description !== issue.description || !original.work) continue;
+      const previous = original.work;
+      if (previous.repoId !== work.repoId || previous.requirementId !== work.requirementId || (previous.changeKind ?? 'feature') !== 'feature' || JSON.stringify(previous.dependsOn) !== JSON.stringify(work.dependsOn) || JSON.stringify(previous.acceptance) !== JSON.stringify(work.acceptance)) continue;
+      if (!work.dependsOn.every(id => this.dependencyReady(id, work.requirementId))) continue;
+      this.startIssue(issue.id);
+      resumed = true;
+    }
+    if (resumed) this.refreshRequirements(null);
   }
   maintenanceAdmission(issueId: number): Job {
     const issue = this.issues.get(issueId);
@@ -277,7 +307,7 @@ export class WorkflowStore {
       this.database.prepare("INSERT INTO work_runs (id, job_id, repo_id, requirement_id, issue_id, status, evidence_path, started_at) VALUES (?, ?, ?, ?, ?, 'running', ?, ?)").run(id, job.id, job.repoId, job.requirementId, job.issueId, `${evidenceRoot}/${id}`, now);
       if (job.issueId !== null) this.database.prepare("UPDATE issues SET status='in_progress', updated_at=? WHERE id=?").run(now, job.issueId);
       if (job.requirementId !== null) this.database.prepare("UPDATE requirements SET status='running', updated_at=? WHERE id=?").run(now, job.requirementId);
-      this.refreshRequirements();
+      this.refreshRequirements(job.requirementId);
       return { job: { ...job, status: 'running', runId: id }, run: this.run(id)! };
   }
   finish(id: string, status: Exclude<WorkRun['status'], 'running'>, reason: string | null = null): void {
@@ -321,18 +351,19 @@ export class WorkflowStore {
           if (children.every(issue => this.runs().some(item => item.issueId === issue.id && item.status === 'merged'))) this.enqueue('requirement_verify', job.repoId, job.requirementId, null, this.requirement(job.requirementId));
         }
       }
-      this.refreshRequirements();
+      this.refreshRequirements(job.requirementId);
     });
   }
   recoverInterrupted(): void {
     for (const run of this.runs().filter(run => run.status === 'running')) this.finish(run.id, 'blocked', 'Queue worker was interrupted. Inspect retained evidence before retrying.');
   }
 
-  private refreshRequirements(): void {
+  private refreshRequirements(changedRequirementId: number | null): void {
     const jobs = this.jobs();
     const runs = this.runs();
     const issues = this.issues.list();
     for (const requirement of this.requirements()) {
+      if (requirement.status === 'done' && requirement.id !== changedRequirementId) continue;
       const related = jobs.filter(job => job.requirementId === requirement.id);
       if (!related.length && requirement.status === 'draft') continue;
       const children = issues.filter(issue => issue.work?.requirementId === requirement.id);

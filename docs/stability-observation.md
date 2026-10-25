@@ -10,6 +10,8 @@ Dependent maintenance captures the predecessor only after fresh complete verific
 
 The post-Issue88 release identity is pending actual controller verification, independent approval and native integration. Before the observations, record that single baseline's actual source/engine/contract identities and integrated commit by referencing its existing `run-state.json`, `state.json`, verification summary, source-bound review receipts and integration record. Keep those controls fixed across the observations; a subsequent authorized control change must be disclosed before comparing results. This document claims no Issue88 delivery proof or observed improvement.
 
+Issue94 / Requirement32 proposes revised phase-local write guidance and automatic continuation only for unchanged, admitted, never-executed ordinary features cascade-blocked by dependencies after genuine merge/publication recovery. Attempted work still uses explicit recovery; history, budgets and delivery gates remain intact. This maintenance does not activate or rename the fixed observation baseline. Only after controller full verification, independent source/original-goal approval, verified integration, enrolled GitHub delivery and quiescent release may the owner record the actual released commit and source/engine/contract identities from those existing receipts. Disclose that new identity before subsequent business observations; preserve prior observations under their original identity and do not count this maintenance as a business observation. No release identity or delivery is inferred here.
+
 | Future observation | Status | Selection |
 | --- | --- | --- |
 | 1 | Pending | First independently authorized real-business requirement delivered after baseline activation. |
