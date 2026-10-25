@@ -1,5 +1,7 @@
 # Autonomous development workbench
 
+Current execution ownership is documented in [the serial execution kernel](execution-kernel.md). Feature and explicitly authorized maintenance jobs share one dispatcher and native lifecycle. Ordinary classification grants no maintenance authority. `GET /api/runs/:id` exposes bounded matching current progress before a delivery exists, and native reports record actual queue waiting and claim-to-completion time. Historical missing measurements remain unavailable. Use [owner operations](owner-workflow.md) for the original pinned authorization and selected-job continuation; late attestation remains compatible with historical owner deliveries.
+
 ## Start and use
 
 Run `npm run dev`. The supervisor starts the loopback API, Vite, and one queue worker. Production use is `npm run build` followed by `npm start`; that supervisor starts the built application and the same queue worker. `npm run worker -- --once` processes at most one runnable job when no other worker owns the database.
