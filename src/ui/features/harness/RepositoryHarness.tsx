@@ -74,7 +74,6 @@ export function RepositoryHarness({ repoId }: { repoId: number }) {
         <h2>Committed configuration</h2>
         <dl className="harness-provenance"><dt>Repository</dt><dd>{data.repository.name} (#{data.repository.id})</dd><dt>Target branch</dt><dd>{data.repository.targetBranch}</dd><dt>Commit</dt><dd>{data.commit ?? 'Unavailable'}</dd></dl>
         <p className="harness-read-message" data-status={data.status}>{data.message}</p>
-        <p className="harness-explanation">Configured checks are not execution or pass evidence. Reading these sources does not run commands.</p>
         <p className="harness-inventory"><strong>{data.sources.length} sources</strong><span>{data.sources.filter(source => source.status === 'available').length} available</span><span>{data.sources.filter(source => source.status !== 'available').length} source availability problems</span></p>
       </section>
       {[

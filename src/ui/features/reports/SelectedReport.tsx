@@ -31,6 +31,6 @@ export function SelectedReport({ runId }: { runId: string }) {
     {result?.progress && result.run.status === 'running' && <section aria-label="Current execution progress"><p>Current stage: <strong>{result.progress.stage.replaceAll('_', ' ')}</strong> · {result.progress.profile}</p><ul>{result.progress.transitions.map((stage, index) => <li key={index}>{stage.stage.replaceAll('_', ' ')} · {((stage.completedAt ? stage.durationMs : Math.max(stage.durationMs, Date.now() - Date.parse(stage.startedAt))) / 1000).toFixed(1)} s{stage.completedAt ? ' · completed' : ' · in progress'}</li>)}</ul></section>}
     {error ? <><p className="form-error" role="alert">{error}</p><Button className="button" type="button" onClick={() => { setError(''); setResult(null); setRetry(value => value + 1); }}>Retry report</Button></>
       : result?.delivery ? <DeliveryView delivery={result.delivery} runId={runId} />
-        : <p role="status">{!result ? 'Loading delivery report…' : result.run.status === 'running' ? 'Execution is in progress. The delivery report will appear here.' : 'Delivery report unavailable for this execution.'}</p>}
+        : <p role="status">{!result ? 'Loading delivery report…' : result.run.status === 'running' ? 'Execution is in progress.' : 'Delivery report unavailable for this execution.'}</p>}
   </section>;
 }

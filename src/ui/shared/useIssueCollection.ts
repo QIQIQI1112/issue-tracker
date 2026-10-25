@@ -14,7 +14,7 @@ export function useIssueCollection(issues: Issue[], repoFilter: string) {
 
   const repositoryIssues = issues.filter(issue => !repoFilter || String(issue.work?.repoId) === repoFilter);
   const query = search.trim().toLocaleLowerCase();
-  const hasFilters = query.length > 0 || filter !== 'all' || labelFilter !== '' || repoFilter !== '';
+  const hasFilters = query.length > 0 || filter !== 'all' || labelFilter !== '';
   const labelOptions = [...new Set([...repositoryIssues.flatMap(issue => issue.labels), ...(labelFilter ? [labelFilter] : [])])].sort((left, right) => left.localeCompare(right));
   const priorityRank = { low: 1, medium: 2, high: 3 } as const;
   const matchingIssues = repositoryIssues.filter((issue) => (filter === 'all' || issue.status === filter) && (!labelFilter || issue.labels.includes(labelFilter)) && (!query || issue.title.toLocaleLowerCase().includes(query) || issue.description.toLocaleLowerCase().includes(query))).sort((left, right) => {

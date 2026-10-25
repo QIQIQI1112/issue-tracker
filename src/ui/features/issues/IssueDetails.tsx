@@ -90,7 +90,7 @@ export function IssueDetails({ id, workbench, issues = [], metadataError = '' }:
         <dt>Dependencies</dt><dd>{issue.work?.dependsOn.map(id => '#' + id).join(', ') || 'None'}</dd>
       </dl>
       {issue.closure && <section aria-label="Closure context" className="diagnostic-section">
-        <h3>Issue closure</h3><p>Closure does not establish successful delivery.</p>
+        <h3>Issue closure</h3>
         <dl>
           <dt>Closure reason</dt><dd>{issue.closure.reason}</dd>
           <dt>Closed at</dt><dd><time dateTime={issue.closure.closedAt}>{issue.closure.closedAt}</time></dd>
@@ -113,7 +113,7 @@ export function IssueDetails({ id, workbench, issues = [], metadataError = '' }:
           <dt>Submission</dt><dd>{requirement.submission.id}</dd><dt>Plan hash</dt><dd><code>{requirement.submission.planHash}</code></dd>
           <dt>Source kind</dt><dd>{requirement.submission.source.kind}</dd><dt>Source reference</dt><dd>{requirement.submission.source.reference}</dd><dt>Source summary</dt><dd>{requirement.submission.source.summary}</dd>
         </dl></> : <p>Submission provenance unavailable: no conversation submission recorded.</p>}
-        <p>{progress?.outcome}</p><p>{progress?.merged}/{progress?.children.length} child issues have recorded merges. Delivery requires recorded execution evidence, regardless of issue status.</p>
+        <p>{progress?.outcome}</p><p>{progress?.merged}/{progress?.children.length} child issues have recorded merges.</p>
         {workbench.jobs.filter(job => owned(job) && job.issueId === null && job.kind === 'requirement_verify').sort((a, b) => b.id - a.id).slice(0, 1).map(job => <p key={job.id}>Latest whole-goal job #{job.id} · {job.status}{job.reason ? ' · ' + job.reason : ''}</p>)}
       </section>}
       <h3>Execution history</h3>

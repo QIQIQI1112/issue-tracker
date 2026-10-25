@@ -15,7 +15,7 @@ function ExecutionEfficiency({ delivery: { efficiency, execution, lifecycle } }:
     {(efficiency || execution) && <h4>Execution efficiency</h4>}
     {lifecycle && <dl className="efficiency-metrics"><div><dt>Queue wait</dt><dd>{duration(lifecycle.queueWaitMs)}</dd></div><div><dt>Claim to completion</dt><dd>{duration(lifecycle.wallMs)}</dd></div><div><dt>Authority profile</dt><dd>{lifecycle.profile}</dd></div></dl>}
     {efficiency ? <>
-      <p>Recorded cost of the selected run, separate from cumulative budget usage and whole requirement delivery.</p>
+      <p>Selected run cost</p>
       <dl className="efficiency-metrics">
         {([
           ['Elapsed time', duration(efficiency.elapsedMs)],
@@ -26,7 +26,7 @@ function ExecutionEfficiency({ delivery: { efficiency, execution, lifecycle } }:
           ['Verification proof reuses', efficiency.verificationReuses],
         ] as const).map(([label, value]) => <div key={label}><dt>{label}</dt><dd> {value}</dd></div>)}
       </dl>
-      <p className="efficiency-note">Agent invocations include test-authoring invocations. Full verification executions count actual full verifier runs, including retries; proof reuses use existing verification evidence.</p>
+
       <h4>Recorded stage durations</h4>
       <dl className="efficiency-metrics efficiency-stages">
         {([
@@ -38,7 +38,7 @@ function ExecutionEfficiency({ delivery: { efficiency, execution, lifecycle } }:
           ['Code review', efficiency.durations.codeReviewMs],
         ] as const).map(([label, value]) => <div key={label}><dt>{label}</dt><dd> {duration(value)}</dd></div>)}
       </dl>
-      <p className="efficiency-note">Verification duration includes focused checks. Stage durations need not sum to elapsed time.</p>
+
     </> : <p>Efficiency metrics were not recorded for this run and are unavailable.</p>}
     {execution && <>
       <h4>Execution context</h4>
@@ -47,7 +47,7 @@ function ExecutionEfficiency({ delivery: { efficiency, execution, lifecycle } }:
         <div><dt>Execution route</dt><dd> {execution.route}</dd></div>
         <div><dt>Coverage mode</dt><dd> {execution.coverageMode}</dd></div>
       </dl>
-      <p className="efficiency-note">Coverage mode describes the recorded test coverage decision.</p>
+
       <p className="efficiency-reason">{execution.reason}</p>
     </>}
   </div>;
@@ -61,7 +61,7 @@ export function DeliveryView({ delivery, runId }: { delivery: Delivery; runId: s
       <div className="delivery-result">
         <h4>Result</h4><p>{delivery.summary ?? delivery.goal}</p>
       </div>
-      {delivery.workerObservations && delivery.workerObservations.length > 0 && <details><summary>Historical worker observations</summary><p>These observations precede the controller's final verification and decision.</p><ul>{delivery.workerObservations.map(item => <li key={item.attempt}><strong>Attempt {item.attempt}</strong><p>{item.summary}</p></li>)}</ul></details>}
+      {delivery.workerObservations && delivery.workerObservations.length > 0 && <details><summary>Historical worker observations</summary><ul>{delivery.workerObservations.map(item => <li key={item.attempt}><strong>Attempt {item.attempt}</strong><p>{item.summary}</p></li>)}</ul></details>}
     </div>
     <ExecutionEfficiency delivery={delivery} />
     <div className="delivery-group">

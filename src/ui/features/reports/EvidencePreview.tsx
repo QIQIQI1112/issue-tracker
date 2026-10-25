@@ -73,6 +73,6 @@ export function EvidencePreview({ runId, evidence }: { runId: string; evidence: 
   const artifact = evidence.find(item => item.path === selected);
   return <>
     <div className="diagnostic-selector">Artifact<Dropdown aria-label="Select evidence artifact" value={artifact?.path ?? ''} onChange={setSelected}><option value="">Select an artifact</option>{evidence.map(item => <option key={item.path} value={item.path}>{item.path} · {item.bytes.toLocaleString('en-US')} bytes</option>)}</Dropdown></div>
-    {artifact ? <ArtifactPreview key={runId + ':' + artifact.path + ':' + artifact.sha256} runId={runId} artifact={artifact} /> : <section aria-label="Evidence preview" className="evidence-preview"><h4>Evidence preview</h4><p>Select a manifest-listed artifact to read text inline. Previews are limited to 1 MiB; every artifact remains downloadable.</p></section>}
+    {artifact ? <ArtifactPreview key={runId + ':' + artifact.path + ':' + artifact.sha256} runId={runId} artifact={artifact} /> : <section aria-label="Evidence preview" className="evidence-preview"><h4>Evidence preview</h4><p>No artifact selected.</p></section>}
   </>;
 }

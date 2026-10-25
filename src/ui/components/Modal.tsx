@@ -29,7 +29,7 @@ export function Modal({ title, children, onDismiss, wide = false }: { title: str
     const next = event.shiftKey ? (index <= 0 ? controls.length - 1 : index - 1) : (index + 1) % controls.length;
     controls[next].focus();
   }} onCancel={(event) => { event.preventDefault(); onDismiss(); }}>
-    <header className="modal-header"><div><span className="eyebrow">LOCAL WORKSPACE</span><h2 id={titleId}>{title}</h2></div><Button type="button" className="icon-button" aria-label="Close dialog" onClick={onDismiss}><Icon name="close" /></Button></header>
+    <header className="modal-header"><div><h2 id={titleId}>{title}</h2></div><Button type="button" className="icon-button" aria-label="Close dialog" onClick={onDismiss}><Icon name="close" /></Button></header>
     {children}
   </dialog>;
 }
