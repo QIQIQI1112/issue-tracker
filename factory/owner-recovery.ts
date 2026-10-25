@@ -4,15 +4,15 @@ import { IssueStore } from '../src/storage.ts';
 import { resolveDatabasePath } from '../src/instance.ts';
 import type { Agent } from './controller.ts';
 import type { Job } from '../src/workflow.ts';
-import { digest, taskIdentity } from './checkpoint.ts';
+import { digest, environmentIdentity, loadCheckpoint, taskIdentity } from './checkpoint.ts';
 import { parseTask } from './contracts.ts';
-import { executionBudget, grantExecutionBudget, validateOwnerGrant, validateRevisionBudget } from './budget.ts';
+import { assertRemainingExecutionBudget, executionBudget, grantExecutionBudget, validateOwnerBudgetRequest, validateOwnerGrant, validateRevisionBudget } from './budget.ts';
 import { readJson, writeJson } from './evidence.ts';
 import { acquireExecutionLease } from './lease.ts';
 import { assertRunQuiescent } from './ownership.ts';
 import { issueTask, SerialQueue } from './queue.ts';
 import { git } from './workspace.ts';
-import { ownerAuthorization } from './profiles.ts';
+import { engineRoot, ownerAuthorization } from './profiles.ts';
 import { assertRevisionBindings, validateAcceptedRevision } from './owner-revision.ts';
 import type { AcceptedRevision } from './owner-revision.ts';
 
@@ -40,7 +40,9 @@ export async function ownerResume(input: unknown, options: { agent?: Agent; vali
   const value = input as ResumeRequest;
   if (!value || typeof value !== 'object' || Object.keys(value).some(key => !['schemaVersion', 'requestId', 'databasePath', 'issueId', 'additionalAttempts', 'additionalTimeMs', 'reason', 'ownerAuthorizationPath', 'acceptedRevisionPath'].includes(key)) || value.schemaVersion !== 1 || typeof value.databasePath !== 'string' || !isAbsolute(value.databasePath) || !existsSync(value.databasePath) || value.ownerAuthorizationPath !== undefined && (typeof value.ownerAuthorizationPath !== 'string' || !isAbsolute(value.ownerAuthorizationPath)) || !Number.isSafeInteger(value.issueId) || value.issueId < 1) throw new Error('Invalid owner resume request.');
   if (value.acceptedRevisionPath !== undefined && (typeof value.acceptedRevisionPath !== 'string' || !isAbsolute(value.acceptedRevisionPath))) throw new Error('Invalid accepted revision path.');
-  validateOwnerGrant({ ...value, fromRunId: 'validation' });
+  if (value.acceptedRevisionPath) validateOwnerGrant({ ...value, fromRunId: 'validation' });
+  else validateOwnerBudgetRequest({ ...value, fromRunId: 'validation' });
+  const remainingBudget = value.additionalAttempts === 0 && value.additionalTimeMs === 0;
   const request: ResumeRequest = { schemaVersion: 1, requestId: value.requestId, databasePath: resolveDatabasePath(value.databasePath), issueId: value.issueId, additionalAttempts: value.additionalAttempts, additionalTimeMs: value.additionalTimeMs, reason: value.reason, ...(value.ownerAuthorizationPath ? { ownerAuthorizationPath: value.ownerAuthorizationPath } : {}), ...(value.acceptedRevisionPath ? { acceptedRevisionPath: value.acceptedRevisionPath } : {}) };
   const evidenceRoot = join(dirname(request.databasePath), 'evidence');
   const directory = join(evidenceRoot, 'owner-resumes', request.requestId);
@@ -102,6 +104,12 @@ export async function ownerResume(input: unknown, options: { agent?: Agent; vali
       const ledger = readJson(join(evidenceRoot, 'budgets', `${digest(`repo-${repo.id}:issue-${issue.id}`)}.json`)) as Parameters<typeof validateRevisionBudget>[0];
       validateRevisionBudget(ledger, task, { requestId: request.requestId, fromRunId: predecessor.id, additionalAttempts: request.additionalAttempts, additionalTimeMs: request.additionalTimeMs, reason: request.reason });
     }
+    if (!job && !revision) {
+      const checkpointPath = join(predecessor.evidencePath, 'checkpoint.json');
+      const accepted = existsSync(checkpointPath) && (readJson(checkpointPath) as { accepted?: boolean }).accepted === true;
+      const checkpoint = accepted ? loadCheckpoint(predecessor.evidencePath, evidenceRoot, task, environmentIdentity(repo.path, engineRoot)) : undefined;
+      assertRemainingExecutionBudget(evidenceRoot, `repo-${repo.id}:issue-${issue.id}`, task, Boolean(checkpoint && !checkpoint.pendingRegression), { requestId: request.requestId, fromRunId: predecessor.id, additionalAttempts: request.additionalAttempts, additionalTimeMs: request.additionalTimeMs, reason: request.reason });
+    }
     if (options.validateOnly) return { requestId: request.requestId, status: 'valid', jobId: job?.id, runId: job?.runId ?? undefined };
     if (options.signal?.aborted) throw new Error('Owner continuation cancelled before admission.');
     if (!journal) {
@@ -115,7 +123,7 @@ export async function ownerResume(input: unknown, options: { agent?: Agent; vali
       const key = `repo-${repo.id}:issue-${issue.id}`;
       const ledger = readJson(join(evidenceRoot, 'budgets', `${digest(key)}.json`)) as { active?: unknown };
       if (ledger.active) executionBudget(evidenceRoot, key, task, `settle-${request.requestId}`).close();
-      grantExecutionBudget(evidenceRoot, key, task, { requestId: request.requestId, fromRunId: predecessor.id, additionalAttempts: request.additionalAttempts, additionalTimeMs: request.additionalTimeMs, reason: request.reason });
+      if (!remainingBudget) grantExecutionBudget(evidenceRoot, key, task, { requestId: request.requestId, fromRunId: predecessor.id, additionalAttempts: request.additionalAttempts, additionalTimeMs: request.additionalTimeMs, reason: request.reason });
       job = store.work.startIssue(issue.id, request.requestId);
       journal.jobId = job.id;
       writeJson(journalPath, journal);
