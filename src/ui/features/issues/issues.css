@@ -42,7 +42,6 @@
   .toolbar-selects { gap: var(--space-md); width: 100%; }
   .select-field { flex: 1 1 0; min-width: 0; }
   .select-field .dropdown { width: 100%; max-width: 100%; }
-  .select-field .dropdown-trigger { font-size: var(--font-size-12); padding-inline: var(--space-md); }
   .select-field > span { display: none; }
   .issue-row { padding: var(--space-xl) var(--space-3xl); gap: var(--space-md) var(--space-lg-plus); min-height: 110px; }
   .issue-list { max-height: clamp(180px, 32dvh, 320px); }

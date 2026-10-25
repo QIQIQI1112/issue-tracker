@@ -19,6 +19,7 @@ export function Dropdown({ value, onChange, children, 'aria-label': name }: Prop
   const id = useId();
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [activeValue, setActiveValue] = useState<string | null>(null);
   const [placement, setPlacement] = useState<CSSProperties>({});
@@ -32,18 +33,23 @@ export function Dropdown({ value, onChange, children, 'aria-label': name }: Prop
     if (!open) return;
     const place = () => {
       const rect = trigger.current?.getBoundingClientRect();
-      if (!rect) return;
+      const menu = panel.current;
+      if (!rect || !menu) return;
       const viewport = window.visualViewport;
       const leftEdge = (viewport?.offsetLeft ?? 0) + 8;
       const topEdge = (viewport?.offsetTop ?? 0) + 8;
       const rightEdge = leftEdge + (viewport?.width ?? window.innerWidth) - 16;
       const bottomEdge = topEdge + (viewport?.height ?? window.innerHeight) - 16;
-      const width = Math.max(1, Math.min(Math.max(rect.width, 240), rightEdge - leftEdge));
-      const below = Math.max(0, bottomEdge - rect.bottom - 4);
-      const above = Math.max(0, rect.top - topEdge - 4);
+      const maxWidth = Math.max(1, Math.min(320, rightEdge - leftEdge));
+      const minWidth = Math.min(192, maxWidth);
+      menu.style.minWidth = `${minWidth}px`;
+      menu.style.maxWidth = `${maxWidth}px`;
+      const width = Math.max(minWidth, Math.min(menu.getBoundingClientRect().width, maxWidth));
+      const below = Math.max(0, bottomEdge - rect.bottom - 8);
+      const above = Math.max(0, rect.top - topEdge - 8);
       const upwards = below < 180 && above > below;
-      const maxHeight = Math.max(1, Math.min(320, bottomEdge - topEdge, upwards ? above : below));
-      setPlacement({ width, maxWidth: Math.max(1, rightEdge - leftEdge), maxHeight, left: Math.max(leftEdge, Math.min(rect.left, rightEdge - width)), ...(upwards ? { bottom: window.innerHeight - Math.min(bottomEdge, rect.top - 4) } : { top: Math.max(topEdge, Math.min(rect.bottom + 4, bottomEdge - maxHeight)) }) });
+      const maxHeight = Math.max(1, Math.min(384, bottomEdge - topEdge, upwards ? above : below));
+      setPlacement({ minWidth, maxWidth, maxHeight, left: Math.max(leftEdge, Math.min(rect.left, rightEdge - width)), ...(upwards ? { bottom: window.innerHeight - Math.min(bottomEdge, rect.top - 8) } : { top: Math.max(topEdge, Math.min(rect.bottom + 8, bottomEdge - maxHeight)) }) });
     };
     place();
     window.addEventListener('resize', place);
@@ -56,7 +62,7 @@ export function Dropdown({ value, onChange, children, 'aria-label': name }: Prop
       window.visualViewport?.removeEventListener('resize', place);
       window.visualViewport?.removeEventListener('scroll', place);
     };
-  }, [open]);
+  }, [open, children]);
 
   useEffect(() => {
     if (!open) return;
@@ -78,7 +84,7 @@ export function Dropdown({ value, onChange, children, 'aria-label': name }: Prop
     trigger.current?.focus({ preventScroll: true });
     onChange(option.value);
   };
-  const row = (option: Option, index: number) => <div key={option.value} id={optionId(index)} role="option" aria-selected={option.value === value} data-active={option === active} className="dropdown-option" onMouseDown={event => event.preventDefault()} onPointerMove={() => setActiveValue(option.value)} onClick={() => commit(option)}>{option.label}</div>;
+  const row = (option: Option, index: number) => <div key={option.value} id={optionId(index)} role="option" aria-selected={option.value === value} data-active={option === active} className="dropdown-option" onMouseDown={event => event.preventDefault()} onPointerMove={() => setActiveValue(option.value)} onClick={() => commit(option)}><span className="dropdown-value">{option.label}</span>{option.value === value && <Icon name="check" className="dropdown-check" />}</div>;
   const groups: { label?: string; rows: ReactNode[] }[] = [];
   options.forEach((option, index) => {
     if (!groups.length || groups[groups.length - 1].label !== option.group) groups.push({ label: option.group, rows: [] });
@@ -97,7 +103,7 @@ export function Dropdown({ value, onChange, children, 'aria-label': name }: Prop
       const index = options.indexOf(active);
       const next = event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1 : Math.max(0, Math.min(options.length - 1, index + (event.key === 'ArrowDown' ? 1 : -1)));
       setActiveValue(options[next]?.value ?? null);
-    }}><span className="dropdown-value">{selected?.label ?? (value || 'No options')}</span><Icon name="chevron" className="dropdown-chevron" /></button>
-    {open && <div id={`${id}-listbox`} role="listbox" aria-label={name} className="dropdown-panel" style={placement}>{groups.map((group, index) => group.label ? <div key={index} role="group" aria-label={group.label}><div className="dropdown-group-label" aria-hidden="true">{group.label}</div>{group.rows}</div> : group.rows)}{!options.length && <div className="dropdown-empty">No options available</div>}</div>}
+    }}><span className="dropdown-value">{selected?.label ?? (value || 'No options')}</span><Icon name="chevronDown" className="dropdown-chevron" /></button>
+    {open && <div ref={panel} id={`${id}-listbox`} role="listbox" aria-label={name} className="dropdown-panel" style={placement}>{groups.map((group, index) => group.label ? <div key={index} role="group" aria-label={group.label}><div className="dropdown-group-label" aria-hidden="true">{group.label}</div>{group.rows}</div> : group.rows)}{!options.length && <div className="dropdown-empty">No options available</div>}</div>}
   </div>;
 }
