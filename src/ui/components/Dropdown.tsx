@@ -2,20 +2,20 @@ import { Children, isValidElement, useEffect, useId, useLayoutEffect, useRef, us
 import type { CSSProperties, ReactNode } from 'react';
 import { Icon } from './Icon.tsx';
 
-type Option = { value: string; label: ReactNode; group?: string; disabled: boolean };
-type NativeOption = { value?: string; children?: ReactNode; label?: string; disabled?: boolean };
-type Props = { value: string; onChange: (value: string) => void; children?: ReactNode; 'aria-label': string; disabled?: boolean };
+type Option = { value: string; label: ReactNode; group?: string };
+type NativeOption = { value?: string; children?: ReactNode; label?: string };
+type Props = { value: string; onChange: (value: string) => void; children?: ReactNode; 'aria-label': string };
 
-function readOptions(children: ReactNode, group?: string, disabled = false): Option[] {
+function readOptions(children: ReactNode, group?: string): Option[] {
   return Children.toArray(children).flatMap(child => {
     if (!isValidElement<NativeOption>(child)) return [];
-    if (child.type === 'optgroup') return readOptions(child.props.children, child.props.label, disabled || Boolean(child.props.disabled));
+    if (child.type === 'optgroup') return readOptions(child.props.children, child.props.label);
     if (child.type !== 'option') return [];
-    return [{ value: String(child.props.value ?? child.props.children ?? ''), label: child.props.children, group, disabled: disabled || Boolean(child.props.disabled) }];
+    return [{ value: String(child.props.value ?? child.props.children ?? ''), label: child.props.children, group }];
   });
 }
 
-export function Dropdown({ value, onChange, children, 'aria-label': name, disabled = false }: Props) {
+export function Dropdown({ value, onChange, children, 'aria-label': name }: Props) {
   const id = useId();
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -24,14 +24,12 @@ export function Dropdown({ value, onChange, children, 'aria-label': name, disabl
   const [placement, setPlacement] = useState<CSSProperties>({});
   const options = readOptions(children);
   const selected = options.find(option => option.value === value);
-  const enabled = options.filter(option => !option.disabled);
-  const active = enabled.find(option => option.value === activeValue) ?? enabled.find(option => option.value === value) ?? enabled[0];
+  const active = options.find(option => option.value === activeValue) ?? selected ?? options[0];
   const activeIndex = options.findIndex(option => option === active);
-  const expanded = open && !disabled;
   const optionId = (index: number) => `${id}-option-${index}`;
 
   useLayoutEffect(() => {
-    if (!expanded) return;
+    if (!open) return;
     const place = () => {
       const rect = trigger.current?.getBoundingClientRect();
       if (!rect) return;
@@ -58,29 +56,29 @@ export function Dropdown({ value, onChange, children, 'aria-label': name, disabl
       window.visualViewport?.removeEventListener('resize', place);
       window.visualViewport?.removeEventListener('scroll', place);
     };
-  }, [expanded]);
+  }, [open]);
 
   useEffect(() => {
-    if (!expanded) return;
+    if (!open) return;
     const dismiss = (event: PointerEvent) => {
       if (event.target instanceof Node && !root.current?.contains(event.target)) setOpen(false);
     };
     document.addEventListener('pointerdown', dismiss, true);
     return () => document.removeEventListener('pointerdown', dismiss, true);
-  }, [expanded]);
+  }, [open]);
 
   useEffect(() => {
-    if (expanded && activeIndex >= 0) document.getElementById(`${id}-option-${activeIndex}`)?.scrollIntoView({ block: 'nearest' });
-  }, [expanded, activeIndex, id]);
+    if (open && activeIndex >= 0) document.getElementById(`${id}-option-${activeIndex}`)?.scrollIntoView({ block: 'nearest' });
+  }, [open, activeIndex, id]);
 
-  const show = () => { setActiveValue(selected && !selected.disabled ? selected.value : enabled[0]?.value ?? null); setOpen(true); };
+  const show = () => { setActiveValue(selected?.value ?? options[0]?.value ?? null); setOpen(true); };
   const commit = (option: Option | undefined) => {
-    if (!option || option.disabled) return;
+    if (!option) return;
     setOpen(false);
     trigger.current?.focus({ preventScroll: true });
     onChange(option.value);
   };
-  const row = (option: Option, index: number) => <div key={option.value} id={optionId(index)} role="option" aria-selected={option.value === value} aria-disabled={option.disabled || undefined} data-active={option === active} className="dropdown-option" onMouseDown={event => event.preventDefault()} onPointerMove={() => { if (!option.disabled) setActiveValue(option.value); }} onClick={() => commit(option)}>{option.label}</div>;
+  const row = (option: Option, index: number) => <div key={option.value} id={optionId(index)} role="option" aria-selected={option.value === value} data-active={option === active} className="dropdown-option" onMouseDown={event => event.preventDefault()} onPointerMove={() => setActiveValue(option.value)} onClick={() => commit(option)}>{option.label}</div>;
   const groups: { label?: string; rows: ReactNode[] }[] = [];
   options.forEach((option, index) => {
     if (!groups.length || groups[groups.length - 1].label !== option.group) groups.push({ label: option.group, rows: [] });
@@ -88,18 +86,18 @@ export function Dropdown({ value, onChange, children, 'aria-label': name, disabl
   });
 
   return <div className="dropdown" ref={root} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false); }}>
-    <select className="dropdown-backing" hidden aria-hidden={true} tabIndex={-1} aria-label={name} value={value} disabled={disabled} onChange={event => onChange(event.currentTarget.value)}>{children}</select>
-    <button ref={trigger} type="button" className="dropdown-trigger" role="combobox" aria-label={name} aria-haspopup="listbox" aria-expanded={expanded} aria-controls={`${id}-listbox`} aria-activedescendant={expanded && activeIndex >= 0 ? optionId(activeIndex) : undefined} disabled={disabled} onClick={() => { if (expanded) setOpen(false); else show(); }} onKeyDown={event => {
-      if (event.key === 'Escape' && expanded) { event.preventDefault(); event.stopPropagation(); setOpen(false); return; }
+    <select className="dropdown-backing" hidden aria-hidden={true} tabIndex={-1} aria-label={name} value={value} onChange={event => onChange(event.currentTarget.value)}>{children}</select>
+    <button ref={trigger} type="button" className="dropdown-trigger" role="combobox" aria-label={name} aria-haspopup="listbox" aria-expanded={open} aria-controls={`${id}-listbox`} aria-activedescendant={open && activeIndex >= 0 ? optionId(activeIndex) : undefined} onClick={() => { if (open) setOpen(false); else show(); }} onKeyDown={event => {
+      if (event.key === 'Escape' && open) { event.preventDefault(); event.stopPropagation(); setOpen(false); return; }
       if (event.key === 'Tab') { setOpen(false); return; }
-      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); if (expanded) commit(active); else show(); return; }
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); if (open) commit(active); else show(); return; }
       if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
       event.preventDefault();
-      if (!expanded) { show(); if (event.key === 'Home' || event.key === 'End') setActiveValue((event.key === 'Home' ? enabled[0] : enabled.at(-1))?.value ?? null); return; }
-      const index = enabled.indexOf(active);
-      const next = event.key === 'Home' ? 0 : event.key === 'End' ? enabled.length - 1 : Math.max(0, Math.min(enabled.length - 1, index + (event.key === 'ArrowDown' ? 1 : -1)));
-      setActiveValue(enabled[next]?.value ?? null);
+      if (!open) { show(); if (event.key === 'Home' || event.key === 'End') setActiveValue((event.key === 'Home' ? options[0] : options.at(-1))?.value ?? null); return; }
+      const index = options.indexOf(active);
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1 : Math.max(0, Math.min(options.length - 1, index + (event.key === 'ArrowDown' ? 1 : -1)));
+      setActiveValue(options[next]?.value ?? null);
     }}><span className="dropdown-value">{selected?.label ?? (value || 'No options')}</span><Icon name="chevron" className="dropdown-chevron" /></button>
-    {expanded && <div id={`${id}-listbox`} role="listbox" aria-label={name} className="dropdown-panel" style={placement}>{groups.map((group, index) => group.label ? <div key={index} role="group" aria-label={group.label}><div className="dropdown-group-label" aria-hidden="true">{group.label}</div>{group.rows}</div> : group.rows)}{!options.length && <div className="dropdown-empty">No options available</div>}</div>}
+    {open && <div id={`${id}-listbox`} role="listbox" aria-label={name} className="dropdown-panel" style={placement}>{groups.map((group, index) => group.label ? <div key={index} role="group" aria-label={group.label}><div className="dropdown-group-label" aria-hidden="true">{group.label}</div>{group.rows}</div> : group.rows)}{!options.length && <div className="dropdown-empty">No options available</div>}</div>}
   </div>;
 }

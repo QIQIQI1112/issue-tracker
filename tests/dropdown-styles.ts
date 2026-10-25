@@ -65,9 +65,9 @@ export function length(value: string | undefined, total: number, fixture: Fixtur
   if (!/^[\d.\s,+*/()-]*(?:(?:min|max|clamp)[\d.\s,+*/()-]*)*$/.test(value)) return NaN;
   return Function('min', 'max', 'clamp', `return (${value})`)(Math.min, Math.max, (low: number, middle: number, high: number) => Math.max(low, Math.min(high, middle))) as number;
 }
-export function effective(node: Host, property: string, state: State = {}): string {
-  const value = declarations(node, state)[property];
+export function effective(node: Host, property: string): string {
+  const value = declarations(node)[property];
   if (value && value !== 'inherit') return value;
-  return node.parentElement ? effective(node.parentElement, property, state) : '';
+  return node.parentElement ? effective(node.parentElement, property) : '';
 }
 
