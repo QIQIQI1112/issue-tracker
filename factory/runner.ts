@@ -4,7 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parsePlan, parseTask, parseReview, parseWorkerReport, parseRegressionReport, ReviewResponseFormatError } from './contracts.ts';
 import type { Review } from './contracts.ts';
-import { completeVerification, parseVerification, parseVerificationContract, readJson, snapshot, writeJson } from './evidence.ts';
+import { completeVerification, inspectNamedNodeReport, parseVerification, parseVerificationContract, readJson, snapshot, writeJson } from './evidence.ts';
 import { trustedVerifier } from './verifier.ts';
 import { runProcess } from './process.ts';
 import { allocatePorts, git, prepareWorkspace, processEnvironment } from './workspace.ts';
@@ -305,13 +305,8 @@ export async function runController(options: { repository: string; task: unknown
           const result = await runProcess({ command: process.execPath, args: ['--import', 'tsx', '--test', `--test-name-pattern=^${escaped}$`, `--test-reporter=${join(trustedRoot, 'factory/node-reporter.mjs')}`, `--test-reporter-destination=${reportPath}`, check.file], cwd: state.workspace, env, logPath, timeoutMs: Math.min(30000, remaining()), signal: cancelled.signal });
           enforce(true);
           if (result.error || result.settled !== true) throw new Error(`Initial behavior proof ownership is unsafe: ${result.error ?? result.status}`);
-          const records = readFileSync(reportPath, 'utf8').trim().split('\n').map(line => JSON.parse(line));
-          const isAssertion = (error: Record<string, unknown> | undefined): boolean => Boolean(error && (error.name === 'AssertionError' || error.code === 'ERR_ASSERTION' || isAssertion(error.cause as Record<string, unknown> | undefined)));
-          const failed = records.some(event => event.type === 'test:fail' && event.data.name === check.title && isAssertion(event.data.details?.error));
-          const passed = records.some(event => event.type === 'test:pass' && event.data.name === check.title && !event.data.skip && !event.data.todo);
-          if (result.status === 'passed' && passed) state.redChecks.push({ ...check, status: 'already_passed', logPath, reportPath });
-          else if (result.status === 'failed' && failed) state.redChecks.push({ ...check, status: 'expected_failure', logPath, reportPath });
-          else throw new Error(`Red check did not establish a named behavior assertion: ${check.file}#${check.title}`);
+          if ((result.status !== 'passed' && result.status !== 'failed') || result.signal !== null || result.exitCode === null) throw new Error(`Initial behavior proof verification process ${result.status}: ${check.file}#${check.title}`);
+          state.redChecks.push({ ...check, status: inspectNamedNodeReport(reportPath, check, state.workspace, result.status), logPath, reportPath });
           save();
         }
         if (reuse) {

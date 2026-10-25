@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { lstatSync, readFileSync, readdirSync, readlinkSync, renameSync, writeFileSync } from 'node:fs';
+import { lstatSync, readFileSync, readdirSync, readlinkSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 export function writeJson(path: string, value: unknown): void {
@@ -69,15 +69,44 @@ export function parseVerificationContract(input: unknown): VerificationContract 
   return { schemaVersion: 2, profile: 'code-only', requiredBrowserTests: [], requiredNodeTests };
 }
 
-export function inspectNodeReport(path: string, required: RequiredCase[] = []): { passed: number; required: number } {
+type NodeCase = { type: 'test:pass' | 'test:fail'; data: { name: string; file: string; details: { type: 'test'; error?: Record<string, unknown> } } };
+
+function readNodeReport(path: string): { cases: NodeCase[]; passed: number; failed: number } {
   const records = readFileSync(path, 'utf8').trim().split('\n').map(line => JSON.parse(line));
-  const summary = records.filter(item => item.type === 'test:summary').at(-1)?.data;
+  const summary = records.filter(item => item.type === 'test:summary' && !item.data?.file).at(-1)?.data;
   const counts = summary?.counts ?? summary;
-  if (!counts || !Number.isInteger(counts.tests) || counts.tests < 1 || counts.passed !== counts.tests) throw new Error('Node report has no complete passing summary.');
-  for (const name of ['failed', 'cancelled', 'skipped', 'todo']) if (counts[name] !== 0) throw new Error(`Node report contains ${name} tests.`);
-  for (const item of required) {
-    const passed = records.some(event => event.type === 'test:pass' && event.data.name === item.title && !event.data.skip && !event.data.todo && typeof event.data.file === 'string' && event.data.file.replaceAll('\\', '/').endsWith(`/${item.file}`));
-    if (!passed) throw new Error(`Missing required Node case: ${item.file}#${item.title}`);
+  if (!counts || !['tests', 'passed', 'failed', 'cancelled', 'skipped', 'todo'].every(name => Number.isSafeInteger(counts[name]) && counts[name] >= 0) || counts.tests < 1) throw new Error('Node report has no complete summary.');
+  for (const name of ['cancelled', 'skipped', 'todo']) if (counts[name] !== 0) throw new Error(`Node report contains ${name} tests.`);
+  const outcomes = records.filter(item => item.type === 'test:pass' || item.type === 'test:fail');
+  if (outcomes.some(item => !item.data || !['test', 'suite'].includes(item.data.details?.type) || item.data.skip || item.data.todo)) throw new Error('Node report contains invalid, skipped or todo outcomes.');
+  const cases: NodeCase[] = outcomes.filter(item => item.data.details.type === 'test');
+  if (cases.some(item => typeof item.data.name !== 'string' || typeof item.data.file !== 'string')) throw new Error('Node report contains an invalid case identity.');
+  const passed = cases.filter(item => item.type === 'test:pass').length;
+  const failed = cases.length - passed;
+  if (counts.tests !== cases.length || counts.passed !== passed || counts.failed !== failed || counts.tests !== passed + failed || (summary.success !== undefined && summary.success !== (failed === 0)) || (failed === 0 && outcomes.some(item => item.type === 'test:fail'))) throw new Error('Node report summary does not match case outcomes.');
+  return { cases, passed, failed };
+}
+
+export function inspectNamedNodeReport(path: string, check: RequiredCase, cwd: string, status: 'passed' | 'failed'): 'already_passed' | 'expected_failure' {
+  try {
+    const report = readNodeReport(path);
+    const item = report.cases[0];
+    if (report.cases.length !== 1 || item.data.name !== check.title || item.data.file !== realpathSync(resolve(cwd, check.file))) throw new Error('Expected one unambiguous exact file/title case.');
+    if (status === 'passed' && item.type === 'test:pass') return 'already_passed';
+    const isAssertion = (error: Record<string, unknown> | undefined): boolean => Boolean(error && (error.name === 'AssertionError' || error.code === 'ERR_ASSERTION' || isAssertion(error.cause as Record<string, unknown> | undefined)));
+    if (status === 'failed' && item.type === 'test:fail' && isAssertion(item.data.details.error)) return 'expected_failure';
+    throw new Error('Process outcome and named behavior assertion do not agree.');
+  } catch (error) {
+    throw new Error(`Named Node proof verification failed to establish a named behavior assertion for ${check.file}#${check.title}: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
   }
-  return { passed: counts.passed, required: required.length };
+}
+
+export function inspectNodeReport(path: string, required: RequiredCase[] = []): { passed: number; required: number } {
+  const report = readNodeReport(path);
+  if (report.failed !== 0) throw new Error('Node report contains failed tests.');
+  for (const item of required) {
+    const matches = report.cases.filter(event => event.data.name === item.title && event.data.file.replaceAll('\\', '/').endsWith(`/${item.file}`));
+    if (matches.length !== 1) throw new Error(`Missing required Node case or ambiguous identity: ${item.file}#${item.title}`);
+  }
+  return { passed: report.passed, required: required.length };
 }
