@@ -1,15 +1,17 @@
+import { prepareAcceptedRevision } from './owner-revision.ts';
+import type { AcceptedRevision } from './owner-revision.ts';
 import { randomUUID } from 'node:crypto';
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync, lstatSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parsePlan, parseTask, parseReview, parseWorkerReport, parseRegressionReport, ReviewResponseFormatError } from './contracts.ts';
 import type { Review } from './contracts.ts';
-import { completeVerification, parseVerification, parseVerificationContract, readJson, snapshot, writeJson } from './evidence.ts';
+import { completeVerification, inspectNamedNodeReport, parseVerification, parseVerificationContract, readJson, snapshot, writeJson } from './evidence.ts';
 import { trustedVerifier } from './verifier.ts';
 import { runProcess } from './process.ts';
 import { allocatePorts, git, prepareWorkspace, processEnvironment } from './workspace.ts';
 import { finishRunRecord } from './run-record.ts';
-import { digest, environmentIdentity, loadCheckpoint, restoreCheckpoint, saveCheckpoint } from './checkpoint.ts';
+import { digest, taskIdentity, environmentIdentity, loadCheckpoint, restoreCheckpoint, saveCheckpoint } from './checkpoint.ts';
 import { assertRunQuiescent, processIdentity } from './ownership.ts';
 import { executionBudget } from './budget.ts';
 import { enforceRegressionDraft, proveRegression } from './regression.ts';
@@ -29,7 +31,7 @@ import type { OwnerAuthorization } from './profiles.ts';
 class IntegrationRejected extends Error {}
 class FocusedFailureHold extends Error {}
 
-export async function runController(options: { repository: string; task: unknown; agent: Agent; baseRef?: string; evidenceRoot?: string; runId?: string; mergeTarget?: string; signal?: AbortSignal; resumeFrom?: string; budgetKey?: string; authority?: OwnerAuthorization }): Promise<ControllerState> {
+export async function runController(options: { repository: string; task: unknown; agent: Agent; baseRef?: string; evidenceRoot?: string; runId?: string; mergeTarget?: string; signal?: AbortSignal; resumeFrom?: string; budgetKey?: string; authority?: OwnerAuthorization; acceptedRevision?: AcceptedRevision }): Promise<ControllerState> {
   const task = parseTask(options.task, options.authority?.scope);
   const repository = resolve(options.repository);
   const runId = options.runId ?? `${task.id}-${randomUUID()}`;
@@ -76,6 +78,7 @@ export async function runController(options: { repository: string; task: unknown
     remaining();
     writeJson(join(runDirectory, 'controller-owner.json'), { pid: process.pid, identity: processIdentity(process.pid), runId });
     const environment = environmentIdentity(repository, engineRoot);
+    if (options.acceptedRevision && (!options.authority || !options.resumeFrom || resolve(options.acceptedRevision.directory) !== resolve(options.resumeFrom) || options.acceptedRevision.checkpoint.taskHash !== taskIdentity(task))) throw new Error('Accepted revision does not match the selected native continuation.');
     let restored: ReturnType<typeof loadCheckpoint> | undefined;
     if (options.resumeFrom) {
       if (dirname(resolve(options.resumeFrom)) !== dirname(resolve(runDirectory)) || resolve(options.resumeFrom) === resolve(runDirectory)) throw new Error('Resume predecessor must be an earlier sibling run in the owned evidence root.');
@@ -85,13 +88,13 @@ export async function runController(options: { repository: string; task: unknown
       try {
         const previous = readJson(join(options.resumeFrom, 'state.json')) as ControllerState;
         if (previous.cleanupSafe === false) throw new Error('Previous worker did not settle; owner cleanup is required.');
-        restored = loadCheckpoint(options.resumeFrom, options.evidenceRoot ?? join(repository, '.data', 'evidence'), task, environment);
+        restored = options.acceptedRevision?.checkpoint ?? loadCheckpoint(options.resumeFrom, options.evidenceRoot ?? join(repository, '.data', 'evidence'), task, environment);
         state.resume = { fromRunId: restored.runId, reused: false, reason: 'Validated accepted checkpoint metadata; source reconstruction is pending.' };
-      } catch (error) { state.resume = { ...state.resume, reused: false, reason: error instanceof Error ? error.message : String(error) }; }
+      } catch (error) { if (options.acceptedRevision) throw error; state.resume = { ...state.resume, reused: false, reason: error instanceof Error ? error.message : String(error) }; }
     }
     if (options.mergeTarget && git(repository, ['status', '--porcelain']).trim()) throw new Error('Automatic execution requires a clean repository. Commit or preserve local changes first.');
-    const workspace = prepareWorkspace(repository, runDirectory, restored?.baseCommit ?? options.baseRef ?? options.mergeTarget, restored ? false : !options.mergeTarget);
-    if (restored) {
+    const workspace = prepareWorkspace(repository, runDirectory, (options.acceptedRevision ? undefined : restored?.baseCommit) ?? options.baseRef ?? options.mergeTarget, restored ? false : !options.mergeTarget);
+    if (restored && !options.acceptedRevision) {
       git(workspace.path, ['read-tree', '--reset', '-u', restored.baselineTree]);
       workspace.baselineTree = restored.baselineTree;
     }
@@ -101,7 +104,11 @@ export async function runController(options: { repository: string; task: unknown
     env = processEnvironment({ API_PORT: apiPort, UI_PORT: uiPort, TEST_API_PORT: apiPort, TEST_UI_PORT: uiPort, DB_PATH: join(runDirectory, 'worker.sqlite'), INSTANCE_ID: runId, FACTORY_TASK_ID: task.id });
     const baseline = snapshot(state.workspace);
     writeJson(join(runDirectory, 'baseline.json'), baseline);
-    const guard = new ScopeGuard(state.workspace, task, baseline, options.authority);
+    if (options.acceptedRevision) {
+      const overlaps = prepareAcceptedRevision(options.acceptedRevision, state.workspace);
+      writeJson(join(runDirectory, 'accepted-revision.json'), { fromRunId: options.acceptedRevision.checkpoint.runId, bindings: options.acceptedRevision.bindings, overlaps });
+    }
+    const guard = new ScopeGuard(state.workspace, task, options.acceptedRevision ? snapshot(state.workspace) : baseline, options.authority);
     const { protectedFiles, originalChecks } = guard;
     let proofsComplete = false;
     const enforce = guard.enforce.bind(guard);
@@ -112,7 +119,7 @@ export async function runController(options: { repository: string; task: unknown
       return value;
     };
     checkpoint = () => { if (settled && !guard.draftingRegression) { enforce(!guard.frozen); saveCheckpoint(state, task, environment, guard.frozen && proofsComplete); } };
-    if (restored) {
+    if (restored && !options.acceptedRevision) {
       restoreCheckpoint(restored, options.resumeFrom!, state.workspace);
       state.plan = restored.plan!;
       state.regressions = restored.regressions ?? [];
@@ -135,6 +142,9 @@ export async function runController(options: { repository: string; task: unknown
       guard.freeze(); proofsComplete = true; enforce();
       writeJson(join(runDirectory, 'accepted-checks.json'), [...protectedFiles].map(([path, hash]) => ({ path, hash })));
       state.resume = { fromRunId: restored.runId, reused: true, reason: 'Reconstructed the original baseline and accepted draft; full verification and code review will run again.' }; save();
+    } else if (options.acceptedRevision) {
+      state.plan = restored!.plan!;
+      state.resume = { fromRunId: restored!.runId, reused: true, reason: 'Prepared retained scoped draft on the current target; approved replacements require fresh named proofs and independent complete-inventory approval.' };
     } else state.plan = parsePlan(await readonly('plan', 0), task);
     if (task.schemaVersion === 2) state.execution = { profile: 'adaptive-v2', coverageMode: state.plan.coverage!.mode, route: state.plan.coverage!.mode === 'reuse' ? 'light' : 'standard', reason: state.plan.coverage!.reason };
     writeJson(join(runDirectory, 'plan.json'), state.plan);
@@ -280,18 +290,20 @@ export async function runController(options: { repository: string; task: unknown
       state.pendingRegression = { review, receipt: state.reviewReceipts!.at(-1)! }; save();
       await regressionLoop();
     };
-    const reuse = state.execution?.coverageMode === 'reuse';
-    if (!restored) {
+    const reuse = !options.acceptedRevision && state.execution?.coverageMode === 'reuse';
+    if (!restored || options.acceptedRevision) {
       if (reuse) for (const check of [...state.plan.slices.flatMap(slice => slice.checks).map(check => check.file), ...state.plan.browserChecks.map(check => `acceptance/${check.file}`)]) if (!originalChecks.has(check)) throw new Error(`Baseline reuse requires existing named checks: ${check}`);
       let acceptanceFeedback = '';
       for (let number = 1; number <= task.budget.maxAttempts; number += 1) {
         if (!reuse) {
-        budget.consume('acceptance');
-        const testReport = parseWorkerReport(await invoke('tests', number - 1, acceptanceFeedback), task);
-        writeJson(join(runDirectory, 'test-report.json'), testReport);
-        writeJson(join(runDirectory, `test-report-${number}.json`), testReport);
-        if (testReport.blockers.length) throw new Error(testReport.blockers.join('\n'));
-        enforce(true);
+          budget.consume('acceptance');
+          if (!options.acceptedRevision) {
+            const testReport = parseWorkerReport(await invoke('tests', number - 1, acceptanceFeedback), task);
+            writeJson(join(runDirectory, 'test-report.json'), testReport);
+            writeJson(join(runDirectory, `test-report-${number}.json`), testReport);
+            if (testReport.blockers.length) throw new Error(testReport.blockers.join('\n'));
+            enforce(true);
+          }
         }
         state.redChecks = [];
         state.browserRedChecks = [];
@@ -305,13 +317,8 @@ export async function runController(options: { repository: string; task: unknown
           const result = await runProcess({ command: process.execPath, args: ['--import', 'tsx', '--test', `--test-name-pattern=^${escaped}$`, `--test-reporter=${join(trustedRoot, 'factory/node-reporter.mjs')}`, `--test-reporter-destination=${reportPath}`, check.file], cwd: state.workspace, env, logPath, timeoutMs: Math.min(30000, remaining()), signal: cancelled.signal });
           enforce(true);
           if (result.error || result.settled !== true) throw new Error(`Initial behavior proof ownership is unsafe: ${result.error ?? result.status}`);
-          const records = readFileSync(reportPath, 'utf8').trim().split('\n').map(line => JSON.parse(line));
-          const isAssertion = (error: Record<string, unknown> | undefined): boolean => Boolean(error && (error.name === 'AssertionError' || error.code === 'ERR_ASSERTION' || isAssertion(error.cause as Record<string, unknown> | undefined)));
-          const failed = records.some(event => event.type === 'test:fail' && event.data.name === check.title && isAssertion(event.data.details?.error));
-          const passed = records.some(event => event.type === 'test:pass' && event.data.name === check.title && !event.data.skip && !event.data.todo);
-          if (result.status === 'passed' && passed) state.redChecks.push({ ...check, status: 'already_passed', logPath, reportPath });
-          else if (result.status === 'failed' && failed) state.redChecks.push({ ...check, status: 'expected_failure', logPath, reportPath });
-          else throw new Error(`Red check did not establish a named behavior assertion: ${check.file}#${check.title}`);
+          if ((result.status !== 'passed' && result.status !== 'failed') || result.signal !== null || result.exitCode === null) throw new Error(`Initial behavior proof verification process ${result.status}: ${check.file}#${check.title}`);
+          state.redChecks.push({ ...check, status: inspectNamedNodeReport(reportPath, check, state.workspace, result.status), logPath, reportPath });
           save();
         }
         if (reuse) {
@@ -324,6 +331,7 @@ export async function runController(options: { repository: string; task: unknown
         writeJson(join(runDirectory, 'acceptance-review.json'), acceptanceReview);
         writeJson(join(runDirectory, `acceptance-review-${number}.json`), acceptanceReview);
         if (acceptanceReview.approved) break;
+        if (options.acceptedRevision) throw new Error('Approved test revision fresh coverage was rejected; a new owner decision is required.');
         acceptanceFeedback = `Independent acceptance review rejected the new checks: ${acceptanceReview.findings.join('\n')}\nRepair only the unapproved scoped checks. Preserve every original test byte, the plan, acceptance criteria, and implementation. All revised checks require fresh owner red proofs and another independent acceptance review.`;
         if (number === task.budget.maxAttempts) throw new Error(`Acceptance review attempt budget exhausted. ${acceptanceFeedback}`);
       }

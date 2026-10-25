@@ -1,0 +1,40 @@
+--- a/tests/remaining-budget-recovery.test.ts
++++ b/tests/remaining-budget-recovery.test.ts
+@@ -115,7 +115,7 @@
+     const agent = { run: async (input: Parameters<typeof delegate.run>[0]) => {
+       assert.equal(input.task.id, `issue-${fixture.issue.id}`, 'Selected-job continuation must not execute queued siblings.');
+       phases.push(input.phase);
+-      if (input.phase === 'implement') assert.equal(readFileSync(join(input.cwd, 'src/value.ts'), 'utf8'), "export const value = 'ready';\n", 'Native reconstruction retains the interrupted accepted draft.');
++      if (input.phase === 'implement' || input.phase === 'repair') assert.equal(readFileSync(join(input.cwd, 'src/value.ts'), 'utf8'), "export const value = 'ready';\n", 'Native reconstruction retains the interrupted accepted draft.');
+       return delegate.run(input);
+     } };
+     let result: Awaited<ReturnType<typeof ownerResume>> | undefined;
+@@ -131,7 +131,7 @@
+     assert.equal(state.integration.verification.status, 'passed');
+     assert.equal(state.integration.review.approved, true);
+     assert.equal(state.integration.commit, git(fixture.repository, ['rev-parse', 'main']).trim());
+-    assert.equal(phases.includes('implement'), true);
++    assert.equal(phases.some(phase => phase === 'implement' || phase === 'repair'), true);
+     assert.equal(phases.includes('review'), true);
+     assert.equal(phases.some(phase => ['plan', 'tests', 'acceptance-review'].includes(phase)), false);
+     assert.deepEqual(fixture.store.work.run(fixture.run.id), oldRun, 'Continuation preserves the actual interrupted run history.');
+--- a/tests/remaining-budget-maintenance.test.ts
++++ b/tests/remaining-budget-maintenance.test.ts
+@@ -66,7 +66,7 @@
+       assert.ok(claimed?.runId, 'Native maintenance claims before invoking any role.');
+       assert.deepEqual(input.authority, authority, 'Every continuation role retains original pinned authority.');
+       phases.push(input.phase);
+-      if (input.phase === 'implement') {
++      if (input.phase === 'implement' || input.phase === 'repair') {
+         assert.equal(readFileSync(join(input.cwd, 'factory/value.ts'), 'utf8'), "export const value = 'ready';\n");
+         return { schemaVersion: 1, taskId: input.task.id, summary: 'Retained the accepted ready draft.', blockers: [] };
+       }
+@@ -86,7 +86,7 @@
+     assert.deepEqual(task.budget, originalTask.budget);
+     assert.equal(state.resume.fromRunId, first.id);
+     assert.equal(state.resume.reused, true);
+-    assert.equal(phases.includes('implement'), true);
++    assert.equal(phases.some(phase => phase === 'implement' || phase === 'repair'), true);
+     assert.equal(phases.includes('review'), true);
+     assert.equal(phases.some(phase => ['plan', 'tests', 'acceptance-review'].includes(phase)), false);
+     assert.equal(state.integration.verification.status, 'passed');

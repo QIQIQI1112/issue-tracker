@@ -1,0 +1,116 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { IssueStore } from '../src/storage.ts';
+import { SerialQueue } from '../factory/queue.ts';
+import { ownerResume } from '../factory/owner-recovery.ts';
+import { maintenanceIdentity } from '../factory/maintenance.ts';
+import { digest, taskIdentity } from '../factory/checkpoint.ts';
+import { snapshot } from '../factory/evidence.ts';
+import { git, processEnvironment } from '../factory/workspace.ts';
+import { runProcess } from '../factory/process.ts';
+import type { Agent } from '../factory/controller.ts';
+import { fixtureAgent, fixtureRepository } from './helpers/factory-fixture.ts';
+import { evidenceDirectory } from './helpers/subprocess.ts';
+
+test('remaining-budget maintenance continuation delivers through pinned native verification review and integration', { timeout: 90000 }, async () => {
+  const root = evidenceDirectory('remaining-budget-maintenance');
+  const repository = fixtureRepository(join(root, 'repo'));
+  writeFileSync(join(repository, 'src/value.ts'), "export {value} from '../factory/value.ts';\n");
+  writeFileSync(join(repository, 'factory/value.ts'), "export const value = 'broken';\n");
+  writeFileSync(join(repository, 'factory/execution-policy.json'), JSON.stringify({ schemaVersion: 1, mode: 'adaptive-v2' }));
+  git(repository, ['add', '.']);
+  git(repository, ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@localhost', '-c', 'commit.gpgsign=false', 'commit', '-qm', 'Prepare bounded maintenance']);
+  const store = new IssueStore(join(root, 'state.sqlite'));
+  try {
+    const repo = store.work.addRepo({ name: 'Remaining maintenance', path: repository, targetBranch: 'main' });
+    const issue = store.create({ title: 'Ready maintenance', description: 'Return the ready value.', status: 'open', priority: 'medium', labels: [], work: { repoId: repo.id, requirementId: null, dependsOn: [], acceptance: ['The value is ready.'], changeKind: 'harness' } });
+    const job = store.work.startIssue(issue.id);
+    const engine = fileURLToPath(new URL('../', import.meta.url));
+    const authority = { schemaVersion: 1, requestId: randomUUID(), issueId: issue.id, issueHash: maintenanceIdentity(issue), profile: 'harness', scope: ['factory/value.ts'], authorization: 'Maintain the ready value under the original bounded authority.', engineSourceHash: snapshot(engine).hash, contractHash: digest(readFileSync(join(engine, 'factory/verification-contract.json'))), baseCommit: git(repository, ['rev-parse', 'main']).trim() };
+    const authorizationPath = join(root, 'authority.json');
+    writeFileSync(authorizationPath, JSON.stringify(authority));
+    const evidenceRoot = join(root, 'evidence');
+    const delegate = fixtureAgent();
+    const interrupted: Agent = { run: async input => {
+      if (input.phase === 'plan') return { schemaVersion: 2, taskId: input.task.id, coverage: { mode: 'reuse', reason: 'The frozen value check observes this maintenance.' }, assumptions: [], slices: [{ id: 'ready', goal: input.task.goal, acceptanceIds: input.task.acceptance.map(item => item.id), checks: [{ file: 'tests/value.test.ts', title: 'value is ready' }] }], browserChecks: [] };
+      if (input.phase === 'implement') {
+        writeFileSync(join(input.cwd, 'factory/value.ts'), "export const value = 'ready';\n");
+        throw new Error('Intentional settled maintenance interruption.');
+      }
+      return delegate.run(input);
+    } };
+    assert.equal(await new SerialQueue(store, { evidenceRoot, agent: interrupted, ownerAuthorizationPath: authorizationPath }).processNext(job.id), true);
+    const first = store.work.runs().find(run => run.jobId === job.id)!;
+    assert.equal(first.status, 'blocked', 'Fixture setup must settle a real authorized native interruption.');
+    assert.equal(existsSync(join(first.evidencePath, 'checkpoint.json')), true, `Fixture setup must reach frozen coverage before continuation: ${first.reason}`);
+    assert.equal(JSON.parse(readFileSync(join(first.evidencePath, 'checkpoint.json'), 'utf8')).accepted, true);
+    assert.equal(git(repository, ['rev-parse', 'main']).trim(), authority.baseCommit);
+    const originalTask = JSON.parse(readFileSync(join(first.evidencePath, 'task.json'), 'utf8'));
+    const ledgerPath = join(evidenceRoot, 'budgets', `${digest(`repo-${repo.id}:issue-${issue.id}`)}.json`);
+    const before = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+    const request = { schemaVersion: 1, requestId: randomUUID(), databasePath: store.path, issueId: issue.id, additionalAttempts: 0, additionalTimeMs: 0, reason: 'Continue within the original maintenance budget.', ownerAuthorizationPath: authorizationPath };
+    const requestPath = join(root, 'resume.json');
+    writeFileSync(requestPath, JSON.stringify(request));
+    const retained = readFileSync(ledgerPath, 'utf8');
+    const preview = await runProcess({ command: process.execPath, args: ['--import', 'tsx', resolve('factory/cli.ts'), 'owner-resume', requestPath, '--validate'], cwd: process.cwd(), env: processEnvironment({}), logPath: join(root, 'preview.log'), timeoutMs: 15000 });
+    assert.equal(preview.settled, true);
+    assert.equal(readFileSync(ledgerPath, 'utf8'), retained, 'CLI validation cannot write or grant budget.');
+    assert.equal(preview.status, 'passed', `The existing CLI must admit explicit zero/zero with original pinned authority. ${preview.output}`);
+    const phases: string[] = [];
+    const resumed: Agent = { run: async input => {
+      const claimed = store.work.jobs().find(item => item.issueId === issue.id && item.status === 'running');
+      assert.ok(claimed?.runId, 'Native maintenance claims before invoking any role.');
+      assert.deepEqual(input.authority, authority, 'Every continuation role retains original pinned authority.');
+      phases.push(input.phase);
+      if (input.phase === 'implement' || input.phase === 'repair') {
+        assert.equal(readFileSync(join(input.cwd, 'factory/value.ts'), 'utf8'), "export const value = 'ready';\n");
+        return { schemaVersion: 1, taskId: input.task.id, summary: 'Retained the accepted ready draft.', blockers: [] };
+      }
+      return delegate.run(input);
+    } };
+    const result = await ownerResume(request, { agent: resumed });
+    assert.equal(result.status, 'merged');
+    const run = store.work.run(result.runId!)!;
+    const state = JSON.parse(readFileSync(join(run.evidencePath, 'state.json'), 'utf8'));
+    const progress = JSON.parse(readFileSync(join(run.evidencePath, 'run-state.json'), 'utf8'));
+    const delivery = JSON.parse(readFileSync(join(run.evidencePath, 'delivery.json'), 'utf8'));
+    assert.equal(progress.profile, 'harness');
+    assert.deepEqual(progress.engine, { sourceHash: authority.engineSourceHash, contractHash: authority.contractHash });
+    assert.deepEqual(JSON.parse(readFileSync(join(run.evidencePath, 'owner-authorization.json'), 'utf8')), authority);
+    const task = JSON.parse(readFileSync(join(run.evidencePath, 'task.json'), 'utf8'));
+    assert.equal(taskIdentity(task), taskIdentity(originalTask));
+    assert.deepEqual(task.budget, originalTask.budget);
+    assert.equal(state.resume.fromRunId, first.id);
+    assert.equal(state.resume.reused, true);
+    assert.equal(phases.some(phase => phase === 'implement' || phase === 'repair'), true);
+    assert.equal(phases.includes('review'), true);
+    assert.equal(phases.some(phase => ['plan', 'tests', 'acceptance-review'].includes(phase)), false);
+    assert.equal(state.integration.verification.status, 'passed');
+    assert.equal(state.integration.review.approved, true);
+    const verification = JSON.parse(readFileSync(resolve(run.evidencePath, progress.proofs.verification.path), 'utf8'));
+    assert.equal(verification.runDirectory.startsWith(`${run.evidencePath}/`), true, 'Continuation must produce fresh verification inside its own run.');
+    assert.equal(verification.snapshot.hash, progress.sourceHash);
+    assert.deepEqual(verification.checks.map((gate: { name: string; status: string }) => [gate.name, gate.status]), [['lint', 'passed'], ['typecheck', 'passed'], ['test', 'passed'], ['build', 'passed']]);
+    assert.equal(delivery.status, 'merged');
+    assert.equal(delivery.integration.commit, git(repository, ['rev-parse', 'main']).trim());
+    assert.equal(delivery.review.approved, true);
+    assert.deepEqual(delivery.resume, state.resume);
+    assert.deepEqual(delivery.budget, state.budget);
+    assert.equal(delivery.efficiency.agentInvocations, phases.length);
+    assert.ok(delivery.phases.every((phase: { status: string; durationMs: number }) => phase.status !== 'running' && Number.isFinite(phase.durationMs) && phase.durationMs >= 0));
+    const after = JSON.parse(readFileSync(ledgerPath, 'utf8'));
+    assert.equal(after.implementationAttempts, before.implementationAttempts + 1);
+    assert.equal(after.acceptanceAttempts, before.acceptanceAttempts);
+    assert.ok(after.usedMs >= before.usedMs);
+    assert.deepEqual(after.ownerGrants, before.ownerGrants);
+    assert.equal(store.work.run(first.id)?.status, 'blocked');
+    assert.equal(store.get(issue.id)?.status, 'done');
+    const settled = { jobs: store.work.jobs(), runs: store.work.runs(), ledger: readFileSync(ledgerPath, 'utf8'), calls: [...phases] };
+    assert.deepEqual(await ownerResume(request, { agent: resumed }), result);
+    assert.deepEqual({ jobs: store.work.jobs(), runs: store.work.runs(), ledger: readFileSync(ledgerPath, 'utf8'), calls: phases }, settled);
+  } finally { store.close(); }
+});

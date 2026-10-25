@@ -1,3 +1,4 @@
+import type { AcceptedRevision } from './owner-revision.ts';
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
@@ -39,7 +40,7 @@ export function issueTask(store: IssueStore, issue: Issue, feedback = '', author
 export class SerialQueue {
   readonly evidenceRoot: string;
   private busy = false;
-  constructor(private store: IssueStore, private options: { evidenceRoot?: string; agent?: Agent; planner?: Planner; signal?: AbortSignal; github?: GitHubHost; publicationPollMs?: number; ownerAuthorizationPath?: string } = {}) {
+  constructor(private store: IssueStore, private options: { evidenceRoot?: string; agent?: Agent; planner?: Planner; signal?: AbortSignal; github?: GitHubHost; publicationPollMs?: number; ownerAuthorizationPath?: string; acceptedRevision?: AcceptedRevision } = {}) {
     this.evidenceRoot = resolve(options.evidenceRoot ?? join(dirname(store.path), 'evidence'));
     mkdirSync(this.evidenceRoot, { recursive: true });
   }
@@ -74,7 +75,7 @@ export class SerialQueue {
         const feedback = previous ? `\nPrevious blocked attempt, diagnostic context only: ${JSON.stringify({ runId: previous.id, ...(policy.mode === 'legacy-v1' ? { reason: previous.reason ?? null } : {}), reasonPath: join(previous.evidencePath, 'state.json'), deliveryPath: join(previous.evidencePath, 'delivery.json'), evidencePath: previous.evidencePath })}. Address the recorded failure without changing the original goal, criteria, or review gates.` : '';
         const task = issueTask(this.store, issue, feedback, authority);
         const execute = authority ? await supervisedRunner(run.evidencePath, authority) : runController;
-        const state = await execute({ repository: repo.path, task, agent: this.options.agent ?? codexAgent(process.env.FACTORY_CODEX_BIN ?? 'codex'), baseRef: targetBranch, mergeTarget: targetBranch, evidenceRoot: this.evidenceRoot, runId: run.id, signal: this.options.signal, resumeFrom: previous?.evidencePath, budgetKey: `repo-${repo.id}:issue-${issue.id}`, authority });
+        const state = await execute({ repository: repo.path, task, agent: this.options.agent ?? codexAgent(process.env.FACTORY_CODEX_BIN ?? 'codex'), baseRef: targetBranch, mergeTarget: targetBranch, evidenceRoot: this.evidenceRoot, runId: run.id, signal: this.options.signal, resumeFrom: previous?.evidencePath, budgetKey: `repo-${repo.id}:issue-${issue.id}`, authority, acceptedRevision: this.options.acceptedRevision });
         const report = readJson(join(run.evidencePath, 'delivery.json')) as Delivery;
         saveDelivery(run.evidencePath, { ...report, lifecycle: { profile: authority?.profile ?? 'feature', queuedAt: job.createdAt, claimedAt: run.startedAt, completedAt: state.completedAt!, queueWaitMs: Math.max(0, Date.parse(run.startedAt) - Date.parse(job.createdAt)), wallMs: Math.max(0, Date.parse(state.completedAt!) - Date.parse(run.startedAt)) } });
         this.store.work.finish(run.id, state.status === 'merged' ? 'merged' : 'blocked', state.reason ?? null);

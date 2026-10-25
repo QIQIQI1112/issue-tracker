@@ -7,8 +7,13 @@ import type { Task } from './contracts.ts';
 
 export type OwnerBudgetGrant = { requestId: string; fromRunId: string; additionalAttempts: number; additionalTimeMs: number; reason: string };
 type Ledger = { schemaVersion: 1; taskHash: string; usedMs: number; implementationAttempts: number; acceptanceAttempts: number; infrastructureRetries?: number; ownerGrants?: OwnerBudgetGrant[]; active?: { runId: string; reservedMs: number; startedAt: number } };
+export function validateOwnerBudgetRequest(grant: OwnerBudgetGrant): void {
+  if (!grant || typeof grant.requestId !== 'string' || !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(grant.requestId) || typeof grant.fromRunId !== 'string' || !grant.fromRunId.trim() || typeof grant.reason !== 'string' || !grant.reason.trim() || grant.reason.length > 2000 || !Number.isSafeInteger(grant.additionalAttempts) || grant.additionalAttempts < 0 || grant.additionalAttempts > 5 || !Number.isSafeInteger(grant.additionalTimeMs) || grant.additionalTimeMs < 0 || grant.additionalTimeMs > 3600000) throw new Error('Owner budget grant requires an explicit bounded allowance, identity and reason.');
+}
+
 export function validateOwnerGrant(grant: OwnerBudgetGrant): void {
-  if (!grant || typeof grant.requestId !== 'string' || !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(grant.requestId) || typeof grant.fromRunId !== 'string' || !grant.fromRunId.trim() || typeof grant.reason !== 'string' || !grant.reason.trim() || grant.reason.length > 2000 || !Number.isSafeInteger(grant.additionalAttempts) || grant.additionalAttempts < 0 || grant.additionalAttempts > 5 || !Number.isSafeInteger(grant.additionalTimeMs) || grant.additionalTimeMs < 0 || grant.additionalTimeMs > 3600000 || !(grant.additionalAttempts || grant.additionalTimeMs)) throw new Error('Owner budget grant requires an explicit bounded allowance, identity and reason.');
+  validateOwnerBudgetRequest(grant);
+  if (!(grant.additionalAttempts || grant.additionalTimeMs)) throw new Error('Owner budget grant requires an explicit bounded allowance, identity and reason.');
 }
 
 function limits(ledger: Ledger, task: Task) {
@@ -24,6 +29,38 @@ function limits(ledger: Ledger, task: Task) {
   }
   if (![maxAttempts, totalTimeoutMs].every(Number.isSafeInteger)) throw new Error('Owner grant limits overflow.');
   return { maxAttempts, totalTimeoutMs };
+}
+
+function reservedUsage(ledger: Ledger, totalTimeoutMs: number): number {
+  if (!ledger.active) return ledger.usedMs;
+  if (!Number.isSafeInteger(ledger.active.reservedMs) || ledger.active.reservedMs < 0 || ledger.active.reservedMs > totalTimeoutMs) throw new Error('Invalid crashed-phase budget reservation.');
+  return ledger.usedMs + ledger.active.reservedMs;
+}
+
+export function assertRemainingExecutionBudget(root: string, key: string, task: Task, acceptedChecks: boolean, request: OwnerBudgetGrant): void {
+  validateOwnerBudgetRequest(request);
+  const ledger = readJson(join(root, 'budgets', `${digest(key)}.json`)) as Ledger;
+  const usedMs = reservedUsage(ledger, limits(ledger, task).totalTimeoutMs);
+  if (request.additionalAttempts || request.additionalTimeMs) {
+    const previous = ledger.ownerGrants?.find(grant => grant.requestId === request.requestId);
+    if (previous && JSON.stringify(previous) !== JSON.stringify(request)) throw new Error('Owner grant request identity changed.');
+    if (!previous) ledger.ownerGrants = [...ledger.ownerGrants ?? [], request];
+  }
+  const effective = limits(ledger, task);
+  if (usedMs >= effective.totalTimeoutMs) throw new Error('Cumulative time budget exhausted.');
+  if (ledger.implementationAttempts >= effective.maxAttempts) throw new Error('Cumulative implementation attempt budget exhausted.');
+  if (!acceptedChecks && ledger.acceptanceAttempts >= effective.maxAttempts) throw new Error('Cumulative acceptance attempt budget exhausted.');
+}
+
+export function validateRevisionBudget(ledger: Ledger, task: Task, grant: OwnerBudgetGrant): void {
+  validateOwnerGrant(grant);
+  const effective = limits(ledger, task);
+  const previous = ledger.ownerGrants?.find(item => item.requestId === grant.requestId);
+  if (previous && JSON.stringify(previous) !== JSON.stringify(grant)) throw new Error('Owner grant request identity changed.');
+  const attempts = effective.maxAttempts + (previous ? 0 : grant.additionalAttempts);
+  const time = effective.totalTimeoutMs + (previous ? 0 : grant.additionalTimeMs);
+  if (![attempts, time].every(Number.isSafeInteger) || ledger.active && (!Number.isSafeInteger(ledger.active.reservedMs) || ledger.active.reservedMs < 0 || ledger.active.reservedMs > effective.totalTimeoutMs)) throw new Error('Revision continuation budget reservation is invalid.');
+  if (ledger.acceptanceAttempts >= attempts || ledger.implementationAttempts >= attempts || ledger.usedMs + (ledger.active?.reservedMs ?? 0) >= time) throw new Error('Revision continuation cumulative acceptance or implementation budget exhausted.');
 }
 
 export function grantExecutionBudget(root: string, key: string, task: Task, input: OwnerBudgetGrant): OwnerBudgetGrant {
@@ -56,10 +93,7 @@ export function executionBudget(root: string, key: string, task: Task, runId: st
     try { ledger = readJson(path) as Ledger; }
     catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; ledger = { schemaVersion: 1, taskHash: taskIdentity(task), usedMs: 0, implementationAttempts: 0, acceptanceAttempts: 0 }; }
     const effective = limits(ledger, task);
-    if (ledger.active) {
-      if (!Number.isSafeInteger(ledger.active.reservedMs) || ledger.active.reservedMs < 0 || ledger.active.reservedMs > effective.totalTimeoutMs) throw new Error('Invalid crashed-phase budget reservation.');
-      ledger.usedMs += ledger.active.reservedMs;
-    }
+    ledger.usedMs = reservedUsage(ledger, effective.totalTimeoutMs);
     if (ledger.infrastructureRetries !== undefined && (!Number.isSafeInteger(ledger.infrastructureRetries) || ledger.infrastructureRetries < 0 || ledger.infrastructureRetries > 1)) throw new Error('Infrastructure retry ledger is invalid.');
     const baseUsed = ledger.usedMs;
     const started = Date.now();
