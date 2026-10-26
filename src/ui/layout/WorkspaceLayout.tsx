@@ -32,7 +32,7 @@ export function WorkspaceLayout({ repos, repoFilter, selectedRepo, subview, regi
       </> : <>
         <header className="page-header"><div><h1>Repositories</h1></div><Button loading={registryLoading} onClick={refreshRepositories}><ToolbarIcon name="arrow" />{workbenchError ? 'Retry repositories' : 'Refresh repositories'}</Button></header>
         <section className="issue-panel" aria-label="Repository directory" aria-busy={registryLoading}>
-          {registryLoading ? <EmptyState title="Loading repositories…" loading role="status" /> : workbenchError ? <div role="alert"><EmptyState title="Repository metadata unavailable"><p>{workbenchError}</p></EmptyState></div> : repos.length ? <ul className="repository-directory">{repos.map(repo => <li key={repo.id}><ToolbarIcon name="database" /><div className="repository-context"><Button className="text-button" onClick={() => chooseRepository(String(repo.id))}>{repo.name}</Button><span>Repository #{repo.id} · {repo.path}</span></div></li>)}</ul> : <EmptyState title="No enrolled repositories" icon="database" />}
+          {registryLoading ? <EmptyState title="Loading repositories…" loading role="status" /> : workbenchError ? <div role="alert"><EmptyState title="Repository metadata unavailable"><p>{workbenchError}</p></EmptyState></div> : repos.length ? <ul className="repository-directory">{repos.map(repo => <li key={repo.id}><div className="repository-context"><Button className="text-button" onClick={() => chooseRepository(String(repo.id))}>{repo.name}</Button><span>Repository #{repo.id} · {repo.path}</span></div></li>)}</ul> : <EmptyState title="No enrolled repositories" icon="database" />}
         </section>
       </>}
     </div></main>
