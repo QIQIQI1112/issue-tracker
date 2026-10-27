@@ -1,10 +1,6 @@
 .workspace { height: 100dvh; min-height: 0; background: var(--frame); display: grid; grid-template-columns: 60px minmax(0, 1fr); grid-template-rows: 60px minmax(0, 1fr); overflow: hidden; transition: grid-template-columns 220ms cubic-bezier(0.22, 1, 0.36, 1); }
 .workspace[data-sidebar="expanded"] { grid-template-columns: 256px minmax(0, 1fr); }
-.global-topbar { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 32px; height: 60px; padding-inline: 12px; min-width: 0; }
-.brand { display: flex; gap: 12px; align-items: center; min-width: 0; }
-.brand-mark { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border: 1px solid var(--brand-border); border-radius: var(--radius-10); color: var(--brand-text); background: var(--brand-surface); font-size: var(--font-size-27); font-weight: var(--font-weight-medium); font-style: italic; }
-.brand strong { font-size: var(--font-size-19); font-weight: var(--font-weight-medium); letter-spacing: var(--tracking-brand); }
-.brand-description { color: var(--muted); font-size: var(--font-size-12); }
+.global-topbar { grid-column: 1 / -1; display: flex; align-items: center; justify-content: flex-end; gap: 32px; height: 60px; padding-inline: 12px; min-width: 0; }
 .sidebar { background: var(--frame); min-width: 0; min-height: 0; padding: 8px 12px 12px; display: flex; flex-direction: column; gap: 8px; font-family: var(--font-family-body); font-size: 14px; line-height: 20px; font-weight: 400; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 .sidebar nav { display: flex; align-items: flex-start; flex: 1; min-height: 0; min-width: 0; width: 100%; overflow: hidden; }
 .nav-button, .rail-toggle { position: relative; width: 100%; display: flex; gap: 8px; align-items: center; padding: 0 12px 0 6px; border-radius: 8px; text-align: left; color: var(--text-primary); background: transparent; min-height: 32px; margin-bottom: 2px; font-size: 14px; line-height: 20px; font-weight: 400; transition: padding 220ms cubic-bezier(0.22, 1, 0.36, 1), color 140ms cubic-bezier(0.4, 0, 0.2, 1), background-color 140ms cubic-bezier(0.4, 0, 0.2, 1); }
@@ -42,7 +38,7 @@
   .workspace-content { padding: 16px; }
 }
 @media (max-width: 600px) {
-  .brand-description, .breadcrumb-workspace { display: none; }
+  .breadcrumb-workspace { display: none; }
   .page-header { padding: 18px 0 16px; gap: 12px; align-items: flex-start; }
   .page-header p { font-size: var(--font-size-12); }
 }

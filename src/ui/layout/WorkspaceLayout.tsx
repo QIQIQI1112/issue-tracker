@@ -19,7 +19,7 @@ export function WorkspaceLayout({ repos, repoFilter, selectedRepo, subview, regi
   }
   return <div className="workspace" data-sidebar={expanded ? 'expanded' : 'collapsed'}>
     <a className="skip-link" href="#main-content">Skip to content</a>
-    <header className="global-topbar"><div className="brand"><span className="brand-mark" aria-hidden="true">l</span><strong>Loop</strong></div><UserMenu /></header>
+    <header className="global-topbar"><UserMenu /></header>
     <aside className="sidebar">
       <nav aria-label="Workspace views"><Button className="nav-button active" aria-label="Repositories" aria-pressed={true} aria-describedby={label ? tooltipId : undefined} onClick={() => chooseRepository('')} onFocus={event => reveal(event.currentTarget, 'Repositories')} onBlur={() => setLabel(null)} onMouseEnter={event => reveal(event.currentTarget, 'Repositories')} onMouseLeave={event => { if (event.currentTarget !== document.activeElement) setLabel(null); }} onKeyDown={event => { if (event.key === 'Escape') setLabel(null); }}><ToolbarIcon name="database" /><span className="nav-text">Repositories</span></Button></nav>
       <Button className="rail-toggle" aria-label={expanded ? 'Collapse navigation rail' : 'Expand navigation rail'} aria-expanded={expanded} onClick={() => { setExpanded(value => !value); setLabel(null); }}><ToolbarIcon name="chevrons" /></Button>
