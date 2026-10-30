@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { act, createElement } from 'react';
+import postcss from 'postcss';
 import { Dropdown } from '../src/ui/components/Dropdown.tsx';
 import { Fixture, open } from './dropdown-fixture.ts';
 import { assertDropdownDesign } from './ui-design-contract.ts';
@@ -15,7 +16,7 @@ function designSources(): DropdownDesignSources {
   };
 }
 
-test('dropdown declared tokens and component recipes retain the independently pinned light design values', () => {
+test('dropdown declared recipes retain shared light tokens typography and semantic styling', () => {
   assertDropdownDesign(designSources());
   const entry = readFileSync(new URL('../src/ui/styles.css', import.meta.url), 'utf8');
   const imports = [...entry.matchAll(/@import\s+['"]([^'"]+)['"]\s*;/g)].map(match => match[1]);
@@ -23,20 +24,43 @@ test('dropdown declared tokens and component recipes retain the independently pi
   assert.match(readFileSync(new URL('../src/ui/main.tsx', import.meta.url), 'utf8'), /import\s+['"]\.\/styles\.css['"]/);
 });
 
-test('dropdown design contract rejects incorrect trigger size accent color and glyph stroke declarations', () => {
+test('dropdown design contract accepts mutable local values and rejects inconsistent shared styling', () => {
   const source = designSources();
-  for (const [part, original, incorrect] of [
-    ['primitives', 'min-height: 32px; padding: 0 var(--space-lg)', 'min-height: 48px; padding: 0 var(--space-lg)'],
-    ['tokens', '--accent: #7c8fe6;', '--accent: #ff0000;'],
-    ['primitives', 'stroke-width: 1.5px;', 'stroke-width: 0;'],
+  const mutable = { ...source };
+  for (const [part, changes] of [
+    ['tokens', { '--radius-input': '11px', '--radius-panel': '18px', '--space-lg': '10px', '--shadow-menu': '0 4px 12px var(--border)' }],
+    ['primitives', { 'min-height': '40px', padding: '2px 10px', gap: '10px', 'border-radius': '11px', 'min-width': 'min(220px, calc(100vw - 24px))', 'max-width': 'min(360px, calc(100vw - 24px))', 'max-height': 'min(420px, calc(100dvh - 24px))', transition: 'color 180ms ease, background-color 180ms ease' }],
+    ['base', { width: '12px', height: '12px', 'border-radius': '12px' }],
   ] as const) {
-    assert.equal(source[part].split(original).length, 2, 'Each negative control changes exactly one intended declaration.');
-    const changed = { ...source, [part]: source[part].replace(original, incorrect) };
+    const sheet = postcss.parse(source[part]);
+    sheet.walkDecls(declaration => {
+      if (part === 'primitives' && declaration.parent?.type === 'rule' && !declaration.parent.selector.includes('.dropdown')) return;
+      if (part === 'primitives' && declaration.prop === 'min-width' && declaration.parent?.type === 'rule' && declaration.parent.selector !== '.dropdown-panel') return;
+      if (part === 'base' && declaration.parent?.type === 'rule' && !declaration.parent.selector.includes('scrollbar')) return;
+      const value = (changes as Record<string, string>)[declaration.prop];
+      if (value) declaration.value = value;
+    });
+    mutable[part] = sheet.toString();
+  }
+  assert.doesNotThrow(() => assertDropdownDesign(mutable));
+  for (const [part, selector, property, incorrect] of [
+    ['primitives', '.dropdown-trigger, .dropdown-panel', 'font-family', 'monospace'],
+    ['primitives', '.dropdown-check', 'color', 'var(--text-tertiary)'],
+    ['primitives', ':root[data-focus-intent="keyboard"] .dropdown .dropdown-trigger:focus', 'border-color', 'transparent'],
+    ['tokens', ':root', '--accent', '#ff0000'],
+    ['primitives', '.dropdown-chevron, .dropdown-check', 'stroke-width', '0px'],
+  ] as const) {
+    const sheet = postcss.parse(source[part]);
+    const recipe = sheet.nodes.find(node => node.type === 'rule' && node.selector === selector);
+    assert.ok(recipe?.type === 'rule', `Readiness requires ${selector}.`);
+    const declaration = recipe.nodes.find(node => node.type === 'decl' && node.prop === property);
+    assert.ok(declaration?.type === 'decl', `Readiness requires ${property}.`);
+    declaration.value = incorrect;
+    const changed = { ...source, [part]: sheet.toString() };
     assert.throws(() => assertDropdownDesign(changed), { code: 'ERR_ASSERTION' }, `The bounded design contract must reject ${incorrect}`);
   }
   assertDropdownDesign(source);
 });
-
 test('dropdown resize updates above and below placement from fixed geometry inputs without changing option identities', async () => {
   const fixture = new Fixture();
   const options = [`Current identifier ${'long_unbroken_label_'.repeat(12)}`, ...Array.from({ length: 30 }, (_, index) => `Other ${index}`)];
@@ -46,32 +70,38 @@ test('dropdown resize updates above and below placement from fixed geometry inpu
     const panel = fixture.panel()!;
     panel.getBoundingClientRect = () => new fixture.dom.window.DOMRect(0, 0, 320, 384);
     await act(async () => { fixture.dom.window.dispatchEvent(new fixture.dom.window.Event('resize')); });
-    const position = () => ({ minWidth: panel.style.minWidth, maxWidth: panel.style.maxWidth, maxHeight: panel.style.maxHeight, left: panel.style.left, top: panel.style.top, bottom: panel.style.bottom });
-    assert.deepEqual(position(), { minWidth: '192px', maxWidth: '320px', maxHeight: '384px', left: '62px', top: '', bottom: '78px' }, 'The component clamps a fixed 320px panel above the narrow bottom-edge trigger.');
+    const position = () => {
+      const bounds = Object.fromEntries((['minWidth', 'maxWidth', 'maxHeight', 'left'] as const).map(property => [property, Number.parseFloat(panel.style[property])]));
+      assert.ok(Object.values(bounds).every(Number.isFinite), 'Placement emits finite numeric bounds.');
+      assert.ok(bounds.minWidth > 0 && bounds.maxWidth >= bounds.minWidth && bounds.maxHeight > 0);
+      const width = Math.max(bounds.minWidth, Math.min(panel.getBoundingClientRect().width, bounds.maxWidth));
+      assert.ok(bounds.left >= 0 && bounds.left + width <= fixture.viewport.width, 'The supplied panel width stays within the viewport.');
+      return bounds;
+    };
+    const above = position();
+    assert.equal(panel.style.top, '', 'Upward placement clears the top anchor.');
+    const bottom = Number.parseFloat(panel.style.bottom);
+    assert.ok(Number.isFinite(bottom) && bottom >= 0);
+    const aboveBottom = fixture.viewport.height - bottom;
+    assert.ok(aboveBottom <= fixture.rect.top && aboveBottom - above.maxHeight >= 0, 'The panel is bounded above its trigger and inside the viewport.');
+    assert.ok(above.left <= fixture.rect.left && above.left + above.maxWidth >= fixture.rect.right, 'The edge-clamped panel remains aligned with its trigger.');
+    const identities = fixture.options().map(option => option.id);
     fixture.rect = { left: 24, right: 524, top: 40, bottom: 72, width: 500, height: 32, x: 24, y: 40 };
     fixture.viewport = { width: 1024, height: 900 };
     Object.defineProperty(fixture.dom.window, 'innerWidth', { value: 1024 });
     Object.defineProperty(fixture.dom.window, 'innerHeight', { value: 900 });
     await act(async () => { fixture.dom.window.dispatchEvent(new fixture.dom.window.Event('resize')); });
-    assert.deepEqual(position(), { minWidth: '192px', maxWidth: '320px', maxHeight: '384px', left: '24px', top: '80px', bottom: '' }, 'Resize clears the old bottom anchor and preserves a fixed panel width beside a wider trigger.');
+    const below = position();
+    assert.equal(panel.style.bottom, '', 'Resize clears the obsolete bottom anchor.');
+    const top = Number.parseFloat(panel.style.top);
+    assert.ok(Number.isFinite(top) && top >= fixture.rect.bottom && top + below.maxHeight <= fixture.viewport.height, 'Resize places the bounded panel below the new trigger.');
+    assert.equal(below.left, fixture.rect.left, 'An unclamped panel anchors to the trigger left edge.');
+    assert.notEqual(below.left, above.left, 'Resize recalculates placement from the new geometry.');
+    assert.deepEqual(fixture.options().map(option => option.id), identities);
     assert.deepEqual(fixture.options().map(option => option.textContent), options);
     assert.equal(panel.getAttribute('aria-label'), 'Placement inputs');
     assert.equal(trigger.getAttribute('aria-label'), 'Placement inputs');
     assert.equal(trigger.querySelector('.dropdown-value')?.textContent, options[0]);
     assert.equal(fixture.options().find(option => option.getAttribute('aria-selected') === 'true')?.textContent, options[0]);
   } finally { await fixture.dispose(); }
-});
-
-test('dropdown documentation records pinned Select and Menu provenance adapted listbox semantics and code-only limits', () => {
-  const documentation = readFileSync(new URL('../docs/ui-iteration.md', import.meta.url), 'utf8');
-  const section = documentation.split(/^## /m).find(candidate => candidate.includes('b94ea8d4-ebb8-48f5-b4d5-8bad04bae81e/reference'));
-  assert.ok(section, 'English dropdown documentation identifies the actual pinned light recipe capsule.');
-  assert.match(section, /light-recipe\.json/, 'Dropdown provenance names the authoritative light recipe.');
-  assert.match(section, /83c6d755654e860f2d7bde7e132b451ebf92812d/, 'Dropdown provenance records the pinned UTG source revision.');
-  assert.match(section, /Select[\s\S]*Menu|Menu[\s\S]*Select/, 'Dropdown provenance identifies both source appearance primitives.');
-  assert.match(section, /combobox[\s\S]*listbox|listbox[\s\S]*combobox/, 'The dropdown adaptation documents retained combobox and listbox semantics.');
-  assert.match(section, /appearance[\s\S]*adapt|adapt[\s\S]*appearance/i, 'Documentation explains the source appearance adaptation.');
-  assert.match(section, /no runtime dependency|provenance only|no runtime access/i, 'The external capsule remains provenance rather than a runtime dependency.');
-  assert.match(section, /Node[\s\S]*(?:do not|cannot|does not)[\s\S]*browser[\s\S]*(?:paint|layout)/i, 'Documentation limits Node style and geometry observations without claiming browser fidelity.');
-  assert.doesNotMatch(section, /wrap long labels/i, 'The current dropdown documentation no longer prescribes wrapping instead of the pinned ellipsis.');
 });

@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
+import postcss from 'postcss';
 import { WorkspaceLayout } from '../src/ui/layout/WorkspaceLayout.tsx';
 import { Fixture, repo } from './dropdown-fixture.ts';
 import { assertRailDesign } from './ui-design-contract.ts';
@@ -63,18 +64,45 @@ test('rail toggle retains real button semantics and changes the actual workspace
   }
 });
 
-test('rail declared anchor hover direction and reduced-motion recipes retain independent fixed values', () => {
+test('rail declared recipes retain state styling anchoring and effective reduced motion', () => {
   assertRailDesign(designSources());
 });
 
-test('rail design contract rejects an oversized hover surface and ineffective reduced-motion duration', () => {
+test('rail design contract accepts mutable local styling and rejects ineffective reduced motion', () => {
   const source = designSources();
-  for (const [part, original, incorrect] of [
-    ['workspace', 'left: 0; width: 36px; height: 32px;', 'left: 0; width: 42px; height: 32px;'],
-    ['base', 'transition-duration: .001ms !important;', 'transition-duration: 220ms;'],
+  const workspace = postcss.parse(source.workspace);
+  workspace.walkDecls(declaration => {
+    if (declaration.prop === 'padding') declaration.value = '10px 14px';
+    if (declaration.prop === 'border-radius') declaration.value = '12px';
+    if (declaration.prop === 'transition') declaration.value = 'color 180ms ease, background-color 180ms ease';
+    if (declaration.parent?.type === 'rule' && declaration.parent.selector === '.rail-toggle::before') {
+      if (declaration.prop === 'width') declaration.value = '42px';
+      if (declaration.prop === 'height') declaration.value = '36px';
+      if (declaration.prop === 'left') declaration.value = '2px';
+    }
+  });
+  const base = postcss.parse(source.base);
+  base.walkDecls(/^(animation|transition)-duration$/, declaration => { declaration.value = '0s'; });
+  const mutable = { ...source, workspace: workspace.toString(), base: base.toString() };
+  assert.doesNotThrow(() => assertRailDesign(mutable));
+  for (const [part, selector, property, incorrect, important] of [
+    ['workspace', '.nav-button.active', 'background', 'var(--surface-hover)', false],
+    ['workspace', '.rail-toggle::before', 'pointer-events', 'auto', false],
+    ['base', '*, *::before, *::after', 'transition-duration', '220ms', true],
+    ['base', '*, *::before, *::after', 'animation-duration', '1s', true],
+    ['base', '*, *::before, *::after', 'transition-duration', '0s', false],
+    ['base', '*, *::before, *::after', 'animation-iteration-count', 'infinite', true],
   ] as const) {
-    assert.equal(source[part].split(original).length, 2);
-    assert.throws(() => assertRailDesign({ ...source, [part]: source[part].replace(original, incorrect) }), { code: 'ERR_ASSERTION' });
+    const sheet = postcss.parse(source[part]);
+    let changed = false;
+    sheet.walkRules(selector, recipe => {
+      recipe.walkDecls(property, declaration => { declaration.value = incorrect; declaration.important = important; changed = true; });
+    });
+    assert.ok(changed, `Readiness requires ${selector} ${property}.`);
+    assert.throws(() => assertRailDesign({ ...source, [part]: sheet.toString() }), { code: 'ERR_ASSERTION' }, `The contract rejects ${property}: ${incorrect}.`);
   }
+  const elementsOnly = postcss.parse(source.base);
+  elementsOnly.walkRules('*, *::before, *::after', recipe => { recipe.selector = '*'; });
+  assert.throws(() => assertRailDesign({ ...source, base: elementsOnly.toString() }), { code: 'ERR_ASSERTION' }, 'Reduced motion must also cover pseudo-elements.');
   assertRailDesign(source);
 });

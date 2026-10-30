@@ -10,16 +10,18 @@ import type { AgentInput } from '../factory/controller.ts';
 function input(phase: AgentInput['phase']): AgentInput {
   const directory = evidenceDirectory('codex-adapter');
   const task = parseTask(JSON.parse(readFileSync('tickets/001-labels.json', 'utf8')));
-  return { phase, task, cwd: process.cwd(), attempt: 1, feedback: 'Independent evidence', directory, timeoutMs: 3000, signal: new AbortController().signal, env: { PATH: process.env.PATH } };
+  return { phase, task, cwd: process.cwd(), attempt: 1, feedback: 'Independent evidence', directory, timeoutMs: 10000, signal: new AbortController().signal, env: { PATH: process.env.PATH } };
 }
 
 for (const phase of ['plan', 'implement'] as const) {
   test(`Codex adapter supplies structured ${phase} context and the correct sandbox`, async () => {
     const context = input(phase);
     const binary = join(context.directory, 'fake-codex.mjs');
-    writeFileSync(binary, `#!/usr/bin/env node\nimport {writeFileSync} from 'node:fs';\nconst args=process.argv.slice(2);\nlet prompt='';\nfor await(const chunk of process.stdin) prompt+=chunk;\nwriteFileSync(args[args.indexOf('--output-last-message')+1],JSON.stringify({args,prompt,cwd:process.cwd()}));\nprocess.stdout.write(JSON.stringify({type:'fixture.completed'})+'\\n');\n`);
+    writeFileSync(binary, `#!/usr/bin/env node\nimport {writeFileSync} from 'node:fs';\nconst args=process.argv.slice(2);\nlet prompt='';\nfor await(const chunk of process.stdin) prompt+=chunk;\n${phase === 'implement' ? 'await new Promise(resolve=>setTimeout(resolve,3500));\n' : ''}writeFileSync(args[args.indexOf('--output-last-message')+1],JSON.stringify({args,prompt,cwd:process.cwd()}));\nprocess.stdout.write(JSON.stringify({type:'fixture.completed'})+'\\n');\n`);
     chmodSync(binary, 0o700);
+    const started = performance.now();
     const result = await codexAgent(binary).run(context) as { args: string[]; prompt: string; cwd: string };
+    if (phase === 'implement') assert.ok(performance.now() - started > 3000, 'The normal result completes beyond the former 3s fixture ceiling.');
     assert.equal(result.args[result.args.indexOf('--sandbox') + 1], phase === 'plan' ? 'read-only' : 'workspace-write');
     assert.equal(result.args[result.args.indexOf('--cd') + 1], context.cwd);
     assert.ok(result.args.includes('--ephemeral'));
