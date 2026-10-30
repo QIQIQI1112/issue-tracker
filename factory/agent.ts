@@ -27,6 +27,9 @@ export const minimumImplementation = `Keep product and test code to the minimum 
 Every added capability, optional API, mode, state, abstraction, dependency, test or fixture must be needed by the current requirement, an actual caller or an existing documented contract.
 Do not add unused or speculative capabilities or extension points for hypothetical future needs.
 Reuse meaningful existing checks and helpers; new business behavior still needs meaningful acceptance coverage.
+Preserve durable shared component, typography and semantic-token standards, functional layout relationships, accessibility and meaningful behavioral acceptance.
+For future acceptance, do not add permanent exact-value pixel or prose assertions for ordinary local dimensions, spacing, radii, shadows, transition timings or documentation wording unless the owner explicitly establishes a durable exact-value contract.
+This guidance preserves frozen tests, role separation, process ownership, independent review, all four verifier/CI gates and original attempt, timeout and retry budgets.
 New permanent defect checks require a confirmed significant OR recurring project defect and worthwhile deterministic prevention that outweighs authoring, maintenance and execution cost.
 Minor one-off findings may use existing meaningful coverage plus repair and independent review. Significant harness safety changes retain targeted regressions.
 Use existing needsRegression and review/coverage summaries to explain this judgment; add no defect registry, role or schema.
