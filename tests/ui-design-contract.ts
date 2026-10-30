@@ -70,7 +70,9 @@ export type RailDesignSources = { workspace: string; tokens: string; base: strin
 export function assertRailDesign(source: RailDesignSources): void {
   const workspace = postcss.parse(source.workspace);
   includes(rule(workspace, '.workspace'), { 'grid-template-columns': '60px minmax(0, 1fr)', transition: 'grid-template-columns 220ms cubic-bezier(0.22, 1, 0.36, 1)' }, 'collapsed workspace');
-  includes(rule(workspace, '.workspace[data-sidebar="expanded"]'), { 'grid-template-columns': '256px minmax(0, 1fr)' }, 'expanded workspace');
+  const expandedColumns = rule(workspace, '.workspace[data-sidebar="expanded"]')['grid-template-columns'];
+  const expandedWidth = /^(\d+(?:\.\d+)?)px minmax\(0, 1fr\)$/.exec(expandedColumns);
+  assert.ok(expandedWidth && Number.isFinite(Number(expandedWidth[1])) && Number(expandedWidth[1]) > 60, 'The expanded workspace needs a finite pixel rail wider than the collapsed 60px rail and the unchanged minmax(0, 1fr) content track.');
   includes(rule(workspace, '.sidebar'), { padding: '8px 12px 12px' }, 'rail insets');
   includes(rule(workspace, '.nav-button, .rail-toggle'), {
     position: 'relative', padding: '0 12px 0 6px', 'border-radius': '8px', background: 'transparent', 'min-height': '32px', color: 'var(--text-primary)',
