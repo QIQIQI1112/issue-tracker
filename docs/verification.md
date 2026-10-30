@@ -10,6 +10,8 @@ Select existing meaningful named checks by changed behavior. Add meaningful busi
 
 Every acceptance ID maps to named Node checks. Plans and regression reports use `browserChecks: []`; nonempty browser obligations are rejected. New checks need actual owner assertion proofs and independent coverage approval before freezing. Imports, setup failures, missing names and timeouts are not behavior proofs. Baseline reuse freezes real existing named checks through a distinct owner receipt. Harness changes retain focused deterministic safety regressions. Independent source review confirms applicability to the actual change.
 
+The reviewed design inventory follows the [observation standards](assertion-observations.md): shared light tokens and typography, semantic/function/accessibility behavior, meaningful layout relationships, effective reduced motion and complete icon notices remain checked. Local dimensions, spacing, radii, shadow geometry, visual timings and documentation/provenance wording are mutable. The exact 208px/document case is retired. Revised or retired acceptance identities require actual named proofs, independent equivalence approval and a complete inventory freeze before implementation; subsequent documentation work cannot change frozen test bytes. Existing Node fixtures do not establish browser rendering or native layout behavior.
+
 ## Complete verification and reuse
 
 The active full manifest is schema version 2, `profile: "code-only"`, nonempty `requiredNodeTests`, and empty `requiredBrowserTests`. Four distinct gates must pass: lint, typecheck, test and build. The real Node report must have complete passing counts, zero failed/cancelled/skipped/todo cases and every required exact file/title. Code and contract bytes must remain unchanged through the run. No browser report or browser installation is required.
@@ -30,6 +32,8 @@ Adaptive integrated tasks run focused diagnostics before one fresh complete inte
 | `NODE_TEST_TIMEOUT_MS` | `180000` | Node test subprocess budget. |
 
 Budgets are positive integer milliseconds. Keep exact PID/process-group receipts and settle owned groups before cleanup. Never kill processes by name or run on a user's live data for tests. Independent isolated worktrees, loopback ports and disposable databases remain required where applicable. Preserve failed reports and cumulative retry history. See [owner maintenance](owner-workflow.md) and [review/recovery](harness-reliability.md).
+
+In `tests/agent.test.ts`, only normal adapter fixture inputs use a local `timeoutMs: 10000` allowance. The existing structured implement case delays its fake worker by 3500ms and observes successful completion beyond the former 3000ms ceiling; the plan case remains immediate. This bounded observation addresses the recurring fixture timeout without a new case or fixture mode. The separate hung-worker case still uses `1500ms` and retains rejection, PID/command/cwd/identity/group ownership, settled receipt, `ESRCH` and timeout-status assertions. Runtime process handling, global budgets, retry policy and all verifier/CI gates are unchanged.
 
 ## Evidence
 

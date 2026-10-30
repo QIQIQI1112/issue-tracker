@@ -38,21 +38,21 @@ function expectDeclarations(container: Root | AtRule, selector: string, expected
   assert.equal(matches.length, 1, `The shell retains one declared ${selector} recipe in ${container.type === 'atrule' ? container.params : 'the base stylesheet'}.`);
   const actual = Object.fromEntries(matches[0].nodes.filter(node => node.type === 'decl').map(node => [node.prop, node.value]));
   assert.deepEqual(Object.fromEntries(Object.keys(expected).map(property => [property, actual[property]])), expected, `The declared ${selector} recipe preserves its required shell values.`);
+  return actual;
 }
 
-test('workspace shell declarations retain right avatar alignment and inset geometry without brand styles', () => {
+test('workspace shell declarations retain avatar alignment and content scrolling without fixed local geometry', () => {
   const sheet = postcss.parse(readFileSync(new URL('../src/ui/layout/workspace.css', import.meta.url), 'utf8'));
-  expectDeclarations(sheet, '.workspace', {
-    height: '100dvh', 'min-height': '0', display: 'grid', 'grid-template-rows': '60px minmax(0, 1fr)', overflow: 'hidden',
+  const workspace = expectDeclarations(sheet, '.workspace', {
+    height: '100dvh', 'min-height': '0', display: 'grid', overflow: 'hidden',
   });
+  const rows = /^(\d+(?:\.\d+)?)px minmax\(0, 1fr\)$/.exec(workspace['grid-template-rows']);
+  assert.ok(rows && Number.isFinite(Number(rows[1])) && Number(rows[1]) > 0, 'A finite positive header track leaves a shrinkable content row.');
   expectDeclarations(sheet, '.main', {
-    'min-width': '0', 'min-height': '0', margin: '0 8px 8px 0', border: '.5px solid var(--border)',
-    'border-radius': 'var(--radius-main)', overflow: 'clip', display: 'flex', 'flex-direction': 'column',
+    'min-width': '0', 'min-height': '0', overflow: 'clip', display: 'flex', 'flex-direction': 'column',
   });
-  expectDeclarations(sheet, '.workspace-content', { 'min-height': '0', 'min-width': '0', flex: '1', padding: '24px', overflow: 'auto' });
-  expectDeclarations(postcss.parse(readFileSync(new URL('../src/ui/theme/tokens.css', import.meta.url), 'utf8')), ':root', { '--radius-main': '20px' });
+  expectDeclarations(sheet, '.workspace-content', { 'min-height': '0', 'min-width': '0', flex: '1', overflow: 'auto' });
   for (const [condition, selector, expected] of [
-    ['(max-width: 860px)', '.workspace-content', { padding: '16px' }],
     ['(max-width: 600px)', '.breadcrumb-workspace', { display: 'none' }],
   ] as const) {
     const media = sheet.nodes.find((node): node is AtRule => node.type === 'atrule' && node.name === 'media' && node.params === condition);
@@ -60,7 +60,7 @@ test('workspace shell declarations retain right avatar alignment and inset geome
     expectDeclarations(media, selector, expected);
   }
   expectDeclarations(sheet, '.global-topbar', {
-    'grid-column': '1 / -1', display: 'flex', 'align-items': 'center', 'justify-content': 'flex-end', height: '60px', 'padding-inline': '12px', 'min-width': '0',
+    'grid-column': '1 / -1', display: 'flex', 'align-items': 'center', 'justify-content': 'flex-end', 'min-width': '0',
   });
   const brandSelectors: string[] = [];
   sheet.walkRules(rule => {
